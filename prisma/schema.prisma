@@ -1,0 +1,147 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("APP_DATABASE_URL")
+}
+
+enum UserType {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model User {
+  id               Int           @id @default(autoincrement())
+  email            String        @unique
+  password         String?
+  name             String
+  phone            String
+  type             UserType      @default(USER)
+  status           UserStatus    @default(INACTIVE)
+  profilePictureId Int?
+  createdAt        DateTime      @default(now()) @db.Timestamptz()
+  updatedAt        DateTime      @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt        DateTime?     @db.Timestamptz()
+  profilePicture   Media?        @relation(fields: [profilePictureId], references: [id])
+  devices          Device[]
+  tokens           Token[]
+  medias           Media[]       @relation("MediaOwner")
+  settings         UserSettings?
+  oauth            UserOAuth?
+}
+
+model UserSettings {
+  id                   Int       @id @default(autoincrement())
+  notificationsEnabled Boolean   @default(true)
+  userId               Int       @unique
+  user                 User      @relation(fields: [userId], references: [id])
+  createdAt            DateTime  @default(now()) @db.Timestamptz()
+  updatedAt            DateTime  @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt            DateTime? @db.Timestamptz()
+}
+
+enum DeviceType {
+  WEB
+  ANDROID
+  IOS
+}
+
+model Device {
+  id        Int        @id @default(autoincrement())
+  uuid      String     @default(uuid())
+  userAgent String?
+  type      DeviceType @default(ANDROID)
+  userId    Int
+  user      User       @relation(fields: [userId], references: [id])
+  createdAt DateTime   @default(now()) @db.Timestamptz()
+  updatedAt DateTime   @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime?  @db.Timestamptz()
+}
+
+enum TokenReason {
+  FORGOT_PASSWORD
+  RESET_PASSWORD
+  VERIFICATION
+  CHANGE_PASSWORD
+}
+
+model Token {
+  id        Int         @id @default(autoincrement())
+  uuid      String      @default(uuid())
+  code      String
+  reason    TokenReason
+  userId    Int?
+  createdAt DateTime    @default(now()) @db.Timestamptz()
+  updatedAt DateTime    @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime?   @db.Timestamptz()
+  user      User?       @relation(fields: [userId], references: [id])
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+  ARCHIVE
+  OTHER
+}
+
+enum MediaStatus {
+  UPLOADING
+  READY
+  STALE
+}
+
+enum MediaAccess {
+  PUBLIC
+  PRIVATE
+}
+
+model Media {
+  id        Int         @id @default(autoincrement())
+  name      String
+  extension String
+  type      MediaType
+  access    MediaAccess
+  size      Float?
+  location  String?
+  path      String
+  thumbPath String?
+  status    MediaStatus @default(UPLOADING)
+  meta      Json?       @db.JsonB
+  userId    Int?
+  createdAt DateTime    @default(now()) @db.Timestamptz()
+  updatedAt DateTime    @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime?   @db.Timestamptz()
+  user      User?       @relation("MediaOwner", fields: [userId], references: [id])
+  users     User[]
+}
+
+enum UserOAuthType {
+  GOOGLE
+  APPLE
+}
+
+model UserOAuth {
+  id         Int           @id @default(autoincrement())
+  userId     Int           @unique
+  providerId String
+  type       UserOAuthType
+  createdAt  DateTime      @default(now()) @db.Timestamptz()
+  updatedAt  DateTime      @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt  DateTime?     @db.Timestamptz()
+  user       User          @relation(fields: [userId], references: [id])
+}
