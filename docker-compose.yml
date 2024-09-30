@@ -1,7 +1,7 @@
 version: '3.7'
 services:
     db:
-        image: 'postgis/postgis:12-3.3'
+        image: 'arm32v7/postgres:13.1'
         container_name: sabonah.db
         ports:
             - 5432:5432
@@ -14,7 +14,7 @@ services:
 
     redis:
         container_name: sabonah.redis
-        image: 'bitnami/redis:6.0.16'
+        image: 'arm32v7/redis:6.0.9'
         ports:
             - 6379:6379
         environment:

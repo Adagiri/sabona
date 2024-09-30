@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "UserType" AS ENUM ('USER', 'ADMIN');
+CREATE TYPE "UserType" AS ENUM ('USER', 'VENDOR', 'RIDER', 'ADMIN');
 
 -- CreateEnum
 CREATE TYPE "UserStatus" AS ENUM ('ACTIVE', 'INACTIVE');
@@ -19,18 +19,15 @@ CREATE TYPE "MediaStatus" AS ENUM ('UPLOADING', 'READY', 'STALE');
 -- CreateEnum
 CREATE TYPE "MediaAccess" AS ENUM ('PUBLIC', 'PRIVATE');
 
--- CreateEnum
-CREATE TYPE "UserOAuthType" AS ENUM ('GOOGLE', 'APPLE');
-
 -- CreateTable
 CREATE TABLE "User" (
     "id" SERIAL NOT NULL,
-    "email" TEXT NOT NULL,
-    "password" TEXT,
-    "name" TEXT NOT NULL,
+    "email" TEXT,
+    "firstName" TEXT,
+    "lastName" TEXT,
     "phone" TEXT NOT NULL,
     "type" "UserType" NOT NULL DEFAULT 'USER',
-    "status" "UserStatus" NOT NULL DEFAULT 'INACTIVE',
+    "status" "UserStatus" NOT NULL DEFAULT 'ACTIVE',
     "profilePictureId" INTEGER,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -42,7 +39,8 @@ CREATE TABLE "User" (
 -- CreateTable
 CREATE TABLE "UserSettings" (
     "id" SERIAL NOT NULL,
-    "notificationsEnabled" BOOLEAN NOT NULL DEFAULT true,
+    "lat" DOUBLE PRECISION,
+    "long" DOUBLE PRECISION,
     "userId" INTEGER NOT NULL,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -100,27 +98,11 @@ CREATE TABLE "Media" (
     CONSTRAINT "Media_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "UserOAuth" (
-    "id" SERIAL NOT NULL,
-    "userId" INTEGER NOT NULL,
-    "providerId" TEXT NOT NULL,
-    "type" "UserOAuthType" NOT NULL,
-    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "deletedAt" TIMESTAMPTZ,
-
-    CONSTRAINT "UserOAuth_pkey" PRIMARY KEY ("id")
-);
-
 -- CreateIndex
-CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+CREATE UNIQUE INDEX "User_phone_key" ON "User"("phone");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "UserSettings_userId_key" ON "UserSettings"("userId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "UserOAuth_userId_key" ON "UserOAuth"("userId");
 
 -- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_profilePictureId_fkey" FOREIGN KEY ("profilePictureId") REFERENCES "Media"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -136,6 +118,3 @@ ALTER TABLE "Token" ADD CONSTRAINT "Token_userId_fkey" FOREIGN KEY ("userId") RE
 
 -- AddForeignKey
 ALTER TABLE "Media" ADD CONSTRAINT "Media_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "UserOAuth" ADD CONSTRAINT "UserOAuth_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
