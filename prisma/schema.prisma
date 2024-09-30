@@ -15,9 +15,9 @@ datasource db {
 }
 
 enum UserType {
-  CUSTOMER
+  USER
   VENDOR
-  DRIVER
+  RIDER
   ADMIN
 }
 
@@ -32,7 +32,7 @@ model User {
   firstName        String?
   lastName         String?
   phone            String        @unique
-  type             UserType      @default(CUSTOMER)
+  type             UserType      @default(USER)
   status           UserStatus    @default(ACTIVE)
   profilePictureId Int?
   createdAt        DateTime      @default(now()) @db.Timestamptz()
@@ -47,8 +47,8 @@ model User {
 
 model UserSettings {
   id                   Int       @id @default(autoincrement())
-  latitude             Float?
-  longitude            Float?
+  lat             Float?
+  long            Float?
   userId               Int       @unique
   user                 User      @relation(fields: [userId], references: [id])
   createdAt            DateTime  @default(now()) @db.Timestamptz()
