@@ -8,7 +8,7 @@ CREATE TYPE "UserStatus" AS ENUM ('ACTIVE', 'INACTIVE');
 CREATE TYPE "DeviceType" AS ENUM ('WEB', 'ANDROID', 'IOS');
 
 -- CreateEnum
-CREATE TYPE "OrderStatus" AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED', 'READY_FOR_PICKUP', 'IN_PROGRESS', 'COMPLETED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED');
+CREATE TYPE "OrderStatus" AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED', 'READY_FOR_PICKUP', 'COMPLETED');
 
 -- CreateEnum
 CREATE TYPE "NotificationType" AS ENUM ('ORDER_ACCEPTED', 'ORDER_REJECTED', 'ORDER_PICKED_UP', 'ORDER_DELIVERED', 'FEEDBACK_SUBMITTED');
@@ -27,6 +27,12 @@ CREATE TYPE "MediaStatus" AS ENUM ('UPLOADING', 'READY', 'STALE');
 
 -- CreateEnum
 CREATE TYPE "MediaAccess" AS ENUM ('PUBLIC', 'PRIVATE');
+
+-- CreateEnum
+CREATE TYPE "PickupStatus" AS ENUM ('PENDING', 'PICKED_UP', 'DELIVERED_TO_VENDOR');
+
+-- CreateEnum
+CREATE TYPE "DeliveryStatus" AS ENUM ('PENDING', 'PICKED_UP_FROM_VENDOR', 'DELIVERED_TO_USER');
 
 -- CreateTable
 CREATE TABLE "User" (
@@ -133,13 +139,41 @@ CREATE TABLE "Media" (
 );
 
 -- CreateTable
+CREATE TABLE "Pickup" (
+    "id" TEXT NOT NULL,
+    "orderId" TEXT NOT NULL,
+    "riderId" TEXT,
+    "pickupAddress" TEXT NOT NULL,
+    "pickupLat" DOUBLE PRECISION NOT NULL,
+    "pickupLong" DOUBLE PRECISION NOT NULL,
+    "status" "PickupStatus" NOT NULL DEFAULT 'PENDING',
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Pickup_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Delivery" (
+    "id" TEXT NOT NULL,
+    "orderId" TEXT NOT NULL,
+    "riderId" TEXT,
+    "deliveryAddress" TEXT NOT NULL,
+    "deliveryLat" DOUBLE PRECISION NOT NULL,
+    "deliveryLong" DOUBLE PRECISION NOT NULL,
+    "status" "DeliveryStatus" NOT NULL DEFAULT 'PENDING',
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Delivery_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Order" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "status" "OrderStatus" NOT NULL DEFAULT 'PENDING',
     "totalAmount" DOUBLE PRECISION NOT NULL,
-    "pickupAddressId" TEXT NOT NULL,
-    "deliveryAddressId" TEXT NOT NULL,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -237,13 +271,19 @@ ALTER TABLE "Token" ADD CONSTRAINT "Token_userId_fkey" FOREIGN KEY ("userId") RE
 ALTER TABLE "Media" ADD CONSTRAINT "Media_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Pickup" ADD CONSTRAINT "Pickup_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Pickup" ADD CONSTRAINT "Pickup_riderId_fkey" FOREIGN KEY ("riderId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Delivery" ADD CONSTRAINT "Delivery_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Delivery" ADD CONSTRAINT "Delivery_riderId_fkey" FOREIGN KEY ("riderId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Order" ADD CONSTRAINT "Order_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Order" ADD CONSTRAINT "Order_pickupAddressId_fkey" FOREIGN KEY ("pickupAddressId") REFERENCES "UserAddress"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Order" ADD CONSTRAINT "Order_deliveryAddressId_fkey" FOREIGN KEY ("deliveryAddressId") REFERENCES "UserAddress"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "RiderOrder" ADD CONSTRAINT "RiderOrder_riderId_fkey" FOREIGN KEY ("riderId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
