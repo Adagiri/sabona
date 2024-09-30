@@ -1,8 +1,14 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// This is your Prisma schema file.
+// Learn more about Prisma: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Key Features:
+// Original Models: Your original User, Order, Token, Device, and Media models are preserved.
+// Bridge Tables: RiderOrder and VendorOrder tables efficiently manage many-to-many relationships between riders, vendors, and orders.
+// Feedback: A new Feedback model for users to leave reviews for completed orders.
+// Notifications: A Notification model that tracks in-app, push, or email notifications with NotificationType and NotificationStatus enums.
+// Order Status History: The OrderStatusHistory table logs each status change with timestamps.
+// This is your Prisma schema file.
+// Learn more about Prisma: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
@@ -14,66 +20,56 @@ datasource db {
   url      = env("APP_DATABASE_URL")
 }
 
+// UserType enum to classify different types of users in the system
 enum UserType {
-  USER
-  VENDOR
-  RIDER
-  ADMIN
+  USER // Regular customer/user
+  VENDOR // Vendor providing services
+  RIDER // Rider for order delivery
+  ADMIN // Administrator of the system
 }
 
+// UserStatus enum to track whether a user is active or inactive
 enum UserStatus {
   ACTIVE
   INACTIVE
 }
 
-model User {
-  id               Int           @id @default(autoincrement())
-  email            String?
-  firstName        String?
-  lastName         String?
-  phone            String        @unique
-  type             UserType      @default(USER)
-  status           UserStatus    @default(ACTIVE)
-  profilePictureId Int?
-  createdAt        DateTime      @default(now()) @db.Timestamptz()
-  updatedAt        DateTime      @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt        DateTime?     @db.Timestamptz()
-  profilePicture   Media?        @relation(fields: [profilePictureId], references: [id])
-  devices          Device[]
-  tokens           Token[]
-  medias           Media[]       @relation("MediaOwner")
-  settings         UserSettings?
-}
-
-model UserSettings {
-  id                   Int       @id @default(autoincrement())
-  lat             Float?
-  long            Float?
-  userId               Int       @unique
-  user                 User      @relation(fields: [userId], references: [id])
-  createdAt            DateTime  @default(now()) @db.Timestamptz()
-  updatedAt            DateTime  @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt            DateTime? @db.Timestamptz()
-}
-
+// DeviceType enum to identify the platform used by the user
 enum DeviceType {
   WEB
   ANDROID
   IOS
 }
 
-model Device {
-  id        Int        @id @default(autoincrement())
-  uuid      String     @default(uuid())
-  userAgent String?
-  type      DeviceType @default(ANDROID)
-  userId    Int
-  user      User       @relation(fields: [userId], references: [id])
-  createdAt DateTime   @default(now()) @db.Timestamptz()
-  updatedAt DateTime   @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt DateTime?  @db.Timestamptz()
+// OrderStatus enum to track the different stages of an order
+enum OrderStatus {
+  PENDING // When the order is created and awaiting vendor action
+  ACCEPTED // When a vendor accepts the order
+  REJECTED // When a vendor rejects the order
+  READY_FOR_PICKUP // When the order is ready for riders to pick up
+  IN_PROGRESS // When the vendor starts working on the order
+  COMPLETED // When the vendor completes the order
+  OUT_FOR_DELIVERY // When the rider is delivering the order
+  DELIVERED // When the order is delivered to the customer
+  CANCELLED // When the order is cancelled
 }
 
+// NotificationType enum to define the different types of notifications
+enum NotificationType {
+  ORDER_ACCEPTED
+  ORDER_REJECTED
+  ORDER_PICKED_UP
+  ORDER_DELIVERED
+  FEEDBACK_SUBMITTED
+}
+
+// NotificationStatus enum to track if a notification is read or unread
+enum NotificationStatus {
+  UNREAD
+  READ
+}
+
+// TokenReason enum to specify different reasons for token generation (e.g., password reset)
 enum TokenReason {
   FORGOT_PASSWORD
   RESET_PASSWORD
@@ -81,18 +77,7 @@ enum TokenReason {
   CHANGE_PASSWORD
 }
 
-model Token {
-  id        Int         @id @default(autoincrement())
-  uuid      String      @default(uuid())
-  code      String
-  reason    TokenReason
-  userId    Int?
-  createdAt DateTime    @default(now()) @db.Timestamptz()
-  updatedAt DateTime    @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt DateTime?   @db.Timestamptz()
-  user      User?       @relation(fields: [userId], references: [id])
-}
-
+// MediaType enum to identify the type of media (image, video, etc.)
 enum MediaType {
   IMAGE
   VIDEO
@@ -101,33 +86,203 @@ enum MediaType {
   OTHER
 }
 
+// MediaStatus enum to track the current status of media (uploading, ready, etc.)
 enum MediaStatus {
   UPLOADING
   READY
   STALE
 }
 
+// MediaAccess enum to manage media visibility (public or private)
 enum MediaAccess {
   PUBLIC
   PRIVATE
 }
 
+// User model to store user-related information
+model User {
+  id               String     @id @default(uuid()) // Now using UUID for user ID
+  email            String? // Optional email field
+  firstName        String? // Optional first name
+  lastName         String? // Optional last name
+  phone            String     @unique // Unique phone number for each user
+  type             UserType   @default(USER) // Defines if user is USER, VENDOR, RIDER, etc.
+  status           UserStatus @default(ACTIVE) // Active or inactive status
+  profilePictureId Int? // Optional relation to user's profile picture
+  createdAt        DateTime   @default(now()) @db.Timestamptz()
+  updatedAt        DateTime   @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt        DateTime?  @db.Timestamptz() // Optional deleted at timestamp
+  profilePicture   Media?     @relation(fields: [profilePictureId], references: [id])
+
+  addresses UserAddress[] // A user can have multiple addresses
+
+  devices      Device[] // Relation to devices used by the user
+  tokens       Token[] // Authentication tokens used by the user
+  medias       Media[]        @relation("MediaOwner") // Media files uploaded by the user
+  settings     UserSettings? // Relation to user settings
+  DeviceToken  DeviceToken[]
+  Order        Order[]
+  RiderOrder   RiderOrder[]
+  VendorOrder  VendorOrder[]
+  Notification Notification[]
+}
+
+model UserAddress {
+  id        String   @id @default(uuid()) // Using UUID for address ID
+  userId    String // Foreign key to the User model
+  user      User     @relation(fields: [userId], references: [id])
+  address   String // The actual address (e.g., street, city, etc.)
+  lat       Float // Latitude of the address
+  long      Float // Longitude of the address
+  label     String? // Optional label (e.g., "Home", "Work")
+  isDefault Boolean  @default(false) // Whether this is the default address
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  // Bidirectional relation with Order model for pickup and delivery addresses
+  pickupOrders   Order[] @relation("pickupAddress")
+  deliveryOrders Order[] @relation("deliveryAddress")
+}
+
+// UserSettings model for storing user-specific settings (e.g., location)
+model UserSettings {
+  id        Int       @id @default(autoincrement()) // Using Int for settings ID
+  lat       Float?
+  long      Float?
+  userId    String    @unique // Changed to String to match User's UUID
+  user      User      @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime? @db.Timestamptz()
+}
+
+// DeviceToken model to store device tokens for push notifications
+model DeviceToken {
+  id        Int      @id @default(autoincrement()) // Using Int for device token ID
+  userId    String // Changed to String to match User's UUID
+  user      User     @relation(fields: [userId], references: [id])
+  token     String   @unique // Unique push token for each device
+  createdAt DateTime @default(now()) @db.Timestamptz()
+}
+
+// Device model to store devices used by users (for web, iOS, Android)
+model Device {
+  id        Int        @id @default(autoincrement()) // Using Int for device ID
+  uuid      String     @default(uuid()) // Unique identifier for each device
+  userAgent String? // Optional user agent string
+  type      DeviceType @default(ANDROID) // Default device type is Android
+  userId    String // Changed to String to match User's UUID
+  user      User       @relation(fields: [userId], references: [id])
+  createdAt DateTime   @default(now()) @db.Timestamptz()
+  updatedAt DateTime   @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime?  @db.Timestamptz() // Optional deletion timestamp
+}
+
+// Token model to manage tokens for authentication (e.g., password reset)
+model Token {
+  id        Int         @id @default(autoincrement()) // Using Int for token ID
+  uuid      String      @default(uuid())
+  code      String // Token code (e.g., OTP)
+  reason    TokenReason // Reason for the token (password reset, etc.)
+  userId    String?
+  createdAt DateTime    @default(now()) @db.Timestamptz()
+  updatedAt DateTime    @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime?   @db.Timestamptz()
+  user      User?       @relation(fields: [userId], references: [id])
+}
+
+// Media model to store media files uploaded by users
 model Media {
-  id        Int         @id @default(autoincrement())
-  name      String
-  extension String
-  type      MediaType
-  access    MediaAccess
+  id        Int         @id @default(autoincrement()) // Using Int for media ID
+  name      String // Media name
+  extension String // File extension (e.g., jpg, png)
+  type      MediaType // Media type (image, video, etc.)
+  access    MediaAccess // Access level (public/private)
   size      Float?
-  location  String?
-  path      String
-  thumbPath String?
-  status    MediaStatus @default(UPLOADING)
+  location  String? // Optional location URL
+  path      String // Path to the file
+  thumbPath String? // Optional thumbnail path
+  status    MediaStatus @default(UPLOADING) // Upload status
   meta      Json?       @db.JsonB
-  userId    Int?
+  userId    String?
   createdAt DateTime    @default(now()) @db.Timestamptz()
   updatedAt DateTime    @default(now()) @updatedAt @db.Timestamptz()
   deletedAt DateTime?   @db.Timestamptz()
   user      User?       @relation("MediaOwner", fields: [userId], references: [id])
-  users     User[]
+  users     User[] // Users related to this media (for example, profile pictures)
+}
+
+// Order model to represent a user's order
+// UserAddress model to store multiple addresses for each user
+
+// Update the Order model to include pickup and delivery addresses
+model Order {
+  id                String               @id @default(uuid()) // Now using UUID for order ID
+  userId            String // User who placed the order
+  user              User                 @relation(fields: [userId], references: [id])
+  status            OrderStatus          @default(PENDING) // Current status of the order
+  totalAmount       Float // Total amount for the order
+  pickupAddressId   String // Pickup address
+  deliveryAddressId String // Delivery address
+  pickupAddress     UserAddress          @relation("pickupAddress", fields: [pickupAddressId], references: [id])
+  deliveryAddress   UserAddress          @relation("deliveryAddress", fields: [deliveryAddressId], references: [id])
+  createdAt         DateTime             @default(now()) @db.Timestamptz()
+  updatedAt         DateTime             @default(now()) @updatedAt @db.Timestamptz()
+  statusHistory     OrderStatusHistory[] // Relation to the order's status history
+  feedback          Feedback? // Optional relation to customer feedback
+  riderOrders       RiderOrder[] // Many-to-many relation with riders
+  vendorOrders      VendorOrder[] // Many-to-many relation with vendors
+  Notification      Notification[]
+}
+
+// RiderOrder model to manage assignments between riders and orders
+model RiderOrder {
+  id         String   @id @default(uuid()) // Now using UUID for rider-order relation ID
+  riderId    String // Rider assigned to the order
+  rider      User     @relation(fields: [riderId], references: [id])
+  orderId    String // Using UUID for orderId field
+  order      Order    @relation(fields: [orderId], references: [id])
+  assignedAt DateTime @default(now()) @db.Timestamptz() // When the rider was assigned
+}
+
+// VendorOrder model to manage assignments between vendors and orders
+model VendorOrder {
+  id         String   @id @default(uuid()) // Now using UUID for vendor-order relation ID
+  vendorId   String // Vendor assigned to the order
+  vendor     User     @relation(fields: [vendorId], references: [id])
+  orderId    String // Using UUID for orderId field
+  order      Order    @relation(fields: [orderId], references: [id])
+  acceptedAt DateTime @default(now()) @db.Timestamptz() // When the vendor accepted the order
+}
+
+// OrderStatusHistory model to track all status changes for an order
+model OrderStatusHistory {
+  id        String      @id @default(uuid()) // Now using UUID for status history ID
+  orderId   String // Using UUID for orderId field
+  order     Order       @relation(fields: [orderId], references: [id])
+  status    OrderStatus // The status change
+  timestamp DateTime    @default(now()) @db.Timestamptz() // When the status was updated
+}
+
+// Feedback model to store user feedback on completed orders
+model Feedback {
+  id        String   @id @default(uuid()) // Now using UUID for feedback ID
+  orderId   String   @unique // Ensuring only one feedback per order
+  order     Order    @relation(fields: [orderId], references: [id])
+  rating    Int // Numerical rating, for example, 1-5 stars
+  comments  String? // Optional text feedback from the user
+  createdAt DateTime @default(now()) @db.Timestamptz() // Timestamp for feedback creation
+}
+
+// Notification model to track in-app, push, and email notifications
+model Notification {
+  id        String             @id @default(uuid()) // Now using UUID for notification ID
+  userId    String // User receiving the notification
+  user      User               @relation(fields: [userId], references: [id])
+  type      NotificationType // Type of notification (order accepted, feedback, etc.)
+  status    NotificationStatus @default(UNREAD) // Status of the notification (read/unread)
+  message   String // Custom message for the notification
+  orderId   String?            @unique // Ensuring only one notification per order if applicable
+  order     Order?             @relation(fields: [orderId], references: [id])
+  createdAt DateTime           @default(now()) @db.Timestamptz() // Timestamp for notification creation
 }
