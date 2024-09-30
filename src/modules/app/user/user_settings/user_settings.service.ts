@@ -7,14 +7,14 @@ import { UpdateUserSettingsRequestDTO } from './dto/request/update_user_settings
 export default class UserSettingsService {
     constructor(private _dbService: DatabaseService) {}
 
-    async Update(userId: number, data: UpdateUserSettingsRequestDTO): Promise<BooleanResponseDTO> {
+    async Update(userId: string, data: UpdateUserSettingsRequestDTO): Promise<BooleanResponseDTO> {
         await this._dbService.userSettings.update({
             where: {
                 userId,
             },
             data: {
-                latitude: data.latitude || 0,
-                longitude: data.longitude || 0,
+                lat: data.latitude || 0,
+                long: data.longitude || 0,
             }
         });
         return {

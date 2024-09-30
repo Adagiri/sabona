@@ -4,7 +4,7 @@ import { MediaResponseModel } from '../../../../../modules/app/media/dto/respons
 
 export class UserResponseModel {
     @ApiProperty()
-    id: number;
+    id: string;
 
     @ApiProperty()
     firstName: string;

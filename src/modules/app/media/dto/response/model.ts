@@ -30,7 +30,7 @@ export class MediaResponseModel {
     status?: MediaStatus;
 
     @ApiProperty()
-    userId?: number;
+    userId?: string;
 
     @ApiProperty()
     meta?: any;

@@ -9,7 +9,7 @@ export default class CreateDeviceResponseDTO {
     uuid: string;
 
     @ApiProperty()
-    userId: number;
+    userId: string;
 
     @ApiProperty({ enum: DeviceType })
     type: DeviceType;

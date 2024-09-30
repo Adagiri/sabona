@@ -45,7 +45,7 @@ export default class UserController {
         response: GetUserByIdResponseDTO,
     })
     Get(
-        @Param('id', ParseIntPipe) id: number,
+        @Param('id', ParseIntPipe) id: string,
     ): Promise<GetUserByIdResponseDTO> {
         return this._userService.Get(id);
     }

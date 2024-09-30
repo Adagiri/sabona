@@ -4,7 +4,7 @@ import { UserSettingsModel } from '../../user_settings/dto/response/model_user_s
 
 export default class GetMeResponseDTO {
     @ApiProperty()
-    id: number;
+    id: string;
 
     @ApiProperty()
     firstName: string;

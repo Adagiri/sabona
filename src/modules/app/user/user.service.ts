@@ -1,33 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, TokenReason, User } from '@prisma/client';
+import { Prisma, User } from '@prisma/client';
 import DatabaseService from '../../../database/database.service';
 import {
     BadRequestException,
     NotFoundException,
 } from '../../../core/exceptions/response.exception';
-import { BooleanResponseDTO } from '../../../core/response/response.schema';
 import {
-    ExcludeFields,
-    GenerateUUID,
     GetOrderOptions,
     GetPaginationOptions,
-    HashPassword,
 } from '../../../helpers/util.helper';
 import AuthService from '../../../modules/app/auth/auth.service';
 import TokenService from '../../../modules/app/token/token.service';
 import FindUsersRequestDTO from './dto/request/find.request';
-import {
-    ForgetPasswordRequestDTO,
-    ForgetPasswordVerificationRequestDTO,
-} from './dto/request/forget_password.request';
 import LoginRequestDTO from './dto/request/login.request';
-import ResetPasswordRequestDTO from './dto/request/reset_password.request';
 import { SignupRequestDTO } from './dto/request/signup.request';
 import FindUsersResponseDTO from './dto/response/find.response';
-import {
-    ForgetPasswordResponseDTO,
-    ForgetPasswordVerificationResponseDTO,
-} from './dto/response/forget_password.response';
 import GetMeResponseDTO from './dto/response/me.response';
 import GetUserByIdResponseDTO from './dto/response/getById.response';
 import OAuthService from '../../../modules/oauth/oauth.service';
@@ -39,6 +26,7 @@ import { VerifyOtpRequestDTO } from './dto/request/verifyOtpCode.request';
 import UpdateUserDetailsRequestDTO from './dto/request/update_details.request';
 import UpdateUserDetailsResponseDTO from './dto/response/update_details.response';
 import VerifyOtpResponseDTO from './dto/response/verifyOtp.response';
+import { APP_ENV, OTP_CODE_FOR_DEV } from 'src/constants';
 
 @Injectable()
 export default class UserService {
@@ -53,7 +41,7 @@ export default class UserService {
     async Login(data: LoginRequestDTO): Promise<string> {
         const user = await this._dbService.user.findFirst({
             where: { phone: data.phone },
-            select: { id: true, email: true, password: true },
+            select: { id: true, email: true },
         });
         if (!user) {
             throw new BadRequestException('auth.invalid_credentials');
@@ -80,8 +68,8 @@ export default class UserService {
                 type: data.type!,
                 settings: {
                     create: {
-                        latitude: data.latitude || 0,
-                        longitude: data.longitude || 0,
+                        lat: data.latitude || 0,
+                        long: data.longitude || 0,
                     },
                 }
             },
@@ -97,55 +85,24 @@ export default class UserService {
         return token;
     }
 
-    async ForgetPassword(data: ForgetPasswordRequestDTO): Promise<ForgetPasswordResponseDTO> {
-        const user = await this._dbService.user.findFirst({
-            where: { email: data.email.toLowerCase() },
-        });
-        if (!user) {
-            throw new BadRequestException('user.not_found');
-        }
 
-        const token = await this._tokenService.CreatePasswordToken({
-            uuid: GenerateUUID(),
-            userId: user.id,
-            reason: TokenReason.FORGOT_PASSWORD,
+    async UpdateUserLocation(userId: string, lat: any, long: any): Promise<any> {
+        const latitude = parseFloat(lat);
+        const longitude = parseFloat(long);
+    
+        await this._dbService.userSettings.update({
+            where: {
+                userId,
+            },
+            data: {
+                lat: latitude,
+                long: longitude,
+            }
         });
-
-        return { token };
+    
+        return true;
     }
-
-    async ForgetPasswordVerification(
-        data: ForgetPasswordVerificationRequestDTO,
-    ): Promise<ForgetPasswordVerificationResponseDTO> {
-        const token = await this._tokenService.GetToken(data.token, TokenReason.FORGOT_PASSWORD);
-        if (!token) {
-            throw new BadRequestException('auth.invalid_token');
-        }
-
-        const resetToken = await this._tokenService.CreatePasswordToken({
-            uuid: GenerateUUID(),
-            userId: token.userId,
-            reason: TokenReason.RESET_PASSWORD,
-        });
-
-        return { token: resetToken };
-    }
-
-    async ResetPassword(data: ResetPasswordRequestDTO): Promise<BooleanResponseDTO> {
-        const token = await this._tokenService.GetToken(data.token, TokenReason.RESET_PASSWORD);
-        if (!token) {
-            throw new BadRequestException('auth.invalid_token');
-        }
-
-        const encryptedPassword = await HashPassword(data.password);
-
-        await this._dbService.user.update({
-            where: { id: token.userId },
-            data: { password: encryptedPassword },
-        });
-
-        return { data: true };
-    }
+    
 
     async GetMe(user: User): Promise<GetMeResponseDTO> {
         const currentUser = await this._dbService.user.findUnique({
@@ -155,7 +112,7 @@ export default class UserService {
                 profilePicture: { select: { id: true, path: true, thumbPath: true } },
             },
         });
-        return ExcludeFields(currentUser, ['password']);
+        return currentUser
     }
 
     async Find(data: FindUsersRequestDTO): Promise<FindUsersResponseDTO> {
@@ -181,7 +138,7 @@ export default class UserService {
         return { data: users, count };
     }
 
-    async Get(id: number): Promise<GetUserByIdResponseDTO> {
+    async Get(id: string): Promise<GetUserByIdResponseDTO> {
         const basicUser = await this._dbService.user.findFirst({
             where: { id },
             select: { id: true },
@@ -219,22 +176,20 @@ export default class UserService {
     }
 
     async VerifyCode(data: VerifyOtpRequestDTO): Promise<VerifyOtpResponseDTO> {
-        if (AppConfig.APP.ENV === 'dev' && data.otp === '123456') {
+        if (AppConfig.APP.ENV !== APP_ENV.PROD && data.otp === OTP_CODE_FOR_DEV) {
             const existingUser = await this._dbService.user.findFirst({
                 where: { phone: data.phone },
                 select: { id: true },
             });
             if (existingUser) {
-                console.log("USER EXIST")
                 const token = await this.Login(data);
                 return { token }
             } else {
-                console.log("USER NOT EXIST")
                 const token = await this.Signup(data);
                 return { token }
             }
 
-        } else if (AppConfig.APP.ENV === 'dev' && data.otp !== '123456') {
+        } else if (AppConfig.APP.ENV !== APP_ENV.PROD && data.otp !== OTP_CODE_FOR_DEV) {
             throw new BadRequestException(
                 "You have entered the wrong otp"
             );
@@ -293,4 +248,5 @@ export default class UserService {
 
         return updatedUser
     }
+
 }

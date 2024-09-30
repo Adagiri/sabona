@@ -3,7 +3,7 @@ import { UserType } from '@prisma/client';
 
 export default class UpdateUserDetailsResponseDTO {
     @ApiProperty()
-    id: number;
+    id: string;
 
     @ApiProperty()
     firstName: string;

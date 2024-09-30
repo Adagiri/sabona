@@ -6,10 +6,10 @@ import { User } from '@prisma/client';
 import AppConfig from '../../../configs/app.config';
 
 export class AuthModel {
-    id: number;
+    id: string;
     user: User | null;
 
-    constructor(id: number, user?: User) {
+    constructor(id: string, user?: User) {
         this.id = id;
         if (user) {
             this.user = user;
@@ -25,7 +25,7 @@ export default class AuthService {
         return uuid();
     }
 
-    async CreateSession(userId: number): Promise<string> {
+    async CreateSession(userId: string): Promise<string> {
         const Token = this._generateToken();
         const Auth = new AuthModel(userId);
         await this._cacheService.Set(Token, Auth, AppConfig.APP.TOKEN_EXPIRATION || 604800);

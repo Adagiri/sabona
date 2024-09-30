@@ -5,7 +5,7 @@ export class UserSettingsModel {
     id: number;
 
     @ApiProperty()
-    userId: number;
+    userId: string;
 
     @ApiProperty()
     createdAt: Date;
@@ -17,8 +17,8 @@ export class UserSettingsModel {
     deletedAt: Date;
 
     @ApiProperty()
-    latitude: number;
+    lat: number;
 
     @ApiProperty()
-    longitude: number;
+    long: number;
 }

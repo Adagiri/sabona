@@ -9,7 +9,7 @@ export default class CreateDeviceRequestDTO {
 
     @ApiProperty()
     @IsInt()
-    userId: number;
+    userId: string;
 
     @ApiPropertyOptional()
     @IsOptional()

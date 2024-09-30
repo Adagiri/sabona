@@ -34,3 +34,10 @@ export enum VerificationStatus {
   }
 
 export const QUIZ_CLEARENCE_PERCENTAGE = 60;
+
+export const OTP_CODE_FOR_DEV = '123456';
+
+export enum APP_ENV {
+    DEV = 'dev',
+    PROD = 'prod',
+}

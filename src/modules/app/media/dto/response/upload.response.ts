@@ -53,7 +53,7 @@ export class UploadFinalizeMediaResponseDTO {
     status: MediaStatus;
 
     @ApiProperty()
-    userId: number;
+    userId: string;
 
     @ApiProperty()
     meta: any;
