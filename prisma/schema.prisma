@@ -46,12 +46,9 @@ enum OrderStatus {
   PENDING // When the order is created and awaiting vendor action
   ACCEPTED // When a vendor accepts the order
   REJECTED // When a vendor rejects the order
-  READY_FOR_PICKUP // When the order is ready for riders to pick up
-  IN_PROGRESS // When the vendor starts working on the order
-  COMPLETED // When the vendor completes the order
-  OUT_FOR_DELIVERY // When the rider is delivering the order
-  DELIVERED // When the order is delivered to the customer
   CANCELLED // When the order is cancelled
+  READY_FOR_PICKUP // When the order is ready for pickup by the rider
+  COMPLETED // When the entire process is completed
 }
 
 // NotificationType enum to define the different types of notifications
@@ -125,10 +122,12 @@ model User {
   RiderOrder   RiderOrder[]
   VendorOrder  VendorOrder[]
   Notification Notification[]
+  Pickup       Pickup[]
+  Delivery     Delivery[]
 }
 
 model UserAddress {
-  id        String   @id @default(uuid()) // Using UUID for address ID
+  id        String   @id @default(uuid()) // UUID for address ID
   userId    String // Foreign key to the User model
   user      User     @relation(fields: [userId], references: [id])
   address   String // The actual address (e.g., street, city, etc.)
@@ -138,12 +137,7 @@ model UserAddress {
   isDefault Boolean  @default(false) // Whether this is the default address
   createdAt DateTime @default(now()) @db.Timestamptz()
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
-
-  // Bidirectional relation with Order model for pickup and delivery addresses
-  pickupOrders   Order[] @relation("pickupAddress")
-  deliveryOrders Order[] @relation("deliveryAddress")
 }
-
 // UserSettings model for storing user-specific settings (e.g., location)
 model UserSettings {
   id        Int       @id @default(autoincrement()) // Using Int for settings ID
@@ -215,24 +209,75 @@ model Media {
 // Order model to represent a user's order
 // UserAddress model to store multiple addresses for each user
 
+// Enum to track the status of the pickup process
+enum PickupStatus {
+  PENDING // Pickup request available, no rider assigned
+  PICKED_UP // Rider has picked up the order from the user
+  DELIVERED_TO_VENDOR // Rider has delivered the order to the vendor
+}
+
+// Enum to track the status of the delivery process
+enum DeliveryStatus {
+  PENDING // Delivery request available, no rider assigned
+  PICKED_UP_FROM_VENDOR // Rider has picked up the order from the vendor
+  DELIVERED_TO_USER // Rider has delivered the order to the user
+}
+
+// Pickup model to track the pickup of the order from the user to the vendor
+model Pickup {
+  id        String       @id @default(uuid()) // UUID for pickup ID
+  orderId   String // The related order
+  order     Order        @relation(fields: [orderId], references: [id])
+  riderId   String? // The rider responsible for the pickup (optional initially)
+  rider     User?        @relation(fields: [riderId], references: [id])
+
+  // Store the snapshot of the pickup address
+  pickupAddress   String // The address for pickup
+  pickupLat       Float // Latitude for pickup location
+  pickupLong      Float // Longitude for pickup location
+
+  status    PickupStatus @default(PENDING) // Status of the pickup process
+  createdAt DateTime     @default(now()) @db.Timestamptz()
+  updatedAt DateTime     @default(now()) @updatedAt @db.Timestamptz()
+}
+
+// Delivery model to track the delivery of the order from the vendor back to the user
+model Delivery {
+  id        String         @id @default(uuid()) // UUID for delivery ID
+  orderId   String // The related order
+  order     Order          @relation(fields: [orderId], references: [id])
+  riderId   String? // The rider responsible for the delivery (optional initially)
+  rider     User?          @relation(fields: [riderId], references: [id])
+
+  // Store the snapshot of the delivery address
+  deliveryAddress   String // The address for delivery
+  deliveryLat       Float // Latitude for delivery location
+  deliveryLong      Float // Longitude for delivery location
+
+  status    DeliveryStatus @default(PENDING) // Status of the delivery process
+  createdAt DateTime       @default(now()) @db.Timestamptz()
+  updatedAt DateTime       @default(now()) @updatedAt @db.Timestamptz()
+}
+
 // Update the Order model to include pickup and delivery addresses
+// Order model to represent a user's order
 model Order {
-  id                String               @id @default(uuid()) // Now using UUID for order ID
-  userId            String // User who placed the order
-  user              User                 @relation(fields: [userId], references: [id])
-  status            OrderStatus          @default(PENDING) // Current status of the order
-  totalAmount       Float // Total amount for the order
-  pickupAddressId   String // Pickup address
-  deliveryAddressId String // Delivery address
-  pickupAddress     UserAddress          @relation("pickupAddress", fields: [pickupAddressId], references: [id])
-  deliveryAddress   UserAddress          @relation("deliveryAddress", fields: [deliveryAddressId], references: [id])
-  createdAt         DateTime             @default(now()) @db.Timestamptz()
-  updatedAt         DateTime             @default(now()) @updatedAt @db.Timestamptz()
-  statusHistory     OrderStatusHistory[] // Relation to the order's status history
-  feedback          Feedback? // Optional relation to customer feedback
-  riderOrders       RiderOrder[] // Many-to-many relation with riders
-  vendorOrders      VendorOrder[] // Many-to-many relation with vendors
-  Notification      Notification[]
+  id                 String      @id @default(uuid()) // UUID for order ID
+  userId             String      // User who placed the order
+  user               User        @relation(fields: [userId], references: [id])
+  status             OrderStatus @default(PENDING) // High-level status of the order
+  totalAmount        Float       // Total amount for the order
+
+  riderOrders        RiderOrder[]          // Existing relation with riders for order management
+  vendorOrders       VendorOrder[]         // Existing relation with vendors for order management
+  Notification       Notification[]        // Notifications related to the order
+  feedback           Feedback?             // Optional feedback from the customer
+  statusHistory      OrderStatusHistory[]  // History of order status changes
+  pickups            Pickup[]              // Relation to the pickup tracking
+  deliveries         Delivery[]            // Relation to the delivery tracking
+
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
 }
 
 // RiderOrder model to manage assignments between riders and orders
