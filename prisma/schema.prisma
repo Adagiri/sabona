@@ -15,7 +15,9 @@ datasource db {
 }
 
 enum UserType {
-  USER
+  CUSTOMER
+  VENDOR
+  DRIVER
   ADMIN
 }
 
@@ -26,12 +28,12 @@ enum UserStatus {
 
 model User {
   id               Int           @id @default(autoincrement())
-  email            String        @unique
-  password         String?
-  name             String
-  phone            String
-  type             UserType      @default(USER)
-  status           UserStatus    @default(INACTIVE)
+  email            String?
+  firstName        String?
+  lastName         String?
+  phone            String        @unique
+  type             UserType      @default(CUSTOMER)
+  status           UserStatus    @default(ACTIVE)
   profilePictureId Int?
   createdAt        DateTime      @default(now()) @db.Timestamptz()
   updatedAt        DateTime      @default(now()) @updatedAt @db.Timestamptz()
@@ -41,12 +43,12 @@ model User {
   tokens           Token[]
   medias           Media[]       @relation("MediaOwner")
   settings         UserSettings?
-  oauth            UserOAuth?
 }
 
 model UserSettings {
   id                   Int       @id @default(autoincrement())
-  notificationsEnabled Boolean   @default(true)
+  latitude             Float?
+  longitude            Float?
   userId               Int       @unique
   user                 User      @relation(fields: [userId], references: [id])
   createdAt            DateTime  @default(now()) @db.Timestamptz()
@@ -128,20 +130,4 @@ model Media {
   deletedAt DateTime?   @db.Timestamptz()
   user      User?       @relation("MediaOwner", fields: [userId], references: [id])
   users     User[]
-}
-
-enum UserOAuthType {
-  GOOGLE
-  APPLE
-}
-
-model UserOAuth {
-  id         Int           @id @default(autoincrement())
-  userId     Int           @unique
-  providerId String
-  type       UserOAuthType
-  createdAt  DateTime      @default(now()) @db.Timestamptz()
-  updatedAt  DateTime      @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt  DateTime?     @db.Timestamptz()
-  user       User          @relation(fields: [userId], references: [id])
 }

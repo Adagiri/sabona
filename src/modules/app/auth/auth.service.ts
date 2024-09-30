@@ -28,7 +28,7 @@ export default class AuthService {
     async CreateSession(userId: number): Promise<string> {
         const Token = this._generateToken();
         const Auth = new AuthModel(userId);
-        await this._cacheService.Set(Token, Auth, AppConfig.APP.TOKEN_EXPIRATION);
+        await this._cacheService.Set(Token, Auth, AppConfig.APP.TOKEN_EXPIRATION || 604800);
         return Token;
     }
 

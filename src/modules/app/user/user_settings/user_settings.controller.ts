@@ -1,5 +1,5 @@
 import { Body } from '@nestjs/common';
-import { User, UserType } from '@prisma/client';
+import { User } from '@prisma/client';
 import { ApiController, Authorized, CurrentUser, Patch } from '../../../../core/decorators';
 import { BooleanResponseDTO } from '../../../../core/response/response.schema';
 import { UpdateUserSettingsRequestDTO } from './dto/request/update_user_settings.request';
@@ -9,7 +9,7 @@ import UserSettingsService from './user_settings.service';
 export default class UserSettingsController {
     constructor(private _userSettingsService: UserSettingsService) {}
 
-    @Authorized([UserType.USER])
+    @Authorized()
     @Patch({
         path: '/user/settings',
         response: BooleanResponseDTO,

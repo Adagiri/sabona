@@ -28,4 +28,9 @@ export const DEFAULT_AVAILABLITY = {
     ],
 };
 
+export enum VerificationStatus {
+    APPROVED = 'approved',
+    PENDING = 'pending',
+  }
+
 export const QUIZ_CLEARENCE_PERCENTAGE = 60;

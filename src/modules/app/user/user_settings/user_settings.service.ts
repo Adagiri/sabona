@@ -13,10 +13,9 @@ export default class UserSettingsService {
                 userId,
             },
             data: {
-                ...(data.hasOwnProperty('notificationsEnabled') && {
-                    notificationsEnabled: data.notificationsEnabled,
-                }),
-            },
+                latitude: data.latitude || 0,
+                longitude: data.longitude || 0,
+            }
         });
         return {
             data: true,

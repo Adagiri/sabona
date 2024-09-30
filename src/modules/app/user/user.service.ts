@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, TokenReason, User, UserOAuthType, UserStatus, UserType } from '@prisma/client';
+import { Prisma, TokenReason, User } from '@prisma/client';
 import DatabaseService from '../../../database/database.service';
 import {
     BadRequestException,
@@ -7,7 +7,6 @@ import {
 } from '../../../core/exceptions/response.exception';
 import { BooleanResponseDTO } from '../../../core/response/response.schema';
 import {
-    ComparePassword,
     ExcludeFields,
     GenerateUUID,
     GetOrderOptions,
@@ -29,13 +28,17 @@ import {
     ForgetPasswordResponseDTO,
     ForgetPasswordVerificationResponseDTO,
 } from './dto/response/forget_password.response';
-import LoginResponseDTO from './dto/response/login.response';
-import SignupResponseDTO from './dto/response/signup.response';
 import GetMeResponseDTO from './dto/response/me.response';
 import GetUserByIdResponseDTO from './dto/response/getById.response';
-import OAuthLoginRequestDTO from './dto/request/oauth_login.request';
 import OAuthService from '../../../modules/oauth/oauth.service';
-import { OAuthProviders } from '../../../core/interfaces';
+import SendVerificationCodeRequestDTO from './dto/request/send_verification_code.request';
+import AppConfig from 'src/configs/app.config';
+import SMSService from 'src/modules/sms/sms.service';
+import { SendVerificationCodeResponseDTO } from './dto/response/send_verification_code.response';
+import { VerifyOtpRequestDTO } from './dto/request/verifyOtpCode.request';
+import UpdateUserDetailsRequestDTO from './dto/request/update_details.request';
+import UpdateUserDetailsResponseDTO from './dto/response/update_details.response';
+import VerifyOtpResponseDTO from './dto/response/verifyOtp.response';
 
 @Injectable()
 export default class UserService {
@@ -44,120 +47,54 @@ export default class UserService {
         private _authService: AuthService,
         private _tokenService: TokenService,
         private _oauthService: OAuthService,
-    ) {}
+        private _smsService: SMSService
+    ) { }
 
-    async Login(data: LoginRequestDTO): Promise<LoginResponseDTO> {
+    async Login(data: LoginRequestDTO): Promise<string> {
         const user = await this._dbService.user.findFirst({
-            where: { email: data.email.toLowerCase() },
+            where: { phone: data.phone },
             select: { id: true, email: true, password: true },
         });
         if (!user) {
             throw new BadRequestException('auth.invalid_credentials');
         }
 
-        const isPasswordMatched = await ComparePassword(data.password, user.password);
-        if (!isPasswordMatched) {
-            throw new BadRequestException('auth.invalid_credentials');
-        }
-
         const token = await this._authService.CreateSession(user.id);
 
-        return { token };
+        return token;
     }
 
-    async OAuthLogin(data: OAuthLoginRequestDTO): Promise<LoginResponseDTO> {
-        const oauthResult = await this._oauthService.GetTokenData(
-            data.token,
-            data.type === UserOAuthType.GOOGLE ? 'google' : 'apple',
-        );
-        if (!oauthResult) {
-            throw new BadRequestException('oauth.invalid_token');
-        }
-
-        const oauth = await this._dbService.userOAuth.findFirst({
-            where: { providerId: oauthResult.id, type: data.type },
-            select: { userId: true },
-        });
-        if (!oauth) {
-            throw new NotFoundException('user.not_found');
-        }
-
-        const user = await this._dbService.user.findFirst({
-            where: { id: oauth.userId },
-            select: { id: true },
-        });
-        if (!user) {
-            throw new NotFoundException('user.not_found');
-        }
-
-        const token = await this._authService.CreateSession(user.id);
-
-        return { token };
-    }
-
-    async Signup(data: SignupRequestDTO): Promise<SignupResponseDTO> {
+    async Signup(data: SignupRequestDTO): Promise<string> {
         const existingUser = await this._dbService.user.findFirst({
-            where: { email: data.email },
+            where: { phone: data.phone },
             select: { id: true },
         });
         if (existingUser) {
-            throw new BadRequestException('auth.email_already_exist');
+            throw new BadRequestException('auth.phone_already_exist');
         }
 
-        const isOAuthLogin = data.providerId && data.providerType;
-
-        let email = data.email;
-        let providerId = null;
-        let providerType = null;
-
-        if (isOAuthLogin) {
-            const providerMappings: Record<UserOAuthType, OAuthProviders> = {
-                [UserOAuthType.GOOGLE]: 'google',
-                [UserOAuthType.APPLE]: 'apple',
-            };
-
-            const oauthResult = await this._oauthService.GetTokenData(
-                data.providerId,
-                providerMappings[data.providerType],
-            );
-            if (!oauthResult) {
-                throw new BadRequestException('oauth.invalid_token');
-            }
-
-            email = oauthResult.email;
-            providerId = oauthResult.id;
-            providerType = oauthResult.type;
-        }
 
         const user = await this._dbService.user.create({
             data: {
-                email,
-                name: data.name,
-                password: isOAuthLogin ? null : await HashPassword(data.password),
                 phone: data.phone,
-                type: UserType.USER,
-                status: UserStatus.ACTIVE,
+                type: data.type!,
                 settings: {
-                    create: {},
-                },
-                ...(isOAuthLogin && {
-                    oauth: {
-                        create: {
-                            providerId,
-                            type:
-                                providerType === 'google'
-                                    ? UserOAuthType.GOOGLE
-                                    : UserOAuthType.APPLE,
-                        },
+                    create: {
+                        latitude: data.latitude || 0,
+                        longitude: data.longitude || 0,
                     },
-                }),
+                }
             },
-            select: { id: true, email: true },
-        });
+            select: { id: true, email: true }
+        })
+
+        if (!user) {
+            throw new BadRequestException('auth.error_creating_user');
+        }
 
         const token = await this._authService.CreateSession(user.id);
 
-        return { token };
+        return token;
     }
 
     async ForgetPassword(data: ForgetPasswordRequestDTO): Promise<ForgetPasswordResponseDTO> {
@@ -261,5 +198,99 @@ export default class UserService {
         });
 
         return user;
+    }
+
+    async SendVerificationCode(data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
+        if (AppConfig.APP.ENV === 'dev') {
+            return {
+                message: "OTP sent successfully",
+            };
+        } else {
+            const otp = await this._smsService.sendVerificationCode(data.phone);
+            if (!otp) {
+                throw new BadRequestException(
+                    "Error while sending verification code, Please try again!!!"
+                );
+            }
+            return {
+                message: "OTP sent successfully",
+            };
+        }
+    }
+
+    async VerifyCode(data: VerifyOtpRequestDTO): Promise<VerifyOtpResponseDTO> {
+        if (AppConfig.APP.ENV === 'dev' && data.otp === '123456') {
+            const existingUser = await this._dbService.user.findFirst({
+                where: { phone: data.phone },
+                select: { id: true },
+            });
+            if (existingUser) {
+                console.log("USER EXIST")
+                const token = await this.Login(data);
+                return { token }
+            } else {
+                console.log("USER NOT EXIST")
+                const token = await this.Signup(data);
+                return { token }
+            }
+
+        } else if (AppConfig.APP.ENV === 'dev' && data.otp !== '123456') {
+            throw new BadRequestException(
+                "You have entered the wrong otp"
+            );
+        } else {
+            const otp = await this._smsService.verifyPhoneNumber(data.phone, data.otp);
+            if (!otp) {
+                throw new BadRequestException(
+                    "Error while sending verification code, Please try again!!!"
+                );
+            }
+
+            const existingUser = await this._dbService.user.findFirst({
+                where: { phone: data.phone },
+                select: { id: true },
+            });
+            if (existingUser) {
+                const token = await this.Login(data);
+                return { token }
+            } else {
+                const token = await this.Signup(data);
+                return { token }
+            }
+        }
+    }
+
+    async UpdateUserDetails(data: UpdateUserDetailsRequestDTO, user: User): Promise<UpdateUserDetailsResponseDTO> {
+        const userDetails = await this._dbService.user.findFirst({
+            where: {
+                id: user.id
+            }
+        })
+
+        if (!userDetails) {
+            throw new BadRequestException(
+                "User not found"
+            )
+        }
+
+        await this._dbService.user.update({
+            where: {
+                id: userDetails.id
+            },
+            data: {
+                email: data.email && data.email,
+                firstName: data.firstName && data.firstName,
+                lastName: data.lastName && data.lastName
+            }
+        })
+
+        const updatedUser = await this._dbService.user.findFirst({
+            where: {
+                id: userDetails.id
+            }
+        })
+
+
+        return updatedUser
     }
 }

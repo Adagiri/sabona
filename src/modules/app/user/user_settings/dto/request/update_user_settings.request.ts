@@ -1,9 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, ValidateIf } from 'class-validator';
+import { ValidateIf } from 'class-validator';
 
 export class UpdateUserSettingsRequestDTO {
     @ApiPropertyOptional()
-    @IsBoolean()
-    @ValidateIf((object, value) => value !== undefined)
-    notificationsEnabled?: boolean;
+    @ValidateIf((o) => o.latitude !== undefined)
+    latitude?: number;
+
+    @ApiPropertyOptional()
+    @ValidateIf((o) => o.longitude !== undefined)
+    longitude?: number;
 }

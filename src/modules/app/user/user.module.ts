@@ -8,6 +8,7 @@ import AuthController from './auth.controller';
 import UserController from './user.controller';
 import UserService from './user.service';
 import OAuthModule from '../../../modules/oauth/oauth.module';
+import SMSModule from 'src/modules/sms/sms.module';
 
 @Module({
     imports: [
@@ -17,6 +18,7 @@ import OAuthModule from '../../../modules/oauth/oauth.module';
         QueueModule,
         UserSettingsModule,
         OAuthModule,
+        SMSModule
     ],
     exports: [UserService],
     providers: [UserService],

@@ -7,7 +7,10 @@ export default class GetMeResponseDTO {
     id: number;
 
     @ApiProperty()
-    name: string;
+    firstName: string;
+
+    @ApiProperty()
+    lastName: string;
 
     @ApiProperty({ enum: UserType })
     type: UserType;

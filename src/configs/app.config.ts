@@ -3,6 +3,7 @@ config();
 
 const AppConfig = {
     APP: {
+        ENV: process.env.APP_ENV,
         NAME: 'API',
         PORT: Number(process.env.APP_PORT),
         DEBUG: Boolean(process.env.APP_DEBUG),
@@ -29,7 +30,7 @@ const AppConfig = {
     TWILIO: {
         ACCOUNT_SID: process.env.APP_TWILIO_ACCOUNT_SID,
         AUTH_TOKEN: process.env.APP_TWILIO_AUTH_TOKEN,
-        FROM_NUMBER: process.env.APP_TWILIO_FROM_NUMBER,
+        VERIFY_SERVICE_SID: process.env.APP_VERIFY_SERVICE_SID
     },
     OAUTH: {
         GOOGLE: process.env.APP_GOOGLE_OAUTH_ENDPOINT,
