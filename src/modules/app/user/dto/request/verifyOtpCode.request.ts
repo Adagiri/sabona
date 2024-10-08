@@ -1,11 +1,14 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { UserType } from "@prisma/client";
-import { IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { IsNotEmpty, IsOptional, IsString, Matches } from "class-validator";
 
 export class VerifyOtpRequestDTO {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @Matches(/^(?:00|\+)(92|966)[0-9\s.\/-]{8,12}$/, {
+    message: 'Phone number must start with +92 or +966 followed by the correct format',
+  })
   phone: string;
 
   @ApiProperty()
@@ -13,7 +16,7 @@ export class VerifyOtpRequestDTO {
   @IsNotEmpty()
   otp: string;
 
-  @ApiProperty({ enum: UserType})
+  @ApiProperty({ enum: UserType })
   @IsString()
   @IsOptional()
   type: UserType;
