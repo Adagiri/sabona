@@ -27,6 +27,11 @@ import UpdateUserDetailsRequestDTO from './dto/request/update_details.request';
 import UpdateUserDetailsResponseDTO from './dto/response/update_details.response';
 import VerifyOtpResponseDTO from './dto/response/verifyOtp.response';
 import { APP_ENV, OTP_CODE_FOR_DEV } from 'src/constants';
+import addCustomerAddressResponseDTO from '../customer/dto/response/addCustomerAddress.response';
+import getAllAddressesResponseDTO from '../customer/dto/response/getAllAddresses.response';
+import editAddressRequestDTO from './dto/request/editAddress.request';
+import editAddressParamRequestDTO from './dto/request/editAddressParam.request';
+import EditAddressResponseDTO from './dto/response/editAddress.response';
 
 @Injectable()
 export default class UserService {
@@ -248,5 +253,88 @@ export default class UserService {
 
         return updatedUser
     }
+
+
+    async AddAddress(data: addCustomerAddressResponseDTO, user: User): Promise<addCustomerAddressResponseDTO> {
+        const address = await this._dbService.userAddress.create({
+            data: {
+                userId: user.id.toString(),
+                ...data
+            }
+        })
+
+        return address;
+    }
+
+    async GetAllAddresses(user: User): Promise<getAllAddressesResponseDTO>{
+        const addresses = await this._dbService.userAddress.findMany({
+            where: {
+                userId: user.id,
+            },
+            select: {
+                id: true,
+                address: true,
+                lat: true,
+                long: true,
+                label: true,
+                isDefault: true,
+                createdAt: true,
+                updatedAt: true
+            }
+        })
+
+        return { data: addresses };
+    }
+
+    async EditAddress(data: editAddressRequestDTO, param: editAddressParamRequestDTO, user: User): Promise<EditAddressResponseDTO> {
+
+        const isUsersAddress = this._dbService.userAddress.findFirst({
+            where: {
+                AND: {
+                    id: param.id,
+                    userId: user.id
+                }
+            }
+        })
+
+        if (!isUsersAddress){
+            throw new BadRequestException("This is not current user's address")
+        }
+
+        const address = await this._dbService.userAddress.update({
+            where: {
+                id: param.id,
+            },
+            data: {
+                address: data.address,
+                lat: data.lat,
+                long: data.long,
+                label: data.label,
+                isDefault: data.isDefault
+            },
+        })
+
+        if (!address) {
+            throw new BadRequestException("Error changing address")
+        }
+
+        const changedAddress = await this._dbService.userAddress.findUnique({
+            where: {
+                id: param.id
+            },
+            select: {
+                id: true,
+                address: true,
+                label: true,
+                lat: true, 
+                long: true,
+                isDefault: true
+            }
+        })
+
+        return changedAddress;
+
+    }
+
 
 }

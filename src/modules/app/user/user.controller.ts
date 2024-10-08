@@ -12,6 +12,11 @@ import { VerifyOtpRequestDTO } from './dto/request/verifyOtpCode.request';
 import UpdateUserDetailsRequestDTO from './dto/request/update_details.request';
 import UpdateUserDetailsResponseDTO from './dto/response/update_details.response';
 import VerifyOtpResponseDTO from './dto/response/verifyOtp.response';
+import addCustomerAddressResponseDTO from '../customer/dto/response/addCustomerAddress.response';
+import getAllAddressesResponseDTO from '../customer/dto/response/getAllAddresses.response';
+import editAddressRequestDTO from './dto/request/editAddress.request';
+import editAddressParamRequestDTO from './dto/request/editAddressParam.request';
+import EditAddressResponseDTO from './dto/response/editAddress.response';
 
 @ApiController({ version: '1', tag: 'user' })
 export default class UserController {
@@ -88,4 +93,39 @@ export default class UserController {
         return this._userService.UpdateUserDetails(data, user);
     }
 
+    @Authorized()
+    @Post({
+        path: 'user/address',
+        description: 'Add an address',
+        response: addCustomerAddressResponseDTO,
+    })
+    async AddAddress(
+        @Body() data: addCustomerAddressResponseDTO,
+        @CurrentUser() user: User): Promise<addCustomerAddressResponseDTO> {
+            return await this._userService.AddAddress(data, user)
+    }
+
+    @Authorized()
+    @Get({
+        path: 'user/address',
+        description: 'Get all user addresses',
+        response: getAllAddressesResponseDTO,
+    })
+    async GetAllAddresses(
+        @CurrentUser() user: User): Promise<getAllAddressesResponseDTO> {
+            return await this._userService.GetAllAddresses(user)
+    }
+
+    @Authorized()
+    @Patch({
+        path: '/user/address/:id',
+        description: 'Edit an address',
+        response: EditAddressResponseDTO,
+    })
+    async EditAddress(
+        @Body() data: editAddressRequestDTO,
+        @Param() param: editAddressParamRequestDTO,
+        @CurrentUser() user: User): Promise<EditAddressResponseDTO> {
+            return await this._userService.EditAddress(data,param, user)
+    }
 }

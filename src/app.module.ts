@@ -16,6 +16,9 @@ import OAuthModule from './modules/oauth/oauth.module';
 import { HttpExceptionFilter } from './core/exceptions/http.exception';
 import AuthGuard from './modules/app/auth/auth.guard';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import CustomerModule from './modules/app/customer/customer.module';
+import RiderModule from './modules/app/rider/rider.module';
+import VendorModule from './modules/app/vendor/vendor.module';
 @Module({
     imports: [
         TranslatorModule.forRoot({
@@ -37,6 +40,9 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
         QueueModule,
         EmailModule,
         OAuthModule,
+        CustomerModule,
+        RiderModule,
+        VendorModule
     ],
     controllers: [AppController],
     providers: [

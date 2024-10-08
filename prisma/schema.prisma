@@ -47,6 +47,7 @@ enum OrderStatus {
   ACCEPTED // When a vendor accepts the order
   REJECTED // When a vendor rejects the order
   CANCELLED // When the order is cancelled
+  IN_PROGRESS // When the order is being processed by the vendor
   READY_FOR_PICKUP // When the order is ready for pickup by the rider
   COMPLETED // When the entire process is completed
 }
@@ -137,6 +138,7 @@ model UserAddress {
   isDefault Boolean  @default(false) // Whether this is the default address
   createdAt DateTime @default(now()) @db.Timestamptz()
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime? @db.Timestamptz()
 }
 // UserSettings model for storing user-specific settings (e.g., location)
 model UserSettings {
@@ -226,7 +228,7 @@ enum DeliveryStatus {
 // Pickup model to track the pickup of the order from the user to the vendor
 model Pickup {
   id        String       @id @default(uuid()) // UUID for pickup ID
-  orderId   String // The related order
+  orderId   String       @unique// The related order
   order     Order        @relation(fields: [orderId], references: [id])
   riderId   String? // The rider responsible for the pickup (optional initially)
   rider     User?        @relation(fields: [riderId], references: [id])
@@ -239,12 +241,13 @@ model Pickup {
   status    PickupStatus @default(PENDING) // Status of the pickup process
   createdAt DateTime     @default(now()) @db.Timestamptz()
   updatedAt DateTime     @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime?    @db.Timestamptz()
 }
 
 // Delivery model to track the delivery of the order from the vendor back to the user
 model Delivery {
   id        String         @id @default(uuid()) // UUID for delivery ID
-  orderId   String // The related order
+  orderId   String         @unique // The related order
   order     Order          @relation(fields: [orderId], references: [id])
   riderId   String? // The rider responsible for the delivery (optional initially)
   rider     User?          @relation(fields: [riderId], references: [id])
@@ -257,6 +260,7 @@ model Delivery {
   status    DeliveryStatus @default(PENDING) // Status of the delivery process
   createdAt DateTime       @default(now()) @db.Timestamptz()
   updatedAt DateTime       @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime?      @db.Timestamptz()
 }
 
 // Update the Order model to include pickup and delivery addresses
@@ -269,15 +273,16 @@ model Order {
   totalAmount        Float       // Total amount for the order
 
   riderOrders        RiderOrder[]          // Existing relation with riders for order management
-  vendorOrders       VendorOrder[]         // Existing relation with vendors for order management
+  vendorOrders       VendorOrder?         // Existing relation with vendors for order management
   Notification       Notification[]        // Notifications related to the order
   feedback           Feedback?             // Optional feedback from the customer
   statusHistory      OrderStatusHistory[]  // History of order status changes
-  pickups            Pickup[]              // Relation to the pickup tracking
-  deliveries         Delivery[]            // Relation to the delivery tracking
+  pickup            Pickup?              // Relation to the pickup tracking
+  delivery         Delivery?           // Relation to the delivery tracking
 
   createdAt DateTime @default(now()) @db.Timestamptz()
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime? @db.Timestamptz()
 }
 
 // RiderOrder model to manage assignments between riders and orders
@@ -288,6 +293,7 @@ model RiderOrder {
   orderId    String // Using UUID for orderId field
   order      Order    @relation(fields: [orderId], references: [id])
   assignedAt DateTime @default(now()) @db.Timestamptz() // When the rider was assigned
+  deletedAt  DateTime? @db.Timestamptz() 
 }
 
 // VendorOrder model to manage assignments between vendors and orders
@@ -295,9 +301,10 @@ model VendorOrder {
   id         String   @id @default(uuid()) // Now using UUID for vendor-order relation ID
   vendorId   String // Vendor assigned to the order
   vendor     User     @relation(fields: [vendorId], references: [id])
-  orderId    String // Using UUID for orderId field
+  orderId    String   @unique// Using UUID for orderId field
   order      Order    @relation(fields: [orderId], references: [id])
   acceptedAt DateTime @default(now()) @db.Timestamptz() // When the vendor accepted the order
+  deletedAt  DateTime? @db.Timestamptz()
 }
 
 // OrderStatusHistory model to track all status changes for an order
