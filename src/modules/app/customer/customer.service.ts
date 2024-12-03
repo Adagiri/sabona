@@ -11,46 +11,46 @@ import CancelOrderResponseDTO from './dto/response/cancelOrder.response';
 export default class CustomerService {
     constructor(private _dbService: DatabaseService) {}
 
-    async CreateOrder(data: CreateOrderRequestDTO, user: User): Promise<any> {
-        const order = await this._dbService.order.create({
-            data: {
-                userId: user.id.toString(),
-                totalAmount: data.totalAmount,
-            }
-        })
+    // async CreateOrder(data: CreateOrderRequestDTO, user: User): Promise<any> {
+    //     const order = await this._dbService.order.create({
+    //         data: {
+    //             userId: user.id.toString(),
+    //             totalAmount: data.totalAmount,
+    //         }
+    //     })
 
-        if (!order) {
-            throw new Error("Order not created");
-        }
+    //     if (!order) {
+    //         throw new Error("Order not created");
+    //     }
 
-        const pickupEntry = await this._dbService.pickup.create({
-            data: {
-                orderId: order.id,
-                pickupAddress: data.pickupAddress,
-                pickupLat: data.pickupLat,
-                pickupLong: data.pickupLong,
-            }
-        })
+    //     const pickupEntry = await this._dbService.pickup.create({
+    //         data: {
+    //             orderId: order.id,
+    //             pickupAddress: data.pickupAddress,
+    //             pickupLat: data.pickupLat,
+    //             pickupLong: data.pickupLong,
+    //         }
+    //     })
 
-        if (!pickupEntry) {
-            throw new Error("Pickup entry not created");
-        }
+    //     if (!pickupEntry) {
+    //         throw new Error("Pickup entry not created");
+    //     }
 
-        const deliveryEntry = await this._dbService.delivery.create({
-            data: {
-                orderId: order.id,
-                deliveryAddress: data.deliveryAddress,
-                deliveryLat: data.deliveryLat,
-                deliveryLong: data.deliveryLong,
-            }
-        })
+    //     const deliveryEntry = await this._dbService.delivery.create({
+    //         data: {
+    //             orderId: order.id,
+    //             deliveryAddress: data.deliveryAddress,
+    //             deliveryLat: data.deliveryLat,
+    //             deliveryLong: data.deliveryLong,
+    //         }
+    //     })
 
-        if (!deliveryEntry) {
-            throw new Error("Delivery entry not created");
-        }
+    //     if (!deliveryEntry) {
+    //         throw new Error("Delivery entry not created");
+    //     }
 
-        return { data: order };
-    }
+    //     return { data: order };
+    // }
 
     async GetAllOrders(user: User): Promise<GetAllCustomerOrdersResponseDTO> { 
         const orders = await this._dbService.order.findMany({
