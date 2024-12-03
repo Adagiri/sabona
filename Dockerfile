@@ -1,17 +1,20 @@
 FROM node:18
 
+# Install pnpm globally
+RUN npm install -g pnpm
+
 WORKDIR /app/
 
 COPY . .
 
-RUN npm install
+RUN pnpm install
 
-RUN npm run db:generate
+RUN pnpm run db:generate
 
-RUN npm run build
+RUN pnpm run build
 
-RUN npm run db:deploy
+RUN pnpm run db:deploy
 
 EXPOSE 3001
 
-CMD ["npm", "run", "start"]
+CMD ["pnpm", "run", "start"]
