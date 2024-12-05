@@ -34,7 +34,7 @@ jobs:
           echo APP_DEBUG=${{ vars.APP_DEBUG }} >> .env
           echo APP_ENV=${{ vars.APP_ENV }} >> .env
           echo APP_REDIS_HOST=${{ vars.APP_REDIS_HOST }} >> .env
-          echo APP_REDIS_PORT=${{ secrets.APP_REDIS_PORT }} >> .env
+          echo APP_REDIS_PORT=${{ vars.APP_REDIS_PORT }} >> .env
           echo APP_TOKEN_EXPIRATION=${{ vars.APP_TOKEN_EXPIRATION }} >> .env
           echo APP_TWILIO_ACCOUNT_SID=${{ vars.APP_TWILIO_ACCOUNT_SID }} >> .env
           echo APP_TWILIO_AUTH_TOKEN=${{ vars.APP_TWILIO_AUTH_TOKEN }} >> .env
