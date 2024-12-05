@@ -39,7 +39,7 @@ jobs:
           echo APP_TWILIO_ACCOUNT_SID=${{ vars.APP_TWILIO_ACCOUNT_SID }} >> .env
           echo APP_TWILIO_AUTH_TOKEN=${{ vars.APP_TWILIO_AUTH_TOKEN }} >> .env
           echo APP_VERIFY_SERVICE_SID=${{ vars.APP_VERIFY_SERVICE_SID }} >> .env
-          echo PORT=${{ vars.PORT }} >> .env
+          echo APP_PORT=${{ vars.APP_PORT }} >> .env
       - name: Build, tag, and push image to Amazon ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
