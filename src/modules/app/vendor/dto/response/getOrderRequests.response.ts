@@ -1,65 +1,36 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNumber, IsString } from "class-validator";
+import { IsArray, IsNumber, IsString } from "class-validator";
 
-class PickupDTO {
+class LaundryService {
     @ApiProperty()
     @IsString()
-    id: string;
+    name: string;
 
     @ApiProperty()
     @IsString()
-    pickupAddress: string;
-
-    @ApiProperty()
-    @IsNumber()
-    pickupLat: number;
-
-    @ApiProperty()
-    @IsNumber()
-    pickupLong: number;
+    description: string;
 }
 
-class deliveryDTO {
-    @ApiProperty()
-    @IsString()
-    id: string;
-
-    @ApiProperty()
-    @IsString()
-    deliveryAddress: string;
-
+class Items {
     @ApiProperty()
     @IsNumber()
-    deliveryLat: number;
-
-    @ApiProperty()
-    @IsNumber()
-    deliveryLong: number;
+    quantity: number;
 }
 
-class userDTO {
+class Services {
     @ApiProperty()
     @IsString()
-    id: string;
+    laundryServiceId: string;
 
-    @ApiProperty()
-    @IsString()
-    firstName: string;
+    @ApiProperty({ type: LaundryService })
+    laundryService: LaundryService;
 
-    @ApiProperty()
-    @IsString()
-    lastName: string;
-
-    @ApiProperty()
-    @IsString()
-    email: string;
-
-    @ApiProperty()
-    @IsString()
-    phone: string;
+    @ApiProperty({ type: [Items] })
+    @IsArray()
+    items: Items[];
 }
 
-class GetOrderRequestsDTO {
+export class GetOrderRequestsDTO {
     @ApiProperty()
     @IsString()
     id: string;
@@ -72,17 +43,12 @@ class GetOrderRequestsDTO {
     @IsNumber()
     totalAmount: number;
 
-    @ApiProperty()
-    pickup?: PickupDTO
-
-    @ApiProperty()
-    delivery?: deliveryDTO
-
-    @ApiProperty()
-    user: userDTO
+    @ApiProperty({ type: [Services] })
+    @IsArray()
+    services: Services[];
 }
 
 export default class GetOrderRequestsResponseDTO {
-    @ApiProperty({type : [GetOrderRequestsDTO]})
+    @ApiProperty({ type: [GetOrderRequestsDTO] })
     data: GetOrderRequestsDTO[];
 }

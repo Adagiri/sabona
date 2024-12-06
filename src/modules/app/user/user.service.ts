@@ -32,6 +32,8 @@ import getAllAddressesResponseDTO from '../customer/dto/response/getAllAddresses
 import editAddressRequestDTO from './dto/request/editAddress.request';
 import editAddressParamRequestDTO from './dto/request/editAddressParam.request';
 import EditAddressResponseDTO from './dto/response/editAddress.response';
+import LoginResponseDTO from './dto/response/login.response';
+import addCustomerAddressRequestDTO from './dto/request/addAddress.request';
 
 @Injectable()
 export default class UserService {
@@ -76,7 +78,8 @@ export default class UserService {
                         lat: data.latitude || 0,
                         long: data.longitude || 0,
                     },
-                }
+                },
+                password: data.password,
             },
             select: { id: true, email: true }
         })
@@ -115,6 +118,28 @@ export default class UserService {
             include: {
                 settings: true,
                 profilePicture: { select: { id: true, path: true, thumbPath: true } },
+                addresses: true,
+                laundry: {
+                    select:{
+                        laundryService:{
+                            select:{
+                                id: true,
+                                name: true,
+                                description: true,
+                                laundryServiceItems:{
+                                    select:{
+                                        id: true,
+                                        name: true,
+                                        price: true,
+                                    }
+                                }
+                            }
+                        },
+                        address: true,
+                        name: true,
+                        id: true,
+                    }
+                },
             },
         });
         return currentUser
@@ -163,6 +188,15 @@ export default class UserService {
     }
 
     async SendVerificationCode(data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
+        const user = await this._dbService.user.findUnique({
+            where: { phone: data.phone },
+        })
+        if (user) {
+            console.log("im inside if statment")
+            throw new BadRequestException(
+                "Phone number is already registered"
+            );
+        }
         if (AppConfig.APP.ENV === 'dev') {
             return {
                 message: "OTP sent successfully",
@@ -220,6 +254,30 @@ export default class UserService {
         }
     }
 
+    async LoginWithEmailPassword(data: LoginRequestDTO): Promise<LoginResponseDTO> {
+        const doesUserExist = await this._dbService.user.findUnique({
+            where:{
+                phone: data.phone
+            }
+        })
+
+        if (!doesUserExist){
+            throw new BadRequestException("User not registered")
+        }
+        const user = await this._dbService.user.findFirst({
+            where: { phone: data.phone, password: data.password },
+
+            select: { id: true, email: true },
+        });
+        if (!user) {
+            throw new BadRequestException('auth.invalid_credentials');
+        }
+
+        const token = await this._authService.CreateSession(user.id);
+
+        return { token };
+    }
+
     async UpdateUserDetails(data: UpdateUserDetailsRequestDTO, user: User): Promise<UpdateUserDetailsResponseDTO> {
         const userDetails = await this._dbService.user.findFirst({
             where: {
@@ -255,7 +313,7 @@ export default class UserService {
     }
 
 
-    async AddAddress(data: addCustomerAddressResponseDTO, user: User): Promise<addCustomerAddressResponseDTO> {
+    async AddAddress(data: addCustomerAddressRequestDTO, user: User): Promise<addCustomerAddressResponseDTO> {
         const address = await this._dbService.userAddress.create({
             data: {
                 userId: user.id.toString(),

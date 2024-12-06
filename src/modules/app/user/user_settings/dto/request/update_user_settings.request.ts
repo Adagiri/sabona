@@ -9,4 +9,8 @@ export class UpdateUserSettingsRequestDTO {
     @ApiPropertyOptional()
     @ValidateIf((o) => o.longitude !== undefined)
     longitude?: number;
+    
+    @ApiPropertyOptional()
+    @ValidateIf((o) => o.isOnboardingCompleted !== undefined)
+    isOnboardingCompleted?: boolean;
 }

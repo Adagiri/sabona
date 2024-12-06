@@ -17,6 +17,7 @@ import getAllAddressesResponseDTO from '../customer/dto/response/getAllAddresses
 import editAddressRequestDTO from './dto/request/editAddress.request';
 import editAddressParamRequestDTO from './dto/request/editAddressParam.request';
 import EditAddressResponseDTO from './dto/response/editAddress.response';
+import addCustomerAddressRequestDTO from './dto/request/addAddress.request';
 
 @ApiController({ version: '1', tag: 'user' })
 export default class UserController {
@@ -55,30 +56,6 @@ export default class UserController {
         return this._userService.Get(id);
     }
 
-    @Post({
-        path: 'user/sendVerificationCode',
-        description: 'send otp code',
-        response: SendVerificationCodeResponseDTO
-    })
-
-    SendVerificationCode(
-        @Body() data: SendVerificationCodeRequestDTO,
-    ): Promise<SendVerificationCodeResponseDTO> {
-        return this._userService.SendVerificationCode(data);
-    }
-
-    @Post({
-        path: 'user/verifyCode',
-        description: 'send otp code',
-        response: VerifyOtpResponseDTO
-    })
-
-    VerifyCode(
-        @Body() data: VerifyOtpRequestDTO,
-    ): Promise<VerifyOtpResponseDTO> {
-        return this._userService.VerifyCode(data);
-    }
-
     @Authorized()
     @Patch({
         path: '/user/update',
@@ -100,7 +77,7 @@ export default class UserController {
         response: addCustomerAddressResponseDTO,
     })
     async AddAddress(
-        @Body() data: addCustomerAddressResponseDTO,
+        @Body() data: addCustomerAddressRequestDTO,
         @CurrentUser() user: User): Promise<addCustomerAddressResponseDTO> {
             return await this._userService.AddAddress(data, user)
     }

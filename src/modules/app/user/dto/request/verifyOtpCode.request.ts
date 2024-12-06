@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { UserType } from "@prisma/client";
 import { IsNotEmpty, IsOptional, IsString, Matches } from "class-validator";
 
@@ -28,4 +28,8 @@ export class VerifyOtpRequestDTO {
   @ApiProperty()
   @IsOptional()
   latitude: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  password: string;
 }

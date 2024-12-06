@@ -2,12 +2,11 @@ import { Param } from '@nestjs/common';
 import { ApiController, Authorized, CurrentUser, Get, Patch } from '../../../core/decorators';
 import RiderService from './rider.service';
 import { User } from '@prisma/client';
-import CreateOrderResponseDTO from '../customer/dto/response/createOrder.response';
-import GetOrderByIdRequestDTO from '../customer/dto/request/getOrderById.request';
 import UpdateStatusRequestDTO from './dto/request/updateStatus.request';
 import GetRideRequestsResponseDTO from './dto/response/getRideRequests.response';
 import UpdateOrderStatusResponseDTO from './dto/response/updateOrderStatus.response';
 import GetDeliveriesResponseDTO from './dto/response/getDeliveries.response';
+import CancelOrderRequestDTO from './dto/request/src/modules/app/rider/dto/request/cancelOrderRequest';
 
 @ApiController({
     path: '/rider',
@@ -20,12 +19,22 @@ export default class RiderController {
 
     @Authorized()
     @Get({
-        path: '/rideRequests',
-        description: 'Get all ride requests',
+        path: '/rides',
+        description: 'Get requests and rides',
         response: GetRideRequestsResponseDTO
     })
     async getRideRequests(@CurrentUser() user: User): Promise<GetRideRequestsResponseDTO> {
-        return await this._riderService.getRideRequests(user);
+        return await this._riderService.getRides(user);
+    }
+
+    @Authorized()
+    @Patch({
+        path: '/:orderId/cancel',
+        description: 'Cancel order',
+        response: UpdateOrderStatusResponseDTO
+    })
+    async cancelOrder(@Param() params:CancelOrderRequestDTO, @CurrentUser() user: User): Promise<UpdateOrderStatusResponseDTO> {
+        return await this._riderService.cancelOrder(params, user);
     }
 
     @Authorized()
@@ -40,16 +49,6 @@ export default class RiderController {
 
     @Authorized()
     @Get({
-        path: '/orders/:id',
-        description: 'Get order by id',
-        response: CreateOrderResponseDTO
-    })
-    async getOrderById(@Param() params:GetOrderByIdRequestDTO, @CurrentUser() user: User): Promise<CreateOrderResponseDTO> {
-        return await this._riderService.getOrderById(params, user);
-    }
-
-    @Authorized()
-    @Get({
         path: '/deliveries',
         description: 'Get all rider deliveries',
         response: GetDeliveriesResponseDTO
@@ -57,5 +56,17 @@ export default class RiderController {
     async getDeliveries(@CurrentUser() user: User): Promise<GetDeliveriesResponseDTO> {
         return await this._riderService.getDeliveries(user);
     }
+
+    @Authorized()
+    @Get({
+        path: '/currentOrders',
+        description: 'Get current orders',
+        response: GetDeliveriesResponseDTO
+    })
+    async getCurrentOrders(@CurrentUser() user: User): Promise<GetDeliveriesResponseDTO> {
+        return await this._riderService.getCurrentOrders(user);
+    }
+
+    
     
 }

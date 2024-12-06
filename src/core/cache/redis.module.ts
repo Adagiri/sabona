@@ -10,7 +10,7 @@ import { RedisClientOptions } from "redis";
     CacheModule.register<RedisClientOptions>({
       isGlobal: true,
       store: redisStore,
-      url: `redis://${AppConfig.REDIS.HOST}:${AppConfig.REDIS.PORT}`,
+      url: `rediss://${AppConfig.REDIS.HOST}:${AppConfig.REDIS.PORT}`,
     }),
   ],
   exports: [RedisService],

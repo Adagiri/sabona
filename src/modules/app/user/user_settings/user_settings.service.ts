@@ -15,6 +15,7 @@ export default class UserSettingsService {
             data: {
                 lat: data.latitude || 0,
                 long: data.longitude || 0,
+                isOnboardingCompleted: data.isOnboardingCompleted,
             }
         });
         return {

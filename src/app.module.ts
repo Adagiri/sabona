@@ -19,6 +19,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import CustomerModule from './modules/app/customer/customer.module';
 import RiderModule from './modules/app/rider/rider.module';
 import VendorModule from './modules/app/vendor/vendor.module';
+import OrderModule from './modules/app/order/order.module';
 @Module({
     imports: [
         TranslatorModule.forRoot({
@@ -42,7 +43,8 @@ import VendorModule from './modules/app/vendor/vendor.module';
         OAuthModule,
         CustomerModule,
         RiderModule,
-        VendorModule
+        VendorModule,
+        OrderModule,
     ],
     controllers: [AppController],
     providers: [

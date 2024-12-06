@@ -17,10 +17,6 @@ export default class SMSService {
 
   async sendVerificationCode(phone: string) {
     try {
-      await this._smsClient.verify.v2.services.create({
-        friendlyName: "Sabonah",
-        codeLength: 6,
-      })
       const verification = await this._smsClient.verify.v2.services(AppConfig.TWILIO.VERIFY_SERVICE_SID).verifications.create({
         to: phone,
         channel: 'sms'
