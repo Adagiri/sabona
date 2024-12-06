@@ -40,6 +40,7 @@ CREATE TABLE "User" (
     "email" TEXT,
     "firstName" TEXT,
     "lastName" TEXT,
+    "password" TEXT,
     "phone" TEXT NOT NULL,
     "type" "UserType" NOT NULL DEFAULT 'USER',
     "status" "UserStatus" NOT NULL DEFAULT 'ACTIVE',
@@ -73,6 +74,7 @@ CREATE TABLE "UserSettings" (
     "lat" DOUBLE PRECISION,
     "long" DOUBLE PRECISION,
     "userId" TEXT NOT NULL,
+    "isOnboardingCompleted" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "deletedAt" TIMESTAMPTZ,
@@ -172,9 +174,72 @@ CREATE TABLE "Delivery" (
 );
 
 -- CreateTable
+CREATE TABLE "Laundry" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "address" TEXT NOT NULL,
+    "vendorId" TEXT,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deletedAt" TIMESTAMPTZ,
+
+    CONSTRAINT "Laundry_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "LaundryService" (
+    "id" TEXT NOT NULL,
+    "laundryId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deletedAt" TIMESTAMPTZ,
+
+    CONSTRAINT "LaundryService_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "LaundryServiceItem" (
+    "id" TEXT NOT NULL,
+    "laundryServiceId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "price" DOUBLE PRECISION NOT NULL,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deletedAt" TIMESTAMPTZ,
+
+    CONSTRAINT "LaundryServiceItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "OrderLaundryService" (
+    "id" TEXT NOT NULL,
+    "orderId" TEXT NOT NULL,
+    "laundryServiceId" TEXT NOT NULL,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "OrderLaundryService_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "OrderLaundryServiceItem" (
+    "id" TEXT NOT NULL,
+    "orderLaundryServiceId" TEXT NOT NULL,
+    "laundryServiceItemId" TEXT NOT NULL,
+    "quantity" INTEGER NOT NULL,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "OrderLaundryServiceItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Order" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
+    "laundryId" TEXT NOT NULL,
     "status" "OrderStatus" NOT NULL DEFAULT 'PENDING',
     "totalAmount" DOUBLE PRECISION NOT NULL,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -298,7 +363,31 @@ ALTER TABLE "Delivery" ADD CONSTRAINT "Delivery_orderId_fkey" FOREIGN KEY ("orde
 ALTER TABLE "Delivery" ADD CONSTRAINT "Delivery_riderId_fkey" FOREIGN KEY ("riderId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Laundry" ADD CONSTRAINT "Laundry_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "LaundryService" ADD CONSTRAINT "LaundryService_laundryId_fkey" FOREIGN KEY ("laundryId") REFERENCES "Laundry"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "LaundryServiceItem" ADD CONSTRAINT "LaundryServiceItem_laundryServiceId_fkey" FOREIGN KEY ("laundryServiceId") REFERENCES "LaundryService"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "OrderLaundryService" ADD CONSTRAINT "OrderLaundryService_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "OrderLaundryService" ADD CONSTRAINT "OrderLaundryService_laundryServiceId_fkey" FOREIGN KEY ("laundryServiceId") REFERENCES "LaundryService"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "OrderLaundryServiceItem" ADD CONSTRAINT "OrderLaundryServiceItem_orderLaundryServiceId_fkey" FOREIGN KEY ("orderLaundryServiceId") REFERENCES "OrderLaundryService"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "OrderLaundryServiceItem" ADD CONSTRAINT "OrderLaundryServiceItem_laundryServiceItemId_fkey" FOREIGN KEY ("laundryServiceItemId") REFERENCES "LaundryServiceItem"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Order" ADD CONSTRAINT "Order_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Order" ADD CONSTRAINT "Order_laundryId_fkey" FOREIGN KEY ("laundryId") REFERENCES "Laundry"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "RiderOrder" ADD CONSTRAINT "RiderOrder_riderId_fkey" FOREIGN KEY ("riderId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
