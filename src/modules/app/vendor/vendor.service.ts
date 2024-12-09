@@ -14,16 +14,18 @@ import { GetAllLaundriesResponseDTO } from "./dto/response/getAllLaundry.respons
 import { GetLaundryByIdResponseDTO } from "./dto/response/getLaundryById.response";
 import LaundryMessageResponseDTO from "./dto/response/laundryMessage";
 import LaundryServiceMessageResponseDTO from "./dto/response/laundryServiceMessage.response";
+import GetOrderRequestDTO from "./dto/request/getOrder.request";
 
 @Injectable()
 export default class VendorService {
     constructor(private _dbService: DatabaseService) { }
 
-    async getOrderRequests(user: User): Promise<GetOrderRequestsResponseDTO> {
+    async getOrderRequests(user: User, param: GetOrderRequestDTO): Promise<GetOrderRequestsResponseDTO> {
         const orderRequests = await this._dbService.order.findMany({
             where: {
                 OR: [
                     {
+                        laundryId: param.laundryId,
                         status: OrderStatus.PENDING,
                     },
                     {

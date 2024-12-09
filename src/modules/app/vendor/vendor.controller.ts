@@ -15,6 +15,7 @@ import { GetAllLaundriesResponseDTO } from "./dto/response/getAllLaundry.respons
 import { GetLaundryByIdResponseDTO } from "./dto/response/getLaundryById.response";
 import LaundryMessageResponseDTO from "./dto/response/laundryMessage";
 import LaundryServiceMessageResponseDTO from "./dto/response/laundryServiceMessage.response";
+import GetOrderRequestDTO from "./dto/request/getOrder.request";
 
 @ApiController({
     path: '/vendor',
@@ -31,8 +32,10 @@ export default class VendorController {
         description: 'Get all order requests',
         response: GetOrderRequestsResponseDTO
     })
-    async getOrderRequests(@CurrentUser() user: User): Promise<GetOrderRequestsResponseDTO> {
-        return await this._vendorService.getOrderRequests(user)
+    async getOrderRequests(
+        @Param() param: GetOrderRequestDTO,
+        @CurrentUser() user: User): Promise<GetOrderRequestsResponseDTO> {
+        return await this._vendorService.getOrderRequests(user, param)
     }
 
     @Authorized()
