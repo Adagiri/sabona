@@ -575,4 +575,33 @@ export default class VendorService {
 
         return { data: { message: 'Item Deleted Successfully' } };
     }
+
+    async getAllOrders (user: User): Promise<any> {
+        console.log(user)
+        const orders = await this._dbService.order.findMany({
+            where: {
+                vendorOrders: {
+                    vendorId: user.id,
+                }
+            }
+        })
+
+        return { data: orders }
+    }
+
+    async getLastCompletedOrder(user: User) {
+        const order = await this._dbService.order.findFirst({
+            where: {
+                vendorOrders: {
+                    vendorId: user.id,
+                },
+                status: OrderStatus.COMPLETED,
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        })
+
+        return { data: order }
+    }
 }

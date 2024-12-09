@@ -23,7 +23,7 @@ import LaundryServiceMessageResponseDTO from "./dto/response/laundryServiceMessa
 })
 
 export default class VendorController {
-    constructor(private _vendorService: VendorService) {}
+    constructor(private _vendorService: VendorService) { }
 
     @Authorized()
     @Get({
@@ -41,8 +41,28 @@ export default class VendorController {
         description: 'Update order status',
         response: UpdateStatusResponseDTO
     })
-    async updateOrderStatus(@Param() params:UpdateStatusRequestDTO, @CurrentUser() user: User): Promise<UpdateStatusResponseDTO> {
+    async updateOrderStatus(@Param() params: UpdateStatusRequestDTO, @CurrentUser() user: User): Promise<UpdateStatusResponseDTO> {
         return await this._vendorService.updateOrderStatus(params, user)
+    }
+
+    @Authorized()
+    @Get({
+        path: '/orders',
+        description: 'Get all orders',
+        response: {}
+    })
+    async getAllOrders(@CurrentUser() user: User): Promise<any> {
+        return await this._vendorService.getAllOrders(user)
+    }
+
+    @Authorized()
+    @Get({
+        path: '/order',
+        description: 'Get last completed order',
+        response: {}
+    })
+    async getLastOrder(@CurrentUser() user: User): Promise<any> {
+        return await this._vendorService.getLastCompletedOrder(user)
     }
 
     @Authorized()

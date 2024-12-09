@@ -219,6 +219,7 @@ model Media {
 // Enum to track the status of the pickup process
 enum PickupStatus {
   PENDING // Pickup request available, no rider assigned
+  ACCEPTED
   PICKED_UP // Rider has picked up the order from the user
   DELIVERED_TO_VENDOR // Rider has delivered the order to the vendor
 }
@@ -226,6 +227,7 @@ enum PickupStatus {
 // Enum to track the status of the delivery process
 enum DeliveryStatus {
   PENDING // Delivery request available, no rider assigned
+  ACCEPTED
   PICKED_UP_FROM_VENDOR // Rider has picked up the order from the vendor
   DELIVERED_TO_USER // Rider has delivered the order to the user
 }
@@ -360,13 +362,16 @@ model Order {
 // RiderOrder model to manage assignments between riders and orders
 model RiderOrder {
   id         String    @id @default(uuid()) // Now using UUID for rider-order relation ID
-  riderId    String // Rider assigned to the order
+  riderId    String
   rider      User      @relation(fields: [riderId], references: [id])
-  orderId    String // Using UUID for orderId field
+  orderId    String
   order      Order     @relation(fields: [orderId], references: [id])
   assignedAt DateTime  @default(now()) @db.Timestamptz() // When the rider was assigned
   deletedAt  DateTime? @db.Timestamptz()
+
+  @@index([riderId, orderId]) // Optional: Index for efficient querying on riderId and orderId
 }
+
 
 // VendorOrder model to manage assignments between vendors and orders
 model VendorOrder {

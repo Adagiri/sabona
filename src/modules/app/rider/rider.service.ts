@@ -130,7 +130,8 @@ export default class RiderService {
                             orderId: params.orderId
                         },
                         data: {
-                            riderId: user.id
+                            riderId: user.id,
+                            status: 'ACCEPTED'
                         }
                     });
                     if (!updatedPickup){
@@ -142,7 +143,8 @@ export default class RiderService {
                             orderId: params.orderId
                         },
                         data: {
-                            riderId: user.id
+                            riderId: user.id,
+                            status: 'ACCEPTED'
                         }
                     });
 
