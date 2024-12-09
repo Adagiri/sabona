@@ -15,17 +15,17 @@ import CancelOrderResponseDTO from './dto/response/cancelOrder.response';
 export default class CustomerController {
     constructor(private _customerService: CustomerService) {}
 
-    // @Authorized()
-    // @Post({
-    //     path: '/createOrder',
-    //     description: 'Create order',
-    //     response: CreateOrderResponseDTO,
-    // })
-    // async CreateOrder(
-    //     @Body() data: CreateOrderRequestDTO, 
-    //     @CurrentUser() user: User): Promise<CreateOrderResponseDTO> {
-    //     return await this._customerService.CreateOrder(data, user)
-    // }
+    @Authorized()
+    @Post({
+        path: '/createOrder',
+        description: 'Create order',
+        response: CreateOrderResponseDTO,
+    })
+    async CreateOrder(
+        @Body() data: CreateOrderRequestDTO, 
+        @CurrentUser() user: User): Promise<CreateOrderResponseDTO> {
+        return await this._customerService.CreateOrder(data, user)
+    }
 
     @Authorized()
     @Patch({
