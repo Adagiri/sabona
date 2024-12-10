@@ -192,7 +192,6 @@ export default class UserService {
             where: { phone: data.phone },
         })
         if (user) {
-            console.log("im inside if statment")
             throw new BadRequestException(
                 "Phone number is already registered"
             );

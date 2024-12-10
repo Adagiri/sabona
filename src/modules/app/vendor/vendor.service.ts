@@ -70,7 +70,6 @@ export default class VendorService {
     }
 
     async updateOrderStatus(params: UpdateStatusRequestDTO, user: User): Promise<UpdateStatusResponseDTO> {
-        console.log(params)
         const order = await this._dbService.order.findUnique({
             where: {
                 id: params.orderId,
@@ -162,15 +161,12 @@ export default class VendorService {
     }
 
     async addLaundry(data: CreateLaundryRequestDTO, user: User): Promise<CreateLaundryReponseDTO> {
-        console.log(data)
         const laundry = await this._dbService.laundry.findFirst({
             where: {
                 vendorId: user.id,
                 deletedAt: null,
             }
         })
-
-        console.log(laundry)
 
         if (laundry) {
             throw new BadRequestException("Laundry already exist")
@@ -479,8 +475,6 @@ export default class VendorService {
             }
         })
 
-        console.log("items", items)
-
         return { data: items }
     }
 
@@ -579,7 +573,6 @@ export default class VendorService {
     }
 
     async getAllOrders (user: User): Promise<any> {
-        console.log(user)
         const orders = await this._dbService.order.findMany({
             where: {
                 vendorOrders: {
@@ -605,5 +598,39 @@ export default class VendorService {
         })
 
         return { data: order }
+    }
+
+    async getUserLaundry(user: User) {
+        const laundry = await this._dbService.laundry.findFirst({
+            where: {
+                vendorId: user.id,
+            }
+        })
+
+        if (!laundry) {
+            throw new BadRequestException("Laundry does not exist")
+        }
+
+        return { data: laundry }
+    }
+
+    async getOrders(user: User) {
+        const orders = await this._dbService.order.findMany({
+            where: {
+                vendorOrders: {
+                    vendorId: user.id,
+                },
+            },
+            include: {
+                user: {
+                   select: {
+                    firstName: true,
+                    lastName: true,
+                   }
+                }
+            }
+        })
+
+        return { data: orders }
     }
 }

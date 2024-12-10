@@ -28,7 +28,7 @@ export default class VendorController {
 
     @Authorized()
     @Get({
-        path: '/orderRequests',
+        path: '/orderRequests/:laundryId',
         description: 'Get all order requests',
         response: GetOrderRequestsResponseDTO
     })
@@ -36,6 +36,26 @@ export default class VendorController {
         @Param() param: GetOrderRequestDTO,
         @CurrentUser() user: User): Promise<GetOrderRequestsResponseDTO> {
         return await this._vendorService.getOrderRequests(user, param)
+    }
+
+    @Authorized()
+    @Get({
+        path: '/laundry',
+        description: 'Get user laundry',
+        response: {}
+    })
+    async getLaundry(@CurrentUser() user: User): Promise<any> {
+        return await this._vendorService.getUserLaundry(user)
+    }
+
+    @Authorized()
+    @Get({
+        path: 'orders',
+        description: 'Get all orders',
+        response: {}
+    })
+    async getOrders(@CurrentUser() user: User): Promise<any> {
+        return await this._vendorService.getOrders(user)
     }
 
     @Authorized()
