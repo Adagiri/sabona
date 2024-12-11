@@ -45,5 +45,17 @@ export default class AuthController {
         return this._userService.VerifyCode(data);
     }
 
+    @Post({
+        path: 'resendVerificationCode',
+        description: 're-send otp code',
+        response: SendVerificationCodeResponseDTO
+    })
+
+    ResendVerificationCode(
+        @Body() data: SendVerificationCodeRequestDTO,
+    ): Promise<SendVerificationCodeResponseDTO> {
+        return this._userService.ResendVerificationCode(data);
+    }
+
 
 }

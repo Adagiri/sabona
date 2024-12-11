@@ -393,5 +393,23 @@ export default class UserService {
 
     }
 
+    async ResendVerificationCode(data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
+        if (AppConfig.APP.ENV === 'dev') {
+            return {
+                message: "OTP sent successfully",
+            };
+        } else {
+            const otp = await this._smsService.sendVerificationCode(data.phone);
+            if (!otp) {
+                throw new BadRequestException(
+                    "Error while sending verification code, Please try again!!!"
+                );
+            }
+            return {
+                message: "OTP sent successfully",
+            };
+        }
+    }
+
 
 }
