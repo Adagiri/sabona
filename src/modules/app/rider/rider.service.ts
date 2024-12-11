@@ -360,4 +360,21 @@ export default class RiderService {
         })
         return { data: orders };
     }
+
+    async getLastOrder(user: User): Promise<{}> {
+        const order = await this._dbService.riderOrder.findFirst({
+            where: {
+                riderId: user.id,
+            },
+            orderBy: {
+                assignedAt: 'desc'
+            }
+        });
+
+        if (!order) {
+            throw new BadRequestException("No orders found");
+        }
+
+        return { data: order };
+    }
 }

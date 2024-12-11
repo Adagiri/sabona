@@ -2,6 +2,7 @@ import {  Injectable } from "@nestjs/common";
 import DatabaseService from "src/database/database.service";
 import getOrderByIdRequestDTO from "./dto/request/getOrderById.request";
 import GetOrderByIdResponseDTO from "./dto/response/getOrderById.response";
+import { BadRequestException } from "src/core/exceptions/response.exception";
 @Injectable()
 export default class OrderService {
     constructor(private _dbService: DatabaseService) {}
@@ -97,7 +98,7 @@ export default class OrderService {
             }
         })
         if (!order) {
-            throw new Error("Order not found");
+            throw new BadRequestException("Order not found");
         }
         return order;
     }

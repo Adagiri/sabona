@@ -4,6 +4,7 @@ import { User } from '@prisma/client';
 import CreateOrderRequestDTO from './dto/request/createOrder.request';
 import AcceptOrderRequestDTO from '../vendor/dto/request/acceptOrder.request';
 import CancelOrderResponseDTO from './dto/response/cancelOrder.response';
+import { OrderListDto } from './dto/response/orderlist.response.dto';
 
 @Injectable()
 export default class CustomerService {
@@ -110,5 +111,52 @@ export default class CustomerService {
 
         return orderCancelled;
 
+    }
+
+    async GetOrders(user: User): Promise<OrderListDto> {
+        const orders = await this._dbService.order.findMany({
+            where: {
+                userId: user.id,
+            },
+            select: {
+                id: true,
+                status: true,
+                services: {
+                    select: {
+                        items: {
+                            select: {
+                                quantity: true,
+                            },
+                        },
+                    },
+                },
+                laundry: {
+                    select:{
+                        name: true,
+                    }
+                },
+            },
+            orderBy:{
+                createdAt: 'desc',
+            }
+        });
+
+        if (!orders) {
+            throw new BadRequestException("Error fetching orders");
+        }
+        
+        const ordersWithTotalQuantity = orders.map(order => {
+            const totalQuantity = order.services.reduce((orderTotal, service) => {
+                const serviceTotal = service.items.reduce((itemTotal, item) => itemTotal + item.quantity, 0);
+                return orderTotal + serviceTotal;
+            }, 0);
+        
+            return {
+                ...order,
+                totalQuantity,
+            };
+        });
+        
+        return ordersWithTotalQuantity;
     }
 }

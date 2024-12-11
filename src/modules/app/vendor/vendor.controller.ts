@@ -8,7 +8,7 @@ import UpdateStatusResponseDTO from "./dto/response/updateStatus.response";
 import CreateLaundryRequestDTO, { LaundryServiceDTO } from "./dto/request/createLaundry.request";
 import EditLaundryRequestDTO from "./dto/request/editLaundry.request";
 import EditLaundryServiceRequestDTO from "./dto/request/laundryServiceEdit.request";
-import { CreateLaundryServiceItemRequestDTO } from "./dto/request/createLaundryServiceItem.request";
+import { CreateLaundryServiceItemRequestDTO, CreateLaundryServiceItemsArrayDTO } from "./dto/request/createLaundryServiceItem.request";
 import { EditLaundryServiceItemRequestDTO } from "./dto/request/editlaundryServiceItem.request";
 import { CreateLaundryReponseDTO } from "./dto/response/createLaundry.response";
 import { GetAllLaundriesResponseDTO } from "./dto/response/getAllLaundry.response";
@@ -198,7 +198,7 @@ export default class VendorController {
     async addLaundryServiceItem(
         @Param('laundryId') laundryId: string,
         @Param('serviceId') serviceId: string,
-        @Body() data: CreateLaundryServiceItemRequestDTO,
+        @Body() data: CreateLaundryServiceItemsArrayDTO,
         @CurrentUser() user: User): Promise<any> {
         return await this._vendorService.addLaundryServiceItem(laundryId, serviceId, data, user)
     }

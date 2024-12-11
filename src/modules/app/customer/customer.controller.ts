@@ -1,11 +1,12 @@
 import { User } from '@prisma/client';
-import { ApiController, Authorized, CurrentUser, Patch, Post } from '../../../core/decorators';
+import { ApiController, Authorized, CurrentUser, Get, Patch, Post } from '../../../core/decorators';
 import CustomerService from './customer.service';
 import { Body, Param } from '@nestjs/common';
 import CreateOrderResponseDTO from './dto/response/createOrder.response';
 import CreateOrderRequestDTO from './dto/request/createOrder.request';
 import AcceptOrderRequestDTO from '../vendor/dto/request/acceptOrder.request';
 import CancelOrderResponseDTO from './dto/response/cancelOrder.response';
+import { OrderListDto } from './dto/response/orderlist.response.dto';
 
 @ApiController({
     path: '/customer',
@@ -37,6 +38,17 @@ export default class CustomerController {
         @Param() params: AcceptOrderRequestDTO,
         @CurrentUser() user: User): Promise<CancelOrderResponseDTO> {
             return await this._customerService.CancelOrder(params, user)
+    }
+
+    @Authorized()
+    @Get({
+        path: '/orders',
+        description: 'Get all user orders',
+        response: OrderListDto,
+    })
+    async GetOrders(
+        @CurrentUser() user: User): Promise<OrderListDto> {
+        return await this._customerService.GetOrders(user)
     }
     
 

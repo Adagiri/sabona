@@ -7,7 +7,7 @@ import CreateLaundryRequestDTO, { LaundryServiceDTO } from "./dto/request/create
 import { BadRequestException } from "src/core/exceptions/response.exception";
 import { Injectable } from "@nestjs/common";
 import EditLaundryRequestDTO from "./dto/request/editLaundry.request";
-import { CreateLaundryServiceItemRequestDTO } from "./dto/request/createLaundryServiceItem.request";
+import { CreateLaundryServiceItemRequestDTO, CreateLaundryServiceItemsArrayDTO } from "./dto/request/createLaundryServiceItem.request";
 import { EditLaundryServiceItemRequestDTO } from "./dto/request/editlaundryServiceItem.request";
 import { CreateLaundryReponseDTO } from "./dto/response/createLaundry.response";
 import { GetAllLaundriesResponseDTO } from "./dto/response/getAllLaundry.response";
@@ -26,7 +26,15 @@ export default class VendorService {
                 OR: [
                     {
                         laundryId: param.laundryId,
+                        status: OrderStatus.IN_PROGRESS,
+                    },
+                    {
+                        laundryId: param.laundryId,
                         status: OrderStatus.PENDING,
+                    },
+                    {
+                        laundryId: param.laundryId,
+                        status: OrderStatus.ACCEPTED,
                     },
                     {
                         AND: {
@@ -213,6 +221,10 @@ export default class VendorService {
                 }
             }
         })
+
+        if (!laundries) {
+            throw new BadRequestException("Error fetching laundries")
+        }
 
         return { data: laundries }
     }
@@ -406,7 +418,7 @@ export default class VendorService {
         return { message: 'Service Deleted Successfully' };
     }
 
-    async addLaundryServiceItem(laundryId: string, serviceId: string, data: CreateLaundryServiceItemRequestDTO, user: User): Promise<any> {
+    async addLaundryServiceItem(laundryId: string, serviceId: string, data: CreateLaundryServiceItemsArrayDTO, user: User): Promise<any> {
         const laundry = await this._dbService.laundry.findFirst({
             where: {
                 id: laundryId,
@@ -429,15 +441,21 @@ export default class VendorService {
             throw new BadRequestException("Service does not exist")
         }
 
-        const item = await this._dbService.laundryServiceItem.create({
-            data: {
-                laundryServiceId: serviceId,
-                name: data.name,
-                price: data.price,
-            }
+        const items = data.items.map(item => ({
+            name: item.name,
+            price: item.price,
+            laundryServiceId: serviceId,
+        }))
+
+        const createdItems = await this._dbService.laundryServiceItem.createMany({
+            data: items
         })
 
-        return item;
+        if (!createdItems) {
+            throw new BadRequestException("Failed to add items")
+        }
+
+        return { data: { message: 'Items Added Successfully' } }
     }
 
     async getAllLaundryServiceItems(laundryId: string, serviceId: string, user: User): Promise<any> {
@@ -580,6 +598,8 @@ export default class VendorService {
                 }
             }
         })
+
+        console.log(orders)
 
         return { data: orders }
     }
