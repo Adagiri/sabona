@@ -55,35 +55,38 @@ export default class RiderService {
                             }
                         }
                     }
-                ]
+                ],
+                NOT: {
+                    status: 'CANCELLED'
+                }
             },
-            orderBy:{
+            orderBy: {
                 createdAt: 'desc'
             },
             select: {
                 id: true,
                 userId: true,
-                laundry:{
-                    select:{
+                laundry: {
+                    select: {
                         name: true,
                         address: true,
                     }
                 },
-                riderOrders:{
-                    select:{
+                riderOrders: {
+                    select: {
                         riderId: true,
                     },
                 },
-                pickup:{
-                    select:{
+                pickup: {
+                    select: {
                         pickupAddress: true,
                         pickupLat: true,
                         pickupLong: true,
                         status: true,
                     }
                 },
-                delivery:{
-                    select:{
+                delivery: {
+                    select: {
                         deliveryAddress: true,
                         deliveryLat: true,
                         deliveryLong: true,
@@ -93,10 +96,10 @@ export default class RiderService {
                 status: true,
             }
         });
-
+        
         return { data: rideRequests };
-    
     }
+        
 
     async updateOrderStatus(params: UpdateStatusRequestDTO, user: User): Promise<UpdateOrderStatusResponseDTO> {
         const order = await this._dbService.order.findUnique({
@@ -250,6 +253,11 @@ export default class RiderService {
         const deliveries = await this._dbService.riderOrder.findMany({
             where: {
                 riderId: user.id,
+                order: {
+                    status: {
+                        not: OrderStatus.CANCELLED
+                    }
+                }
             },
             select: {
                 orderId: true,
