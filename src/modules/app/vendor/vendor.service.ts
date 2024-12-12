@@ -15,6 +15,7 @@ import { GetLaundryByIdResponseDTO } from "./dto/response/getLaundryById.respons
 import LaundryMessageResponseDTO from "./dto/response/laundryMessage";
 import LaundryServiceMessageResponseDTO from "./dto/response/laundryServiceMessage.response";
 import GetOrderRequestDTO from "./dto/request/getOrder.request";
+import CancelOrderRequestDTO from "./dto/request/cancelOrder.request";
 
 @Injectable()
 export default class VendorService {
@@ -588,6 +589,37 @@ export default class VendorService {
         })
 
         return { data: { message: 'Item Deleted Successfully' } };
+    }
+
+    async cancelOrder(params: CancelOrderRequestDTO, user: User): Promise<UpdateStatusResponseDTO> {
+        console.log("params", params)
+        const order = await this._dbService.order.findUnique({
+            where: {
+                id: params.orderId,
+                vendorOrders: {
+                    vendorId: user.id,
+                }
+            }
+        })
+
+        if (!order) {
+            throw new BadRequestException("Order does not exist")
+        }
+
+        const updatedOrder = await this._dbService.order.update({
+            where: {
+                id: params.orderId,
+            },
+            data: {
+                status: OrderStatus.CANCELLED,
+            }
+        })
+
+        if (!updatedOrder) {
+            throw new BadRequestException("Failed to cancel order")
+        }
+
+        return { message: 'SUCCESS' }
     }
 
     async getAllOrders (user: User): Promise<any> {

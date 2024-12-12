@@ -16,6 +16,7 @@ import { GetLaundryByIdResponseDTO } from "./dto/response/getLaundryById.respons
 import LaundryMessageResponseDTO from "./dto/response/laundryMessage";
 import LaundryServiceMessageResponseDTO from "./dto/response/laundryServiceMessage.response";
 import GetOrderRequestDTO from "./dto/request/getOrder.request";
+import CancelOrderRequestDTO from "./dto/request/cancelOrder.request";
 
 @ApiController({
     path: '/vendor',
@@ -66,6 +67,16 @@ export default class VendorController {
     })
     async updateOrderStatus(@Param() params: UpdateStatusRequestDTO, @CurrentUser() user: User): Promise<UpdateStatusResponseDTO> {
         return await this._vendorService.updateOrderStatus(params, user)
+    }
+
+    @Authorized()
+    @Patch({
+        path: '/order/:orderId/cancel',
+        description: 'Cancel order',
+        response: UpdateStatusResponseDTO
+    })
+    async cancelOrder(@Param() params: CancelOrderRequestDTO, @CurrentUser() user: User): Promise<UpdateStatusResponseDTO> {
+        return await this._vendorService.cancelOrder(params, user)
     }
 
     @Authorized()

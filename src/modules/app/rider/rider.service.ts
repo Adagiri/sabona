@@ -1,11 +1,12 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
-import { OrderStatus, User } from '@prisma/client';
+import { OrderStatus, PickupStatus, User } from '@prisma/client';
 import UpdateStatusRequestDTO from './dto/request/updateStatus.request';
 import GetRideRequestsResponseDTO from './dto/response/getRideRequests.response';
 import UpdateOrderStatusResponseDTO from './dto/response/updateOrderStatus.response';
 import GetDeliveriesResponseDTO from './dto/response/getDeliveries.response';
 import CancelOrderRequestDTO from './dto/request/src/modules/app/rider/dto/request/cancelOrderRequest';
+import { BadRequestException } from 'src/core/exceptions/response.exception';
 
 @Injectable()
 export default class RiderService {
@@ -286,32 +287,58 @@ export default class RiderService {
     }
 
     async cancelOrder(params: CancelOrderRequestDTO, user: User): Promise<UpdateOrderStatusResponseDTO> {
-        const orders = await this._dbService.riderOrder.findMany({
+        const pickupOrder = await this._dbService.pickup.findFirst({
             where: {
-                AND: {
+                    riderId: user.id,
                     orderId: params.orderId,
-                    riderId: user.id
-                },
+                    status: OrderStatus.ACCEPTED
             },
-            orderBy: {
-                assignedAt: 'desc'
-            }
         });
-    
-        if (!orders || orders.length === 0) {
-            throw new BadRequestException("Order does not exist");
+
+        const deliveryOrder = await this._dbService.delivery.findFirst({
+            where: {
+                    riderId: user.id,
+                    orderId: params.orderId,
+                    status: OrderStatus.ACCEPTED
+            },
+        });
+
+        if (!pickupOrder && !deliveryOrder) {
+            throw new BadRequestException("You can not cancel this order");
         }
 
-        //for the case in where same rider is assigned for pickup and dropoff
-        const latestRiderOrder = orders[0];
-        const riderOrderDeletion = await this._dbService.riderOrder.delete({
-            where: {
-                id: latestRiderOrder.id
-            },
-        });
-        
-        if (!riderOrderDeletion) {
-            throw new BadRequestException("Failed to cancel order");
+        if (pickupOrder) {
+            console.log('pickupOrder');
+            const updateStatus = await this._dbService.pickup.update({
+                where: {
+                    orderId: params.orderId
+                },
+                data: {
+                    status: PickupStatus.PENDING,
+                    riderId: null
+                }
+            });
+
+            if (!updateStatus) {
+                throw new BadRequestException("Error updating status");
+            }
+        }
+
+        if (deliveryOrder) {
+            console.log('deliveryOrder');
+            const updateStatus = await this._dbService.delivery.update({
+                where: {
+                    orderId: params.orderId
+                },
+                data: {
+                    status: PickupStatus.PENDING,
+                    riderId: null
+                }
+            });
+
+            if (!updateStatus) {
+                throw new BadRequestException("Error updating status");
+            }
         }
 
         return {message: 'SUCCESS'}
