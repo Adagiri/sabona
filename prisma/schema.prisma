@@ -12,8 +12,8 @@
 
 generator client {
   provider = "prisma-client-js"
-  // output   = "../node_modules/.prisma/client"
-  binaryTargets = ["rhel-openssl-1.0.x", "native"]
+  output   = "../node_modules/.prisma/client"
+  // binaryTargets = ["rhel-openssl-1.0.x", "native"]
 }
 
 datasource db {
@@ -232,6 +232,22 @@ enum DeliveryStatus {
   DELIVERED_TO_USER // Rider has delivered the order to the user
 }
 
+enum DetergentType {
+  REGULAR
+  SENSITIVE
+  USE_MINE
+}
+
+enum ColorType {
+  LIGHT
+  DARK
+  MIXED
+}
+
+enum DeliveryType {
+  NORMAL
+  EXPRESS
+}
 // Pickup model to track the pickup of the order from the user to the vendor
 model Pickup {
   id      String  @id @default(uuid()) // UUID for pickup ID
@@ -244,6 +260,10 @@ model Pickup {
   pickupAddress String // The address for pickup
   pickupLat     Float // Latitude for pickup location
   pickupLong    Float // Longitude for pickup location
+
+  //Store the pickup address and time 
+  pickupTime String? // Time for pickup
+  pickupDate String? // Date for pickup
 
   status    PickupStatus @default(PENDING) // Status of the pickup process
   createdAt DateTime     @default(now()) @db.Timestamptz()
@@ -263,6 +283,10 @@ model Delivery {
   deliveryAddress String // The address for delivery
   deliveryLat     Float // Latitude for delivery location
   deliveryLong    Float // Longitude for delivery location
+
+  //Store the address and time for delivery
+  deliveryTime String? // Time for delivery
+  deliveryDate String? // Date for delivery
 
   status    DeliveryStatus @default(PENDING) // Status of the delivery process
   createdAt DateTime       @default(now()) @db.Timestamptz()
@@ -353,6 +377,9 @@ model Order {
   statusHistory OrderStatusHistory[] // History of order status changes
   pickup        Pickup? // Relation to the pickup tracking
   delivery      Delivery? // Relation to the delivery tracking
+  deliveryType  DeliveryType @default(NORMAL) // Type of delivery (normal/express)
+  detergentType DetergentType @default(REGULAR) // Type of detergent used
+  colorType     ColorType @default(MIXED) // Type of color (light/dark/mixed)
 
   createdAt DateTime  @default(now()) @db.Timestamptz()
   updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz()
