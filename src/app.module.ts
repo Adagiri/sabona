@@ -20,6 +20,7 @@ import CustomerModule from './modules/app/customer/customer.module';
 import RiderModule from './modules/app/rider/rider.module';
 import VendorModule from './modules/app/vendor/vendor.module';
 import OrderModule from './modules/app/order/order.module';
+import AdminModule from './modules/app/admin/admin.module';
 @Module({
     imports: [
         TranslatorModule.forRoot({
@@ -45,6 +46,7 @@ import OrderModule from './modules/app/order/order.module';
         RiderModule,
         VendorModule,
         OrderModule,
+        AdminModule
     ],
     controllers: [AppController],
     providers: [
