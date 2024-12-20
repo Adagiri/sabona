@@ -71,9 +71,9 @@ export default class CreateOrderRequestDTO {
     @IsNumber()
     deliveryLong: number;
 
-    @ApiProperty()
-    @IsString()
-    deliveryTime: string;
+    // @ApiProperty()
+    // @IsString()
+    // deliveryTime: string;
     
     @ApiProperty()
     @IsString()
