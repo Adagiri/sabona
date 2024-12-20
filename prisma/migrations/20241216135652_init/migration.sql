@@ -29,10 +29,19 @@ CREATE TYPE "MediaStatus" AS ENUM ('UPLOADING', 'READY', 'STALE');
 CREATE TYPE "MediaAccess" AS ENUM ('PUBLIC', 'PRIVATE');
 
 -- CreateEnum
-CREATE TYPE "PickupStatus" AS ENUM ('PENDING', 'PICKED_UP', 'DELIVERED_TO_VENDOR');
+CREATE TYPE "PickupStatus" AS ENUM ('PENDING', 'ACCEPTED', 'PICKED_UP', 'DELIVERED_TO_VENDOR');
 
 -- CreateEnum
-CREATE TYPE "DeliveryStatus" AS ENUM ('PENDING', 'PICKED_UP_FROM_VENDOR', 'DELIVERED_TO_USER');
+CREATE TYPE "DeliveryStatus" AS ENUM ('PENDING', 'ACCEPTED', 'PICKED_UP_FROM_VENDOR', 'DELIVERED_TO_USER');
+
+-- CreateEnum
+CREATE TYPE "DetergentType" AS ENUM ('REGULAR', 'SENSITIVE', 'USE_MINE');
+
+-- CreateEnum
+CREATE TYPE "ColorType" AS ENUM ('LIGHT', 'DARK', 'MIXED');
+
+-- CreateEnum
+CREATE TYPE "DeliveryType" AS ENUM ('NORMAL', 'EXPRESS');
 
 -- CreateTable
 CREATE TABLE "User" (
@@ -149,6 +158,8 @@ CREATE TABLE "Pickup" (
     "pickupAddress" TEXT NOT NULL,
     "pickupLat" DOUBLE PRECISION NOT NULL,
     "pickupLong" DOUBLE PRECISION NOT NULL,
+    "pickupTime" TEXT,
+    "pickupDate" TEXT,
     "status" "PickupStatus" NOT NULL DEFAULT 'PENDING',
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -165,6 +176,8 @@ CREATE TABLE "Delivery" (
     "deliveryAddress" TEXT NOT NULL,
     "deliveryLat" DOUBLE PRECISION NOT NULL,
     "deliveryLong" DOUBLE PRECISION NOT NULL,
+    "deliveryTime" TEXT,
+    "deliveryDate" TEXT,
     "status" "DeliveryStatus" NOT NULL DEFAULT 'PENDING',
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -242,6 +255,9 @@ CREATE TABLE "Order" (
     "laundryId" TEXT NOT NULL,
     "status" "OrderStatus" NOT NULL DEFAULT 'PENDING',
     "totalAmount" DOUBLE PRECISION NOT NULL,
+    "deliveryType" "DeliveryType" NOT NULL DEFAULT 'NORMAL',
+    "detergentType" "DetergentType" NOT NULL DEFAULT 'REGULAR',
+    "colorType" "ColorType" NOT NULL DEFAULT 'MIXED',
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "deletedAt" TIMESTAMPTZ,
@@ -319,6 +335,9 @@ CREATE UNIQUE INDEX "Pickup_orderId_key" ON "Pickup"("orderId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Delivery_orderId_key" ON "Delivery"("orderId");
+
+-- CreateIndex
+CREATE INDEX "RiderOrder_riderId_orderId_idx" ON "RiderOrder"("riderId", "orderId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "VendorOrder_orderId_key" ON "VendorOrder"("orderId");

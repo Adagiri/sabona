@@ -21,6 +21,8 @@ export default class CustomerService {
                         pickupAddress: data.pickupAddress,
                         pickupLat: data.pickupLat,
                         pickupLong: data.pickupLong,
+                        pickupDate: data.pickupDate,
+                        pickupTime  : data.pickupTime,
                     }
                 },
                 delivery: {
@@ -28,8 +30,13 @@ export default class CustomerService {
                         deliveryAddress: data.deliveryAddress,
                         deliveryLat: data.deliveryLat,
                         deliveryLong: data.deliveryLong,
+                        // deliveryTime: data.pickupTime,
+                        deliveryDate: data.deliveryDate,
                     }
                 },
+                deliveryType: data.deliveryType,
+                detergentType: data.detergentType,
+                colorType: data.colorType,
                 services: {
                     create: data.services.map(service => ({
                         laundryServiceId: service.serviceId,

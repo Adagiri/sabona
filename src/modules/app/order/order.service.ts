@@ -58,6 +58,8 @@ export default class OrderService {
                         pickupLat: true,
                         pickupLong: true,
                         status: true,
+                        pickupDate: true,
+                        pickupTime: true,
                     },
                 },
                 delivery: {
@@ -67,6 +69,8 @@ export default class OrderService {
                         deliveryLat: true,
                         deliveryLong: true,
                         status: true,
+                        deliveryDate: true,
+                        deliveryTime: true,
                     },
                 },
                 services: {

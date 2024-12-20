@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, User } from '@prisma/client';
+import { Prisma, User, UserStatus, UserType } from '@prisma/client';
 import DatabaseService from '../../../database/database.service';
 import {
     BadRequestException,
@@ -73,6 +73,7 @@ export default class UserService {
             data: {
                 phone: data.phone,
                 type: data.type!,
+                status: data.type === UserType.USER ? UserStatus.ACTIVE : UserStatus.INACTIVE,
                 settings: {
                     create: {
                         lat: data.latitude || 0,

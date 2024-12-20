@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { ColorType, DeliveryType, DetergentType } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsArray, isArray, IsNumber, IsString } from 'class-validator';
+import { IsArray, IsEnum, IsNumber, IsString } from 'class-validator';
 
 
 export class OrderServiceItemDTO {
@@ -52,6 +53,14 @@ export default class CreateOrderRequestDTO {
 
     @ApiProperty()
     @IsString()
+    pickupTime: string;
+
+    @ApiProperty()
+    @IsString()
+    pickupDate: string;
+
+    @ApiProperty()
+    @IsString()
     deliveryAddress: string;
 
     @ApiProperty()
@@ -61,9 +70,24 @@ export default class CreateOrderRequestDTO {
     @ApiProperty()
     @IsNumber()
     deliveryLong: number;
+
+    // @ApiProperty()
+    // @IsString()
+    // deliveryTime: string;
+    
+    @ApiProperty()
+    @IsString()
+    deliveryDate: string;
+
+    @ApiProperty()
+    @IsEnum(DeliveryType)
+    deliveryType: DeliveryType;
+
+    @ApiProperty()
+    @IsEnum(DetergentType)
+    detergentType: DetergentType;
+
+    @ApiProperty()
+    @IsEnum(ColorType)
+    colorType: ColorType;
 }
-
-
-
-
-
