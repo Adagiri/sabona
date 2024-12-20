@@ -30,7 +30,7 @@ export default class CustomerService {
                         deliveryAddress: data.deliveryAddress,
                         deliveryLat: data.deliveryLat,
                         deliveryLong: data.deliveryLong,
-                        deliveryTime: data.pickupTime,
+                        // deliveryTime: data.pickupTime,
                         deliveryDate: data.deliveryDate,
                     }
                 },
