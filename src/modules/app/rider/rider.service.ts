@@ -94,6 +94,7 @@ export default class RiderService {
                     }
                 },
                 status: true,
+                deliveryType: true,
             }
         });
         

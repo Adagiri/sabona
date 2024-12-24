@@ -1,0 +1,5 @@
+-- CreateEnum
+CREATE TYPE "LEVEL" AS ENUM ('BASIC', 'LOYAL', 'ELITE');
+
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "level" "LEVEL" DEFAULT 'BASIC';

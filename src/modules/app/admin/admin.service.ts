@@ -6,7 +6,7 @@ import { AllUserListDto } from './dto/response/allCustomerList.response.dto';
 import FindUsersRequestDTO from '../user/dto/request/find.request';
 import FindUsersResponseDTO from '../user/dto/response/find.response';
 import { Prisma, UserStatus, UserType } from '@prisma/client';
-import { GetOrderOptions, GetPaginationOptions } from 'src/helpers/util.helper';
+import { GetDateFilterOptions, GetOrderOptions, GetPaginationOptions } from 'src/helpers/util.helper';
 import FindOrderRequestDTO from './dto/request/find.request';
 import FindApplicationRequestDTO from './dto/request/application.request';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
@@ -36,6 +36,7 @@ export default class AdminService {
                     select:{
                         firstName: true,
                         lastName: true,
+                        phone: true,
                     }
                 },
                 totalAmount: true,
@@ -45,6 +46,7 @@ export default class AdminService {
                             select:{
                                 firstName: true,
                                 lastName: true,
+                                phone: true,
                             }
                         }
                     }
@@ -61,8 +63,38 @@ export default class AdminService {
                 laundry: {
                     select: {
                         name: true,
+                        vendor: {
+                            select:{
+                                phone: true,
+                            }
+                        }
                     },
                 },
+                delivery:{
+                    select:{
+                        rider:{
+                            select:{
+                                firstName: true,
+                                lastName: true,
+                                phone: true,
+                            }
+                        }
+                    }
+                },
+                pickup:{
+                    select: {
+                        rider: {
+                            select: {
+                                firstName: true,
+                                lastName: true,
+                                phone: true,
+                            }
+                        },
+                        pickupLat: true,
+                        pickupLong: true,
+                        pickupAddress: true,
+                    }
+                }
             },
             ...pagination,
             orderBy: order,
@@ -99,6 +131,7 @@ export default class AdminService {
     async Find(data: FindUsersRequestDTO): Promise<FindUsersResponseDTO> {
         const where: Prisma.UserWhereInput = {
             ...(!!data.type && { type: data.type }),
+            ...GetDateFilterOptions(data.dateFilter)
         };
         const pagination = GetPaginationOptions(data);
         const order = GetOrderOptions(data);
@@ -181,6 +214,29 @@ export default class AdminService {
         });
 
         return { message: 'Application approved successfully' };
+    }
+
+    async GetCustomersLocation(): Promise<any> {
+        const users = await this._dbService.user.findMany({
+            select:{
+                id : true,
+                settings:{
+                    select:{
+                        lat:true,
+                        long :true
+                    }
+                }
+            },
+            where:{
+                type: UserType.USER,
+            }
+        });
+
+        if (!users) {
+            throw new BadRequestException('Error fetching users');
+        }
+
+        return { data: users };
     }
 }
 

@@ -98,6 +98,12 @@ enum MediaAccess {
   PRIVATE
 }
 
+enum LEVEL {
+  BASIC
+  LOYAL
+  ELITE
+}
+
 // User model to store user-related information
 model User {
   id               String     @id @default(uuid()) // Now using UUID for user ID
@@ -113,6 +119,8 @@ model User {
   updatedAt        DateTime   @default(now()) @updatedAt @db.Timestamptz()
   deletedAt        DateTime?  @db.Timestamptz() // Optional deleted at timestamp
   profilePicture   Media?     @relation(fields: [profilePictureId], references: [id])
+
+  level            LEVEL? @default(BASIC)// User level
 
   addresses UserAddress[] // A user can have multiple addresses
 
