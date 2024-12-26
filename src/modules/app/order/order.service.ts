@@ -18,6 +18,8 @@ export default class OrderService {
                 createdAt: true,
                 updatedAt: true,
                 laundryId: true,
+                deliveryType: true,
+                notes:true,
                 laundry:{
                     select:{
                         id: true,

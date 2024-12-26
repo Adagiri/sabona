@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Order" ALTER COLUMN "detergentType" DROP DEFAULT,
+ALTER COLUMN "colorType" DROP DEFAULT;
