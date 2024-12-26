@@ -111,7 +111,6 @@ export default class VendorController {
         return await this._vendorService.addLaundry(data, user)
     }
 
-    @Authorized()
     @Get({
         path: '/laundry/all',
         description: 'Get all laundries',
@@ -121,7 +120,6 @@ export default class VendorController {
         return await this._vendorService.getAllLaundries()
     }
 
-    @Authorized()
     @Get({
         path: '/laundry/:laundryId',
         description: 'Get laundry by id',
@@ -214,7 +212,6 @@ export default class VendorController {
         return await this._vendorService.addLaundryServiceItem(laundryId, serviceId, data, user)
     }
 
-    @Authorized()
     @Get({
         path: '/laundry/:laundryId/service/:serviceId/items',
         description: 'Get all laundry service items',

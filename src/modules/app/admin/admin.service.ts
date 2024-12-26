@@ -147,6 +147,7 @@ export default class AdminService {
                 createdAt: true,
                 updatedAt: true,
                 status: true,
+                level : UserType.USER === data.type ? true : false,
             },
             where,
             ...pagination,

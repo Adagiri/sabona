@@ -172,6 +172,7 @@ model DeviceToken {
   user      User     @relation(fields: [userId], references: [id])
   token     String   @unique // Unique push token for each device
   createdAt DateTime @default(now()) @db.Timestamptz()
+  deletedAt DateTime?  @db.Timestamptz() // Optional deletion timestamp
 }
 
 // Device model to store devices used by users (for web, iOS, Android)
