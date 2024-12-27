@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {  Injectable } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { SendMultipleNotificationResponseDTO } from '../app/notification/dto/response/notification.response';
 import SendNotificationRequestDTO, { MultipleDeviceNotificationDto } from '../app/notification/dto/request/notification.request';
+import { BadRequestException } from 'src/core/exceptions/response.exception';
 
 @Injectable()
 export default class FirebaseService {
