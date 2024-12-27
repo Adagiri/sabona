@@ -16,6 +16,7 @@ export default class CustomerService {
                 userId: user.id,
                 laundryId: data.laundryId,
                 totalAmount: data.totalAmount,
+                notes: data.note,
                 pickup: {
                     create: {
                         pickupAddress: data.pickupAddress,
@@ -35,8 +36,8 @@ export default class CustomerService {
                     }
                 },
                 deliveryType: data.deliveryType,
-                detergentType: data.detergentType,
-                colorType: data.colorType,
+                // detergentType: data.detergentType,
+                // colorType: data.colorType,
                 services: {
                     create: data.services.map(service => ({
                         laundryServiceId: service.serviceId,

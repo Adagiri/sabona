@@ -1,8 +1,9 @@
 import { Body } from '@nestjs/common';
-import { ApiController, Post } from '../../../core/decorators';
+import { ApiController, Authorized, CurrentUser, Post } from '../../../core/decorators';
 import DeviceService from './device.service';
-import CreateDeviceRequestDTO from './dto/request/create.request';
-import CreateDeviceResponseDTO from './dto/response/create.response';
+import CreateDeviceRequestDTO, { CreateFCMTokenRequestDTO } from './dto/request/create.request';
+import CreateDeviceResponseDTO, { CreateFCMTokenResponseDTO } from './dto/response/create.response';
+import { User } from '@prisma/client';
 
 @ApiController({
     path: '/device',
@@ -19,5 +20,18 @@ export default class DeviceController {
     })
     Create(@Body() data: CreateDeviceRequestDTO): Promise<CreateDeviceResponseDTO> {
         return this._deviceService.Create(data);
+    }
+
+    @Authorized()
+    @Post({
+        path: '/fcm-token',
+        description: 'Add FCM token to device',
+        response: CreateFCMTokenResponseDTO,
+    })
+    AddFCMToken(
+        @Body() data: CreateFCMTokenRequestDTO ,
+        @CurrentUser() user: User
+    ): Promise<CreateFCMTokenResponseDTO> {
+        return this._deviceService.AddFCMToken(data , user);
     }
 }

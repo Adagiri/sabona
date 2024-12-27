@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DeviceType } from '@prisma/client';
-import { IsEnum, IsInt, IsOptional, Length } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Length } from 'class-validator';
 
 export default class CreateDeviceRequestDTO {
     @ApiProperty({ enum: DeviceType })
@@ -16,3 +16,10 @@ export default class CreateDeviceRequestDTO {
     @Length(1, 255)
     userAgent?: string;
 }
+
+export class CreateFCMTokenRequestDTO  {
+    @ApiProperty()
+    @IsString()
+    token: string;
+}
+

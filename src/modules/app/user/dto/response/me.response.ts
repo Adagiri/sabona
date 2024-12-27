@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { UserStatus, UserType } from '@prisma/client';
+import { LEVEL, UserStatus, UserType } from '@prisma/client';
 import { UserSettingsModel } from '../../user_settings/dto/response/model_user_settings';
 
 export default class GetMeResponseDTO {
@@ -29,4 +29,7 @@ export default class GetMeResponseDTO {
 
     @ApiProperty()
     settings?: UserSettingsModel;
+
+    @ApiProperty()
+    level?: LEVEL
 }
