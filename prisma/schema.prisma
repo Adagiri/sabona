@@ -98,6 +98,12 @@ enum MediaAccess {
   PRIVATE
 }
 
+enum LEVEL {
+  BASIC
+  LOYAL
+  ELITE
+}
+
 // User model to store user-related information
 model User {
   id               String     @id @default(uuid()) // Now using UUID for user ID
@@ -113,6 +119,8 @@ model User {
   updatedAt        DateTime   @default(now()) @updatedAt @db.Timestamptz()
   deletedAt        DateTime?  @db.Timestamptz() // Optional deleted at timestamp
   profilePicture   Media?     @relation(fields: [profilePictureId], references: [id])
+
+  level            LEVEL? @default(BASIC)// User level
 
   addresses UserAddress[] // A user can have multiple addresses
 
@@ -164,6 +172,7 @@ model DeviceToken {
   user      User     @relation(fields: [userId], references: [id])
   token     String   @unique // Unique push token for each device
   createdAt DateTime @default(now()) @db.Timestamptz()
+  deletedAt DateTime?  @db.Timestamptz() // Optional deletion timestamp
 }
 
 // Device model to store devices used by users (for web, iOS, Android)
@@ -378,8 +387,9 @@ model Order {
   pickup        Pickup? // Relation to the pickup tracking
   delivery      Delivery? // Relation to the delivery tracking
   deliveryType  DeliveryType @default(NORMAL) // Type of delivery (normal/express)
-  detergentType DetergentType @default(REGULAR) // Type of detergent used
-  colorType     ColorType @default(MIXED) // Type of color (light/dark/mixed)
+  detergentType DetergentType? // Type of detergent used
+  colorType     ColorType? // Type of color (light/dark/mixed)
+  notes         String? // Additional notes for the order
 
   createdAt DateTime  @default(now()) @db.Timestamptz()
   updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz()

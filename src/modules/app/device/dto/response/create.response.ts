@@ -17,3 +17,8 @@ export default class CreateDeviceResponseDTO {
     @ApiProperty()
     userAgent: string;
 }
+
+export class CreateFCMTokenResponseDTO {
+    @ApiProperty()
+    message: string;
+}   

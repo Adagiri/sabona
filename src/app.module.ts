@@ -21,6 +21,8 @@ import RiderModule from './modules/app/rider/rider.module';
 import VendorModule from './modules/app/vendor/vendor.module';
 import OrderModule from './modules/app/order/order.module';
 import AdminModule from './modules/app/admin/admin.module';
+import { NotificationModule } from './modules/app/notification/notification.module';
+import { FirebaseModule } from './modules/firebase/firebase.module';
 @Module({
     imports: [
         TranslatorModule.forRoot({
@@ -46,7 +48,9 @@ import AdminModule from './modules/app/admin/admin.module';
         RiderModule,
         VendorModule,
         OrderModule,
-        AdminModule
+        AdminModule,
+        NotificationModule,
+        FirebaseModule,
     ],
     controllers: [AppController],
     providers: [

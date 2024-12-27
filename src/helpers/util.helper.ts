@@ -3,6 +3,7 @@ import { OrderDirection } from '../core/request/paginated.request';
 import * as gpc from 'generate-pincode';
 import AppConfig from 'src/configs/app.config';
 import { v4 as uuid } from 'uuid';
+import { Prisma } from '@prisma/client';
 
 export async function HashPassword(plainText: string): Promise<any> {
     return new Promise(function (resolve, reject) {
@@ -49,6 +50,14 @@ export interface PaginationDBParams {
 export interface OrderByRequestParams {
     Column: string;
     Direction: 'ASC' | 'DESC';
+}
+
+export enum DateFilter {
+    Today = 'Today',
+    ByWeek = 'ByWeek',
+    ByMonth = 'ByMonth',
+    BySixMonths = 'BySixMonths',
+    ByYear = 'ByYear',
 }
 
 /**
@@ -266,6 +275,48 @@ export function GetOrderOptions(options: GetOrderOptionsArgs) {
     }
 
     return databaseOptions;
+}
+
+export function GetDateFilterOptions(filter?: DateFilter): Prisma.UserWhereInput {
+    if (!filter) return {};
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    switch (filter) {
+        case DateFilter.BySixMonths:
+            return {
+                createdAt: {
+                    gte: new Date(now.setMonth(now.getMonth() - 6)),
+                },
+            };
+        case DateFilter.ByMonth:
+            return {
+                createdAt: {
+                    gte: new Date(now.setMonth(now.getMonth() - 1)),
+                },
+            };
+        case DateFilter.ByYear:
+            return {
+                createdAt: {
+                    gte: new Date(now.setFullYear(now.getFullYear() - 1)),
+                },
+            };
+        case DateFilter.ByWeek:
+            return {
+                createdAt: {
+                    gte: new Date(now.setDate(now.getDate() - 7)),
+                },
+            };
+        case DateFilter.Today:
+            return {
+                createdAt: {
+                    gte: startOfToday,
+                },
+            };
+        default:
+            return {};
+    }
 }
 
 export function ExcludeFields<T, Key extends keyof T>(model: T, keys: Key[]): Omit<T, Key> {

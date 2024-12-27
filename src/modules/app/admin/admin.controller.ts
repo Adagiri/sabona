@@ -12,6 +12,9 @@ import FindOrderRequestDTO from './dto/request/find.request';
 import FindApplicationRequestDTO from './dto/request/application.request';
 import { ApproveApplicationDTO } from './dto/request/application.approve.request';
 import ApplicationApproveMessageResponseDTO from './dto/response/approve.response.dto';
+import GetOrderByIdRequestDTO from '../order/dto/request/getOrderById.request';
+import GetOrderByIdResponseDTO from '../order/dto/response/getOrderById.response';
+import OrderService from '../order/order.service';
 
 @ApiController({
     path: '/admin',
@@ -20,7 +23,10 @@ import ApplicationApproveMessageResponseDTO from './dto/response/approve.respons
 })
 export default class AdminController {
     constructor(
-        private _adminService: AdminService) { }
+        private _adminService: AdminService,
+        private _orderService: OrderService
+
+    ) { }
 
     // Get All orders
     @Authorized(UserType.ADMIN)
@@ -33,6 +39,19 @@ export default class AdminController {
         return await this._adminService.GetAllOrders(data)
     }
 
+
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/orders/:id',
+        description: 'Get Order By Order Id',
+        response: GetOrderByIdResponseDTO,
+    })
+    async getOrderById(@Param() params: GetOrderByIdRequestDTO): Promise<GetOrderByIdResponseDTO> {
+        return await this._orderService.getOrderById(params)
+    }
+
+
+    // Get all user list
     @Authorized(UserType.ADMIN)
     @Get({
         path: '/users/all',
@@ -43,6 +62,9 @@ export default class AdminController {
         return this._adminService.Find(data);
     }
 
+
+    // Get all applications
+    @Authorized(UserType.ADMIN)
     @Get({
         path: '/applications',
         description: 'Get Applications listing',
@@ -52,6 +74,8 @@ export default class AdminController {
         return this._adminService.GetAllApplications(data);
     }
 
+
+    // Approve Applications
     @Authorized(UserType.ADMIN)
     @Post({
         path: '/application/approve/:userId',
@@ -63,6 +87,16 @@ export default class AdminController {
         @Param('userId') userId: string
     ): Promise<ApplicationApproveMessageResponseDTO> {
         return await this._adminService.ApproveApplication(userId)
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/users/location',
+        description: 'Get Users Location',
+        response: Promise<any>,
+    })
+    async getUsersLocation(): Promise<any> {
+        return this._adminService.GetCustomersLocation();
     }
 
 }
