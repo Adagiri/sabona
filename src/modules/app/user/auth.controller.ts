@@ -7,6 +7,8 @@ import { SendVerificationCodeResponseDTO } from './dto/response/send_verificatio
 import SendVerificationCodeRequestDTO from './dto/request/send_verification_code.request';
 import VerifyOtpResponseDTO from './dto/response/verifyOtp.response';
 import { VerifyOtpRequestDTO } from './dto/request/verifyOtpCode.request';
+import { isUserExistResponseDTO } from './dto/response/isUserExist.response';
+import IsUserExistRequestDTO from './dto/request/isUserExist.request';
 
 @ApiController({ version: '1', tag: 'auth', path: '/auth' })
 export default class AuthController {
@@ -55,6 +57,18 @@ export default class AuthController {
         @Body() data: SendVerificationCodeRequestDTO,
     ): Promise<SendVerificationCodeResponseDTO> {
         return this._userService.ResendVerificationCode(data);
+    }
+
+    @Post({
+        path: 'isUserExist',
+        description: 'Check if user exist',
+        response: isUserExistResponseDTO
+    })
+
+    IsUserExist(
+        @Body() data: IsUserExistRequestDTO,
+    ): Promise<isUserExistResponseDTO> {
+        return this._userService.checkIsUserExist(data);
     }
 
 
