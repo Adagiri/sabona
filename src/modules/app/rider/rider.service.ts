@@ -7,13 +7,18 @@ import UpdateOrderStatusResponseDTO from './dto/response/updateOrderStatus.respo
 import GetDeliveriesResponseDTO from './dto/response/getDeliveries.response';
 import CancelOrderRequestDTO from './dto/request/src/modules/app/rider/dto/request/cancelOrderRequest';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
+import { extractTokens } from 'src/helpers/util.helper';
+import NotificationService from '../notification/notification.service';
 
 @Injectable()
 export default class RiderService {
-    constructor(private _dbService: DatabaseService) {}
+    constructor(
+        private _dbService: DatabaseService,
+        private _notificationService: NotificationService,
+    ) { }
 
     async getRides(user: User): Promise<GetRideRequestsResponseDTO> {
-        
+
         const rideRequests = await this._dbService.order.findMany({
             where: {
                 OR: [
@@ -27,16 +32,16 @@ export default class RiderService {
                             },
                             {
                                 OR: [
-                                    { 
+                                    {
                                         riderOrders: { none: { deletedAt: null } } // no rider assigned, and not deleted 
                                     },
-                                    { 
-                                        riderOrders: { 
-                                            every: { 
-                                                riderId: user.id, 
+                                    {
+                                        riderOrders: {
+                                            every: {
+                                                riderId: user.id,
                                                 deletedAt: null // current rider assigned, and not deleted 
-                                            } 
-                                        } 
+                                            }
+                                        }
                                     }
                                 ]
                             }
@@ -46,7 +51,7 @@ export default class RiderService {
                         riderOrders: {
                             some: {
                                 riderId: user.id,
-                                deletedAt: null 
+                                deletedAt: null
                             },
                         },
                         NOT: {
@@ -97,10 +102,10 @@ export default class RiderService {
                 deliveryType: true,
             }
         });
-        
+
         return { data: rideRequests };
     }
-        
+
 
     async updateOrderStatus(params: UpdateStatusRequestDTO, user: User): Promise<UpdateOrderStatusResponseDTO> {
         const order = await this._dbService.order.findUnique({
@@ -111,10 +116,72 @@ export default class RiderService {
                 status: true,
             }
         });
-    
+
         if (!order) {
             throw new BadRequestException("Order does not exist");
         }
+
+        const customerId = await this._dbService.order.findUnique({
+            where: {
+                id: params.orderId
+            },
+            select: {
+                userId: true,
+            }
+        });
+
+        const laundryId = await this._dbService.order.findUnique({
+            where: {
+                id: params.orderId
+            },
+            select: {
+                laundryId: true,
+            }
+        });
+
+        const vendorId = await this._dbService.laundry.findMany({
+            where: {
+                id: laundryId?.laundryId,
+            },
+            select: {
+                vendorId: true,
+            }
+
+        });
+
+        const vendorDeviceTokens = await this._dbService.user.findMany({
+            where: {
+                id: vendorId[0]?.vendorId,
+                DeviceToken: { some: { token: { not: "" } } }
+            },
+            select: {
+                DeviceToken: {
+                    select: {
+                        token: true,
+                    },
+                },
+            },
+        });
+
+        const customerDeviceTokens = await this._dbService.user.findMany({
+            where: {
+                id: customerId?.userId,
+                DeviceToken: { some: { token: { not: "" } } }
+            },
+            select: {
+                DeviceToken: {
+                    select: {
+                        token: true,
+                    },
+                },
+            },
+        });
+
+        // Extract Customer tokens
+        const customserTokens = extractTokens(customerDeviceTokens);
+
+        // Extract Vendor tokens
+        const vendorTokens = extractTokens(vendorDeviceTokens);
 
         switch (params.status) {
             case 'ACCEPT':
@@ -124,12 +191,28 @@ export default class RiderService {
                         riderId: user.id
                     }
                 });
-    
+
                 if (!riderOrder) {
                     throw new BadRequestException("Failed to accept order");
                 }
 
+
                 if (order.status === 'ACCEPTED') {
+
+                    const customerNotificationData = {
+                        tokens: customserTokens,
+                        title: "Rider on the way!!",
+                        body: "Your order has been accepted by rider.",
+                    };
+
+                    // Send Vendor notification Data
+                    const vendorNotificationData = {
+                        tokens: vendorTokens,
+                        title: "Order Accepted by rider!!",
+                        body: "Rider is on the way to pick from customer.",
+                    };
+
+
                     const updatedPickup = await this._dbService.pickup.update({
                         where: {
                             orderId: params.orderId
@@ -139,10 +222,29 @@ export default class RiderService {
                             status: 'ACCEPTED'
                         }
                     });
-                    if (!updatedPickup){
+                    if (!updatedPickup) {
                         throw new BadRequestException("Error updating pickup status")
                     }
+
+                    await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
+                    await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
+
+
+
                 } else if (order.status === 'READY_FOR_PICKUP') {
+
+                    const customerNotificationData = {
+                        tokens: customserTokens,
+                        title: "Out for delivery!!",
+                        body: "Rider is on the way to laundry to pick your processed order.",
+                    };
+
+                    const vendorNotificationData = {
+                        tokens: vendorTokens,
+                        title: "Rider on the way!!",
+                        body: "Rider is on the way to pick up the order from your laundry.",
+                    };
+
                     const updatedDelivery = await this._dbService.delivery.update({
                         where: {
                             orderId: params.orderId
@@ -153,15 +255,32 @@ export default class RiderService {
                         }
                     });
 
-                    if (!updatedDelivery){ 
+                    if (!updatedDelivery) {
                         throw new BadRequestException("Error updating delivery status")
                     }
+
+                    await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
+                    await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
                 }
 
                 return { message: 'SUCCESS' }
 
             case 'PICKED_UP':
                 if (order.status === 'ACCEPTED') {
+
+                    const customerNotificationData = {
+                        tokens: customserTokens,
+                        title: "Order Picked up!!",
+                        body: "Your order has been picked up by the rider.",
+                    };
+
+                    // Send Vendor notification Data
+                    const vendorNotificationData = {
+                        tokens: vendorTokens,
+                        title: "Order picked up!!",
+                        body: "Rider has picked up the order and is on the way to vendor.",
+                    };
+
                     const updateStatusPickedUp = await this._dbService.pickup.update({
                         where: {
                             orderId: params.orderId
@@ -170,14 +289,31 @@ export default class RiderService {
                             status: 'PICKED_UP'
                         }
                     });
-    
+
                     if (!updateStatusPickedUp) {
                         throw new BadRequestException("Could not update status");
                     }
-    
-                    return {message: 'SUCCESS'}
+
+                    await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
+                    await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
+
+                    return { message: 'SUCCESS' }
                 }
                 else if (order.status === 'READY_FOR_PICKUP') {
+
+                    const customerNotificationData = {
+                        tokens: customserTokens,
+                        title: "Out for delivery!!",
+                        body: "Rider has picked up your order and can reach any time soon.",
+                    };
+
+                    // Send Vendor notification Data
+                    const vendorNotificationData = {
+                        tokens: vendorTokens,
+                        title: "Order picked up!!",
+                        body: "Rider has picked up the order from your laundry.",
+                    };
+
                     const updateStatusPickedUpFromVendor = await this._dbService.delivery.update({
                         where: {
                             orderId: params.orderId
@@ -186,17 +322,34 @@ export default class RiderService {
                             status: 'PICKED_UP_FROM_VENDOR'
                         }
                     });
-    
+
                     if (!updateStatusPickedUpFromVendor) {
                         throw new BadRequestException("Could not update status");
                     }
-    
-                    return {message: 'SUCCESS'}
+
+                    await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
+                    await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
+
+                    return { message: 'SUCCESS' }
                 }
-               
-            
+
+
             case 'DROPPED_OFF':
                 if (order.status === 'ACCEPTED') {
+
+                    const customerNotificationData = {
+                        tokens: customserTokens,
+                        title: "In Progress!!",
+                        body: "Rider has delivered the order to vendor and is now processing.",
+                    };
+
+                    // Send Vendor notification Data
+                    const vendorNotificationData = {
+                        tokens: vendorTokens,
+                        title: "Order Delievered!!",
+                        body: "The rider has delivered the order at your laundry.",
+                    };
+
                     const updateStatusDeliveredtoVendor = await this._dbService.pickup.update({
                         where: {
                             orderId: params.orderId
@@ -205,11 +358,11 @@ export default class RiderService {
                             status: 'DELIVERED_TO_VENDOR'
                         }
                     });
-    
+
                     if (!updateStatusDeliveredtoVendor) {
                         throw new BadRequestException("Could not update status");
                     }
-    
+
                     await this._dbService.order.update({
                         where: {
                             id: params.orderId
@@ -218,11 +371,27 @@ export default class RiderService {
                             status: 'IN_PROGRESS'
                         }
                     });
-    
-                    return {message: 'SUCCESS'}
-    
+
+                    await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
+                    await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
+
+                    return { message: 'SUCCESS' }
+
                 }
                 else if (order.status === 'READY_FOR_PICKUP') {
+
+                    const customerNotificationData = {
+                        tokens: customserTokens,
+                        title: "Order Completed!!",
+                        body: "Rider has delivered the order to you.",
+                    };
+
+                    const vendorNotificationData = {
+                        tokens: vendorTokens,
+                        title: "Order Delivered!!",
+                        body: "Rider has delivered the order to the customer.",
+                    };
+
                     const updateStatusDeliveredToUser = await this._dbService.delivery.update({
                         where: {
                             orderId: params.orderId
@@ -231,11 +400,11 @@ export default class RiderService {
                             status: 'DELIVERED_TO_USER'
                         }
                     });
-    
+
                     if (!updateStatusDeliveredToUser) {
                         throw new BadRequestException("Could not update status");
                     }
-    
+
                     await this._dbService.order.update({
                         where: {
                             id: params.orderId
@@ -244,8 +413,11 @@ export default class RiderService {
                             status: 'COMPLETED'
                         }
                     });
-    
-                    return {message: 'SUCCESS'}
+
+                    await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
+                    await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
+
+                    return { message: 'SUCCESS' }
                 }
         }
     }
@@ -263,19 +435,19 @@ export default class RiderService {
             select: {
                 orderId: true,
                 order: {
-                    select:{
+                    select: {
                         totalAmount: true,
                         status: true,
-                        user:{
-                            select:{
+                        user: {
+                            select: {
                                 firstName: true,
                                 lastName: true,
                             }
                         },
-                        services:{
-                            select:{
-                                items:{
-                                    select:{
+                        services: {
+                            select: {
+                                items: {
+                                    select: {
                                         quantity: true,
                                     }
                                 }
@@ -285,30 +457,30 @@ export default class RiderService {
                     }
                 }
             },
-            orderBy:{
+            orderBy: {
                 order: {
                     createdAt: 'desc'
                 }
             }
         })
 
-        return { data: deliveries};
+        return { data: deliveries };
     }
 
     async cancelOrder(params: CancelOrderRequestDTO, user: User): Promise<UpdateOrderStatusResponseDTO> {
         const pickupOrder = await this._dbService.pickup.findFirst({
             where: {
-                    riderId: user.id,
-                    orderId: params.orderId,
-                    status: OrderStatus.ACCEPTED
+                riderId: user.id,
+                orderId: params.orderId,
+                status: OrderStatus.ACCEPTED
             },
         });
 
         const deliveryOrder = await this._dbService.delivery.findFirst({
             where: {
-                    riderId: user.id,
-                    orderId: params.orderId,
-                    status: OrderStatus.ACCEPTED
+                riderId: user.id,
+                orderId: params.orderId,
+                status: OrderStatus.ACCEPTED
             },
         });
 
@@ -350,14 +522,14 @@ export default class RiderService {
             }
         }
 
-        return {message: 'SUCCESS'}
+        return { message: 'SUCCESS' }
     }
 
     async getCurrentOrders(user: User): Promise<GetDeliveriesResponseDTO> {
         const orders = await this._dbService.riderOrder.findMany({
-            where:{
+            where: {
                 riderId: user.id,
-                order:{
+                order: {
                     status: {
                         in: [OrderStatus.ACCEPTED, OrderStatus.READY_FOR_PICKUP]
                     }
@@ -366,19 +538,19 @@ export default class RiderService {
             select: {
                 orderId: true,
                 order: {
-                    select:{
+                    select: {
                         totalAmount: true,
                         status: true,
-                        user:{
-                            select:{
+                        user: {
+                            select: {
                                 firstName: true,
                                 lastName: true,
                             }
                         },
-                        services:{
-                            select:{
-                                items:{
-                                    select:{
+                        services: {
+                            select: {
+                                items: {
+                                    select: {
                                         quantity: true,
                                     }
                                 }
@@ -388,7 +560,7 @@ export default class RiderService {
                     }
                 }
             },
-            orderBy:{
+            orderBy: {
                 order: {
                     createdAt: 'desc'
                 }

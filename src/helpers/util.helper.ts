@@ -277,6 +277,24 @@ export function GetOrderOptions(options: GetOrderOptionsArgs) {
     return databaseOptions;
 }
 
+type DeviceToken = {
+    token: string;
+  };
+  
+  type User = {
+    DeviceToken: DeviceToken[];
+  };
+  
+  type UserDeviceToken = User[];
+
+export const extractTokens = (vendorsDeviceToken: UserDeviceToken): string[] => {
+    return vendorsDeviceToken.reduce((acc: string[], user: User) => {
+        const vendorTokens = user.DeviceToken.map((deviceToken: DeviceToken) => deviceToken.token);
+        return acc.concat(vendorTokens);
+    }, []);
+};
+
+
 export function GetDateFilterOptions(filter?: DateFilter): Prisma.UserWhereInput {
     if (!filter) return {};
 

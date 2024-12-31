@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import SendNotificationRequestDTO, { MultipleDeviceNotificationDto } from './dto/request/notification.request';
-import * as admin from 'firebase-admin';
 import { SendMultipleNotificationResponseDTO, SendNotificationResponseDTO } from './dto/response/notification.response';
 import FirebaseService from 'src/modules/firebase/firebase.service';
 

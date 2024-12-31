@@ -1,4 +1,4 @@
-import { OrderStatus, User } from "@prisma/client";
+import { OrderStatus, User, UserType } from "@prisma/client";
 import DatabaseService from "src/database/database.service";
 import UpdateStatusRequestDTO from "./dto/request/updateStatus.request";
 import GetOrderRequestsResponseDTO from "./dto/response/getOrderRequests.response";
@@ -16,10 +16,15 @@ import LaundryMessageResponseDTO from "./dto/response/laundryMessage";
 import LaundryServiceMessageResponseDTO from "./dto/response/laundryServiceMessage.response";
 import GetOrderRequestDTO from "./dto/request/getOrder.request";
 import CancelOrderRequestDTO from "./dto/request/cancelOrder.request";
+import { extractTokens } from "src/helpers/util.helper";
+import NotificationService from "../notification/notification.service";
 
 @Injectable()
 export default class VendorService {
-    constructor(private _dbService: DatabaseService) { }
+    constructor(
+        private _dbService: DatabaseService,
+        private _notificationService: NotificationService,
+    ) { }
 
     async getOrderRequests(user: User, param: GetOrderRequestDTO): Promise<GetOrderRequestsResponseDTO> {
         const orderRequests = await this._dbService.order.findMany({
@@ -53,7 +58,7 @@ export default class VendorService {
                 totalAmount: true,
                 deliveryType: true,
                 services: {
-                    select:{
+                    select: {
                         laundryServiceId: true,
                         laundryService: {
                             select: {
@@ -67,12 +72,12 @@ export default class VendorService {
                             }
                         }
                     },
-               },
-               vendorOrders:{
-                     select: {
-                          vendorId: true,
-                     }
-               }
+                },
+                vendorOrders: {
+                    select: {
+                        vendorId: true,
+                    }
+                }
             }
         })
 
@@ -90,6 +95,48 @@ export default class VendorService {
             throw new BadRequestException("Order does not exist")
         }
 
+
+        const customer = await this._dbService.order.findFirst({
+            where: {
+                id: params.orderId,
+            },
+            select: {
+                userId: true,
+            }
+        })
+
+
+        const customerDeviceTokens = await this._dbService.user.findMany({
+            where: {
+                id: customer.userId,
+                DeviceToken: { some: { token: { not: "" } } }
+            },
+            select: {
+                DeviceToken: {
+                    select: {
+                        token: true,
+                    },
+                },
+            },
+        });
+
+        const riderDeviceTokens = await this._dbService.user.findMany({
+            where: {
+                type: UserType.RIDER,
+                DeviceToken: { some: { token: { not: "" } } }
+            },
+            select: {
+                DeviceToken: {
+                    select: {
+                        token: true,
+                    },
+                },
+            },
+        });
+
+        const customerTokens = extractTokens(customerDeviceTokens);
+        const riderTokens = extractTokens(riderDeviceTokens);
+
         switch (params.status) {
             case OrderStatus.ACCEPTED:
                 const isOrderAlreadyAccepted = await this._dbService.order.findFirst({
@@ -102,6 +149,8 @@ export default class VendorService {
                         }
                     }
                 })
+
+
 
                 if (isOrderAlreadyAccepted) {
                     throw new BadRequestException("Order already accepted")
@@ -136,9 +185,37 @@ export default class VendorService {
                     throw new BadRequestException("Failed to accept order")
                 }
 
+                const customerAcceptedNotificationData = {
+                    tokens: customerTokens,
+                    title: "Order Accepted!!",
+                    body: "Your order has been accepted successfully.",
+                };
+
+                const riderAcceptedNotificationData = {
+                    tokens: riderTokens,
+                    title: "New Order!!",
+                    body: "You have recieved a new order.",
+                };
+
+                await this._notificationService.SendNotificationToMultipleTokens(customerAcceptedNotificationData);
+                await this._notificationService.SendNotificationToMultipleTokens(riderAcceptedNotificationData);
+
                 return { message: 'SUCCESS' }
 
             case OrderStatus.READY_FOR_PICKUP:
+
+                const customerReadyForPickupNotificationData = {
+                    tokens: customerTokens,
+                    title: "Order Processed!!",
+                    body: "Your order is processed and will be delivered soon.",
+                };
+
+                const riderReadyForPickupNotificationData = {
+                    tokens: riderTokens,
+                    title: "New Order!!",
+                    body: "You have recieved a new order.",
+                };
+
                 const isVendorsOrder = await this._dbService.vendorOrder.findFirst({
                     where: {
                         AND: {
@@ -164,6 +241,9 @@ export default class VendorService {
                 if (!updatedOrder) {
                     throw new Error("Failed to update order")
                 }
+
+                await  this._notificationService.SendNotificationToMultipleTokens(customerReadyForPickupNotificationData);
+                await  this._notificationService.SendNotificationToMultipleTokens(riderReadyForPickupNotificationData);
 
                 return { message: 'SUCCESS' }
         }
@@ -215,7 +295,7 @@ export default class VendorService {
                 name: true,
                 address: true,
                 laundryService: {
-                    select:{
+                    select: {
                         id: true,
                         name: true,
                         description: true,
@@ -249,7 +329,7 @@ export default class VendorService {
                         id: true,
                         name: true,
                         description: true,
-                        laundryServiceItems:{
+                        laundryServiceItems: {
                             select: {
                                 name: true,
                                 price: true,
@@ -491,7 +571,7 @@ export default class VendorService {
             select: {
                 id: true,
                 name: true,
-                price:true
+                price: true
             }
         })
 
@@ -623,7 +703,7 @@ export default class VendorService {
         return { message: 'SUCCESS' }
     }
 
-    async getAllOrders (user: User): Promise<any> {
+    async getAllOrders(user: User): Promise<any> {
         const orders = await this._dbService.order.findMany({
             where: {
                 vendorOrders: {
@@ -676,10 +756,10 @@ export default class VendorService {
             },
             include: {
                 user: {
-                   select: {
-                    firstName: true,
-                    lastName: true,
-                   }
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                    }
                 }
             }
         })

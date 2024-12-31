@@ -1,17 +1,17 @@
-import {  Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import DatabaseService from "src/database/database.service";
 import getOrderByIdRequestDTO from "./dto/request/getOrderById.request";
 import GetOrderByIdResponseDTO from "./dto/response/getOrderById.response";
 import { BadRequestException } from "src/core/exceptions/response.exception";
 @Injectable()
 export default class OrderService {
-    constructor(private _dbService: DatabaseService) {}
+    constructor(private _dbService: DatabaseService) { }
     async getOrderById(params: getOrderByIdRequestDTO): Promise<GetOrderByIdResponseDTO> {
         const order = await this._dbService.order.findUnique({
             where: {
                 id: params.id
             },
-            select:{
+            select: {
                 id: true,
                 totalAmount: true,
                 status: true,
@@ -19,12 +19,22 @@ export default class OrderService {
                 updatedAt: true,
                 laundryId: true,
                 deliveryType: true,
-                notes:true,
-                laundry:{
-                    select:{
+                notes: true,
+                user: {
+                    select: {
+                        phone: true,
+                    },
+                },
+                laundry: {
+                    select: {
                         id: true,
                         name: true,
                         address: true,
+                        vendor: {
+                            select: {
+                                phone: true,
+                            }
+                        },
                         laundryService:{
                             select:{
                                 id: true,
