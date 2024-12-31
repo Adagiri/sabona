@@ -34,6 +34,8 @@ import editAddressParamRequestDTO from './dto/request/editAddressParam.request';
 import EditAddressResponseDTO from './dto/response/editAddress.response';
 import LoginResponseDTO from './dto/response/login.response';
 import addCustomerAddressRequestDTO from './dto/request/addAddress.request';
+import IsUserExistRequestDTO from './dto/request/isUserExist.request';
+import { isUserExistResponseDTO } from './dto/response/isUserExist.response';
 
 @Injectable()
 export default class UserService {
@@ -80,7 +82,7 @@ export default class UserService {
                         long: data.longitude || 0,
                     },
                 },
-                password: data.password,
+                // password: data.password,
             },
             select: { id: true, email: true }
         })
@@ -98,7 +100,7 @@ export default class UserService {
     async UpdateUserLocation(userId: string, lat: any, long: any): Promise<any> {
         const latitude = parseFloat(lat);
         const longitude = parseFloat(long);
-    
+
         await this._dbService.userSettings.update({
             where: {
                 userId,
@@ -108,10 +110,10 @@ export default class UserService {
                 long: longitude,
             }
         });
-    
+
         return true;
     }
-    
+
 
     async GetMe(user: User): Promise<GetMeResponseDTO> {
         const currentUser = await this._dbService.user.findUnique({
@@ -121,14 +123,14 @@ export default class UserService {
                 profilePicture: { select: { id: true, path: true, thumbPath: true } },
                 addresses: true,
                 laundry: {
-                    select:{
-                        laundryService:{
-                            select:{
+                    select: {
+                        laundryService: {
+                            select: {
                                 id: true,
                                 name: true,
                                 description: true,
-                                laundryServiceItems:{
-                                    select:{
+                                laundryServiceItems: {
+                                    select: {
                                         id: true,
                                         name: true,
                                         price: true,
@@ -189,14 +191,14 @@ export default class UserService {
     }
 
     async SendVerificationCode(data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
-        const user = await this._dbService.user.findUnique({
-            where: { phone: data.phone },
-        })
-        if (user) {
-            throw new BadRequestException(
-                "Phone number is already registered"
-            );
-        }
+        // const user = await this._dbService.user.findUnique({
+        //     where: { phone: data.phone },
+        // })
+        // if (user) {
+        //     throw new BadRequestException(
+        //         "Phone number is already registered"
+        //     );
+        // }
         if (AppConfig.APP.ENV === 'dev') {
             return {
                 message: "OTP sent successfully",
@@ -256,12 +258,12 @@ export default class UserService {
 
     async LoginWithEmailPassword(data: LoginRequestDTO): Promise<LoginResponseDTO> {
         const doesUserExist = await this._dbService.user.findUnique({
-            where:{
+            where: {
                 phone: data.phone
             }
         })
 
-        if (!doesUserExist){
+        if (!doesUserExist) {
             throw new BadRequestException("User not registered")
         }
         const user = await this._dbService.user.findFirst({
@@ -324,7 +326,7 @@ export default class UserService {
         return address;
     }
 
-    async GetAllAddresses(user: User): Promise<getAllAddressesResponseDTO>{
+    async GetAllAddresses(user: User): Promise<getAllAddressesResponseDTO> {
         const addresses = await this._dbService.userAddress.findMany({
             where: {
                 userId: user.id,
@@ -355,7 +357,7 @@ export default class UserService {
             }
         })
 
-        if (!isUsersAddress){
+        if (!isUsersAddress) {
             throw new BadRequestException("This is not current user's address")
         }
 
@@ -384,7 +386,7 @@ export default class UserService {
                 id: true,
                 address: true,
                 label: true,
-                lat: true, 
+                lat: true,
                 long: true,
                 isDefault: true
             }
@@ -410,6 +412,21 @@ export default class UserService {
                 message: "OTP sent successfully",
             };
         }
+    }
+
+    async checkIsUserExist(data: IsUserExistRequestDTO): Promise<isUserExistResponseDTO> {
+        const user = await this._dbService.user.findFirst({
+            where: { phone: data.phone },
+        })
+        if (user) {
+            return (
+                { isExist: true }
+
+            )
+        }
+        return (
+            { isExist: false }
+        )
     }
 
 
