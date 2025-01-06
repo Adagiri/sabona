@@ -7,7 +7,7 @@ import CreateLaundryRequestDTO, { LaundryServiceDTO } from "./dto/request/create
 import { BadRequestException } from "src/core/exceptions/response.exception";
 import { Injectable } from "@nestjs/common";
 import EditLaundryRequestDTO from "./dto/request/editLaundry.request";
-import { CreateLaundryServiceItemRequestDTO, CreateLaundryServiceItemsArrayDTO } from "./dto/request/createLaundryServiceItem.request";
+import {  CreateLaundryServiceItemsArrayDTO } from "./dto/request/createLaundryServiceItem.request";
 import { EditLaundryServiceItemRequestDTO } from "./dto/request/editlaundryServiceItem.request";
 import { CreateLaundryReponseDTO } from "./dto/response/createLaundry.response";
 import { GetAllLaundriesResponseDTO } from "./dto/response/getAllLaundry.response";
@@ -18,7 +18,6 @@ import GetOrderRequestDTO from "./dto/request/getOrder.request";
 import CancelOrderRequestDTO from "./dto/request/cancelOrder.request";
 import { extractTokens } from "src/helpers/util.helper";
 import NotificationService from "../notification/notification.service";
-
 @Injectable()
 export default class VendorService {
     constructor(
@@ -29,7 +28,7 @@ export default class VendorService {
     async getOrderRequests(user: User, param: GetOrderRequestDTO): Promise<GetOrderRequestsResponseDTO> {
         const orderRequests = await this._dbService.order.findMany({
             where: {
-                OR: [
+                    OR: [
                     {
                         laundryId: param.laundryId,
                         status: OrderStatus.IN_PROGRESS,
@@ -57,6 +56,7 @@ export default class VendorService {
                 userId: true,
                 totalAmount: true,
                 deliveryType: true,
+                orderNumber:true,
                 services: {
                     select: {
                         laundryServiceId: true,
@@ -150,8 +150,6 @@ export default class VendorService {
                     }
                 })
 
-
-
                 if (isOrderAlreadyAccepted) {
                     throw new BadRequestException("Order already accepted")
                 }
@@ -189,17 +187,59 @@ export default class VendorService {
                     tokens: customerTokens,
                     title: "Order Accepted!!",
                     body: "Your order has been accepted successfully.",
+                    notificationData: {
+                        orderId: order.id,
+                        key: 'GET_ORDER_BY_ID',
+                        route: 'TrackOrder',
+                    },
                 };
 
                 const riderAcceptedNotificationData = {
                     tokens: riderTokens,
                     title: "New Order!!",
                     body: "You have recieved a new order.",
+                    notificationData: {
+                        orderId: order.id,
+                        key: 'FETCH_RIDER_REQUESTS',
+                        route: 'Home',
+                    }
                 };
 
-                await this._notificationService.SendNotificationToMultipleTokens(customerAcceptedNotificationData);
-                await this._notificationService.SendNotificationToMultipleTokens(riderAcceptedNotificationData);
-
+                if (customerTokens?.length) {
+                    const res = await this._notificationService.SendNotificationToMultipleTokens(customerAcceptedNotificationData);
+                    if (res) {
+                        const createNotification = await this._dbService.notification.create({
+                            data: {
+                                orderId: order.id,
+                                userId: customer.userId,
+                                type: "ORDER_ACCEPTED",
+                                message: "Your order has been accepted successfully.",
+                                status: "UNREAD",
+                                data: {
+                                    orderId: order.id,
+                                    key: 'FETCH_RIDER_REQUESTS',
+                                    route: 'Home',
+                                },
+                            }
+                        })
+                        if (createNotification) {
+                            console.log("Notification created")
+                        }
+                        else {
+                            console.log("Failed to create notification")
+                        }
+                    }
+                }
+                if (riderTokens?.length) {
+                    const res = await this._notificationService.SendNotificationToMultipleTokens(riderAcceptedNotificationData);
+                    if(res){
+                        console.log("Rider notified")
+                    }
+                
+                }
+                else {
+                    console.log("No rider to notify")
+                }
                 return { message: 'SUCCESS' }
 
             case OrderStatus.READY_FOR_PICKUP:
@@ -208,12 +248,22 @@ export default class VendorService {
                     tokens: customerTokens,
                     title: "Order Processed!!",
                     body: "Your order is processed and will be delivered soon.",
+                    notificationData: {
+                        orderId: order.id,
+                        key: 'GET_ORDER_BY_ID',
+                        route: 'TrackOrder',
+                    }
                 };
 
                 const riderReadyForPickupNotificationData = {
                     tokens: riderTokens,
                     title: "New Order!!",
                     body: "You have recieved a new order.",
+                    notificationData: {
+                        orderId: order.id,
+                        key: 'FETCH_RIDER_REQUESTS',
+                        route: 'Home',
+                    }
                 };
 
                 const isVendorsOrder = await this._dbService.vendorOrder.findFirst({
@@ -241,9 +291,37 @@ export default class VendorService {
                 if (!updatedOrder) {
                     throw new Error("Failed to update order")
                 }
-
-                await  this._notificationService.SendNotificationToMultipleTokens(customerReadyForPickupNotificationData);
-                await  this._notificationService.SendNotificationToMultipleTokens(riderReadyForPickupNotificationData);
+                if (customerTokens?.length) {
+                    const res = await this._notificationService.SendNotificationToMultipleTokens(customerReadyForPickupNotificationData);
+                    if (res) {
+                        const createNotification = await this._dbService.notification.create({
+                            data: {
+                                userId: customer.userId,
+                                orderId: order.id,
+                                message: "Your order is processed and will be delivered soon.",
+                                status: "UNREAD",
+                                data: {
+                                    orderId: order.id,
+                                    key: 'GET_ORDER_BY_ID',
+                                    route: 'TrackOrder',
+                                },
+                                type: "ORDER_PROCESSING",
+                            }
+                        });
+                        if (createNotification) {
+                            console.log("Customer Notification created")
+                        }
+                        else {
+                            console.log("Failed to create notification")
+                        }
+                    }
+                }
+                if(riderTokens?.length) {
+                   const res = await this._notificationService.SendNotificationToMultipleTokens(riderReadyForPickupNotificationData);
+                   if(res){
+                          console.log("Rider notified")
+                   }
+                }
 
                 return { message: 'SUCCESS' }
         }
@@ -294,6 +372,16 @@ export default class VendorService {
                 id: true,
                 name: true,
                 address: true,
+                vendor:{
+                    select:{
+                        addresses:{
+                            select:{
+                                lat:true,
+                                long:true
+                            }
+                        }      
+                    }
+                },
                 laundryService: {
                     select: {
                         id: true,

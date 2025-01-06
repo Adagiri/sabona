@@ -53,9 +53,11 @@ enum OrderStatus {
   COMPLETED // When the entire process is completed
 }
 
-// NotificationType enum to define the different types of notifications
+// NotificationType enum to define the different types of notificationsnotification
 enum NotificationType {
+  ORDER_PLACED
   ORDER_ACCEPTED
+  ORDER_PROCESSING
   ORDER_REJECTED
   ORDER_PICKED_UP
   ORDER_DELIVERED
@@ -371,6 +373,7 @@ model OrderLaundryServiceItem {
 // Order model to represent a user's order
 model Order {
   id          String                @id @default(uuid()) // UUID for order ID
+  orderNumber Int?                   @default(autoincrement()) // Auto-incrementing order number
   userId      String // User who placed the order
   user        User                  @relation(fields: [userId], references: [id])
   laundryId   String // Foreign key to the Laundry model
@@ -448,7 +451,9 @@ model Notification {
   type      NotificationType // Type of notification (order accepted, feedback, etc.)
   status    NotificationStatus @default(UNREAD) // Status of the notification (read/unread)
   message   String // Custom message for the notification
-  orderId   String?            @unique // Ensuring only one notification per order if applicable
+  orderId   String?          
   order     Order?             @relation(fields: [orderId], references: [id])
   createdAt DateTime           @default(now()) @db.Timestamptz() // Timestamp for notification creation
+  data     Json?              @db.JsonB // Additional data for the notification
+  deletedAt DateTime?         @db.Timestamptz()
 }

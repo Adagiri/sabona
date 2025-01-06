@@ -32,9 +32,15 @@ export default class FirebaseService {
     async SendNotificationToMultipleTokens(data: MultipleDeviceNotificationDto) {
         try {
             const { tokens, title, body } = data;
+            const notificationData = data?.notificationData
             const message = {
                 notification: { title, body },
                 tokens,
+                data : notificationData && {
+                    orderId: notificationData.orderId,
+                    key: notificationData.key,
+                    route: notificationData.route,
+                } || {},
             };
             const res = await admin.messaging().sendEachForMulticast(message);
             return res as SendMultipleNotificationResponseDTO;

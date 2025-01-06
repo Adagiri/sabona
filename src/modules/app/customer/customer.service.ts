@@ -105,32 +105,86 @@ export default class CustomerService {
         const vendorTokens = extractTokens(vendorsDeviceTokens);
 
         // Send Customer notification Data
-        const customerNotificationData = {
+        const customerNotificationData: MultipleDeviceNotificationDto = {
             tokens: customserTokens,
             title: "Order Placed!!",
             body: "Your order has been placed successfully.",
-            data:{
+            notificationData: {
                 orderId: order.id,
-                route: "APP_ROUTES.USER.TRACK_ORDER",
-                key: "FETCH_ORDER_DETAILS"
-            }
+                key: 'FETCH_ORDERS',
+                route: 'Orders',
+            },
+
         };
 
         // Send Vendor notification Data
-        const vendorNotificationData = {
+        const vendorNotificationData: MultipleDeviceNotificationDto = {
             tokens: vendorTokens,
             title: "New Order!!",
             body: "You have recieved a new order.",
-            data:{
+            notificationData: {
                 orderId: order.id,
-                route: "APP_ROUTES.USER.HOME_TABS",
-                key: "FETCH_ORDER_REQUESTS"
+                key: 'FETCH_ORDER_REQUESTS',
+                route: 'Home',
             }
         };
 
+        if (customserTokens?.length) {
+            const res = await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
+            if (res) {
+                const createNotification = await this._dbService.notification.create({
+                    data: {
+                        userId: user.id,
+                        orderId: order.id,
+                        message: "Your order has been placed successfully.",
+                        status: "UNREAD",
+                        data: {
+                            orderId: order.id,
+                            key: 'FETCH_ORDERS',
+                            route: 'Orders',
+                        },
+                        type: "ORDER_PLACED",
+                    }
+                });
+                if (createNotification) {
+                    console.log("Customer Notification created successfully");
+                }
+                else {
+                    console.log("Error creating notification");
+                }
 
-        await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
-        await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
+            }
+        }
+        else {
+            console.log("No customer tokens found");
+        }
+        if (vendorTokens?.length) {
+            const res = await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
+            if (res) {
+                const createNotification = await this._dbService.notification.create({
+                    data: {
+                        userId: vendorId[0].vendorId,
+                        orderId: order.id,
+                        message: "You have recieved a new order.",
+                        status: "UNREAD",
+                        data: {
+                            orderId: order.id,
+                            key: 'FETCH_ORDER_REQUESTS',
+                            route: 'Home',
+                        },
+                        type: "ORDER_PLACED",
+                    }
+                });
+                if (createNotification) {
+                    console.log("Vendor Notification created successfully");
+                }
+                else {
+                    console.log("Error creating notification");
+                }
+            }
+        } else {
+            console.log("No vendor tokens found");
+        }
 
 
         if (!order) {
