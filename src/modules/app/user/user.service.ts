@@ -67,7 +67,7 @@ export default class UserService {
             select: { id: true },
         });
         if (existingUser) {
-            throw new BadRequestException('auth.phone_already_exist');
+            throw new BadRequestException('This phone number is already registered');
         }
 
 
@@ -219,7 +219,7 @@ export default class UserService {
     async VerifyCode(data: VerifyOtpRequestDTO): Promise<VerifyOtpResponseDTO> {
         if (AppConfig.APP.ENV !== APP_ENV.PROD && data.otp === OTP_CODE_FOR_DEV) {
             const existingUser = await this._dbService.user.findFirst({
-                where: { phone: data.phone },
+                where: { phone: data.phone , type : data?.type },
                 select: { id: true },
             });
             if (existingUser) {
