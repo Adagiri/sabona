@@ -172,7 +172,8 @@ model DeviceToken {
   id        Int      @id @default(autoincrement()) // Using Int for device token ID
   userId    String // Changed to String to match User's UUID
   user      User     @relation(fields: [userId], references: [id])
-  token     String   @unique // Unique push token for each device
+  token     String
+  deviceId  String
   createdAt DateTime @default(now()) @db.Timestamptz()
   deletedAt DateTime?  @db.Timestamptz() // Optional deletion timestamp
 }
@@ -393,7 +394,6 @@ model Order {
   detergentType DetergentType? // Type of detergent used
   colorType     ColorType? // Type of color (light/dark/mixed)
   notes         String? // Additional notes for the order
-
   createdAt DateTime  @default(now()) @db.Timestamptz()
   updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz()
   deletedAt DateTime? @db.Timestamptz()
