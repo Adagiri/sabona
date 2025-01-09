@@ -44,6 +44,7 @@ enum DeviceType {
 
 // OrderStatus enum to track the different stages of an order
 enum OrderStatus {
+  PENDING_PAYMENT // When the order is created and awaiting payment
   PENDING // When the order is created and awaiting vendor action
   ACCEPTED // When a vendor accepts the order
   REJECTED // When a vendor rejects the order
@@ -102,6 +103,11 @@ enum LEVEL {
   BASIC
   LOYAL
   ELITE
+}
+
+enum PaymentType {
+  CASH
+  CARD
 }
 
 // User model to store user-related information
@@ -378,6 +384,9 @@ model Order {
   status      OrderStatus           @default(PENDING) // High-level status of the order
   totalAmount Float // Total amount for the order
   services    OrderLaundryService[]
+  payment     Payment? // Payment details for the order
+  paymentType PaymentType? // Payment type for the order
+  paid        Boolean? 
 
   riderOrders   RiderOrder[] // Existing relation with riders for order management
   vendorOrders  VendorOrder? // Existing relation with vendors for order management
@@ -451,4 +460,19 @@ model Notification {
   orderId   String?            @unique // Ensuring only one notification per order if applicable
   order     Order?             @relation(fields: [orderId], references: [id])
   createdAt DateTime           @default(now()) @db.Timestamptz() // Timestamp for notification creation
+}
+
+model Payment {
+  id                   String   @id @default(uuid()) // UUID for payment ID
+  orderId              String   @unique
+  order                Order    @relation(fields: [orderId], references: [id])
+
+  transactionRef       String   // PayTabs transaction reference
+  amount     Float    // Total transaction amount
+  type      String   // Type of transaction (e.g., Sale, Refund)
+  status        String   // Payment Status 
+  paymentMethod        String   // Payment Method (e.g., Visa, MasterCard)
+
+  createdAt            DateTime @default(now()) @db.Timestamptz() // Timestamp of creation
+  updatedAt            DateTime @default(now()) @updatedAt @db.Timestamptz() // Timestamp of last update
 }

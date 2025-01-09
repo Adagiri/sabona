@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
-import { User } from '@prisma/client';
+import { OrderStatus, PaymentType, User } from '@prisma/client';
 import CreateOrderRequestDTO from './dto/request/createOrder.request';
 import AcceptOrderRequestDTO from '../vendor/dto/request/acceptOrder.request';
 import CancelOrderResponseDTO from './dto/response/cancelOrder.response';
@@ -17,6 +17,8 @@ export default class CustomerService {
                 laundryId: data.laundryId,
                 totalAmount: data.totalAmount,
                 notes: data.note,
+                paymentType: data.paymentType,
+                status: data.paymentType === PaymentType.CASH ? OrderStatus.PENDING : OrderStatus?.PENDING_PAYMENT,
                 pickup: {
                     create: {
                         pickupAddress: data.pickupAddress,

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import DatabaseService from '../../database/database.service';
-import { LEVEL, UserType, OrderStatus } from '@prisma/client';
+import { LEVEL, UserType, OrderStatus, PaymentType } from '@prisma/client';
 import * as moment from 'moment-timezone';
 import { chunk } from 'lodash';
 
@@ -154,5 +154,42 @@ export default class CronService {
         }
 
         console.log("++++++++++ Cron Job: Yearly Reset of User Levels Finished ++++++++++");
+    }
+
+    @Cron(CronExpression.EVERY_30_MINUTES, { name: 'cancel-card-unpaid-orders' })
+    async HandleCancelUnpaidCardOrders() {
+        console.log("++++++++++ Cron Job: Cancel Card Unpaid Orders Started ++++++++++");
+        try {
+            const ordersToCancel = await this._dbService.order.findMany({
+                where:{
+                    AND: {
+                        paid: null,
+                        paymentType: PaymentType.CARD,
+                        status: { not: OrderStatus.CANCELLED }
+                    }
+                },
+            })
+
+            console.log(`Found ${ordersToCancel.length} card unpaid orders to cancel.`);
+
+            const chunkedOrders = chunk(ordersToCancel, 50);
+
+            for (const chunkUsers of chunkedOrders) {
+                const cancelPromises = chunkUsers.map(order =>
+                    this._dbService.order.update({
+                        where: { id: order.id },
+                        data: { status: OrderStatus.CANCELLED },
+                    })
+                );
+                await Promise.all(cancelPromises); // Run updates concurrently
+
+                console.log(`${chunkUsers.length} orders have been cancelled.`);
+            }
+        }catch(error){
+            console.error("Error during the cancel card unpaid orders cron job:", error);
+        }
+        
+        console.log("++++++++++ Cron Job: Cancel Unpaid Card Orders Finished ++++++++++");
+
     }
 }
