@@ -218,13 +218,13 @@ export default class AdminService {
             data: { status: UserStatus.ACTIVE },
         });
 
-        const deviceTokens = await this._dbService.user.findMany({
+        const deviceTokens = await this._dbService.deviceToken.findMany({
             where: {
-                id: userId,
-                DeviceToken: { some: { token: { not: "" } } },
+                userId: userId,
+                deletedAt:null
             },
             select: {
-                DeviceToken: true
+                token: true,
 
             }
         });

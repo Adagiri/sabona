@@ -279,19 +279,11 @@ export function GetOrderOptions(options: GetOrderOptionsArgs) {
 
 type DeviceToken = {
     token: string;
-  };
-  
-  type User = {
-    DeviceToken: DeviceToken[];
-  };
-  
-  type UserDeviceToken = User[];
+};
 
-export const extractTokens = (vendorsDeviceToken: UserDeviceToken): string[] => {
-    return vendorsDeviceToken.reduce((acc: string[], user: User) => {
-        const vendorTokens = user.DeviceToken.map((deviceToken: DeviceToken) => deviceToken.token);
-        return acc.concat(vendorTokens);
-    }, []);
+// Since your input is a direct array of DeviceToken objects
+export const extractTokens = (deviceTokens: DeviceToken[]): string[] => {
+    return deviceTokens.map(deviceToken => deviceToken.token);
 };
 
 

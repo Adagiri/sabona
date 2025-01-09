@@ -55,7 +55,15 @@ export default class OrderService {
                     select: {
                         riderId: true,
                         assignedAt: true,
+                        id: true,
+                        type: true,
                     },
+                },
+                vendorOrders:{
+                    select:{
+                        vendorId: true,
+                        id: true,
+                    }
                 },
                 statusHistory: {
                     select: {

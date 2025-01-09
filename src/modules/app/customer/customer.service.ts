@@ -1,6 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
-import { User } from '@prisma/client';
+import { FeedbackType, User } from '@prisma/client';
 import CreateOrderRequestDTO from './dto/request/createOrder.request';
 import AcceptOrderRequestDTO from '../vendor/dto/request/acceptOrder.request';
 import CancelOrderResponseDTO from './dto/response/cancelOrder.response';
@@ -8,6 +8,11 @@ import { OrderListDto } from './dto/response/orderlist.response.dto';
 import { extractTokens } from 'src/helpers/util.helper';
 import NotificationService from '../notification/notification.service';
 import { MultipleDeviceNotificationDto } from '../notification/dto/request/notification.request';
+import CreateFeedbackDTO from './dto/request/createFeeback.request';
+import CreateFeedbackResponseDTO from './dto/response/createFeedback.response';
+import { BadRequestException } from 'src/core/exceptions/response.exception';
+import { HasFeedBackRequestDTO } from './dto/request/hasFeedback.request';
+import { HasFeedbackResponseDTO } from './dto/response/hasFeedback.response.dto';
 
 @Injectable()
 export default class CustomerService {
@@ -18,17 +23,13 @@ export default class CustomerService {
 
     async CreateOrder(data: CreateOrderRequestDTO, user: User): Promise<any> {
         // Fetch customer device tokens
-        const customerDeviceTokensPromise = this._dbService.user.findMany({
+        const customerDeviceTokensPromise = this._dbService.deviceToken.findMany({
             where: {
-                DeviceToken: { some: { token: { not: "" } } },
-                id: user.id,
+                userId: user.id,
+                deletedAt: null,
             },
             select: {
-                DeviceToken: {
-                    select: {
-                        token: true,
-                    },
-                },
+                token: true,
             },
         });
 
@@ -42,17 +43,13 @@ export default class CustomerService {
 
         });
 
-        const vendorsDeviceTokensPromise = await this._dbService.user.findMany({
+        const vendorsDeviceTokensPromise = await this._dbService.deviceToken.findMany({
             where: {
-                DeviceToken: { some: { token: { not: "" } } },
-                id: vendorId[0].vendorId,
+                userId: vendorId[0].vendorId,
+                deletedAt: null,
             },
             select: {
-                DeviceToken: {
-                    select: {
-                        token: true,
-                    },
-                },
+                token: true,
             },
         });
 
@@ -302,5 +299,86 @@ export default class CustomerService {
         });
 
         return ordersWithTotalQuantity;
+    }
+
+    async AddFeedback(data: CreateFeedbackDTO, user: User): Promise<CreateFeedbackResponseDTO> {
+
+        const {
+            pickupRiderRating,
+            deliveryRiderRating,
+            vendorRating,
+            orderId,
+            pickupRiderFeedback,
+            deliveryRiderFeedback,
+            vendorFeedback,
+            pickupRiderOrderId,
+            deliveryRiderOrderId,
+            vendorOrderId,
+        } = data;
+
+        const isOrderCompleted = await this._dbService.order.findFirst({
+            where: {
+                id: orderId,
+                status: "COMPLETED",
+            },
+        });
+
+        const createFeedback = async (
+            rating: number | undefined,
+            comments: string | undefined,
+            type: FeedbackType,
+        ) => {
+            if (rating !== 0) {
+                const res = await this._dbService.feedback.create({
+                    data: {
+                        userId: user.id,
+                        rating,
+                        comments: comments ?? "",
+                        type,
+                        orderId,
+                        riderOrderId: type === "RIDER_PICKUP" ? pickupRiderOrderId : type === "RIDER_DELIVERY" ? deliveryRiderOrderId : null,
+                        vendorOrderId: type === "VENDOR" ? vendorOrderId : null,
+                    },
+                });
+                if (res) {
+                    return true
+                }
+            }
+        };
+
+        if (isOrderCompleted) {
+            const feedbacksCreated = await Promise.all([
+                createFeedback(vendorRating, vendorFeedback, "VENDOR"),
+                createFeedback(pickupRiderRating, pickupRiderFeedback, "RIDER_PICKUP"),
+                createFeedback(deliveryRiderRating, deliveryRiderFeedback, "RIDER_DELIVERY"),
+            ]);
+
+            if (feedbacksCreated.some((feedback) => feedback === true)) {
+                return { message: "Feedback added successfully" };
+            }
+            else {
+                throw new BadRequestException("Error adding feedback");
+            }
+        }
+        else {
+            throw new BadRequestException("Order is not completed");
+        }
+
+    }
+
+    async HasFeedback(params: HasFeedBackRequestDTO, user: User): Promise<HasFeedbackResponseDTO> {
+        const feedback = await this._dbService.feedback.findFirst({
+            where: {
+                userId: user?.id,
+                orderId: params.orderId,
+            }
+        });
+
+        if (feedback) {
+            return { hasFeedback: true }
+        }
+        else {
+            return { hasFeedback: false }
+        }
     }
 }

@@ -7,7 +7,7 @@ import CreateLaundryRequestDTO, { LaundryServiceDTO } from "./dto/request/create
 import { BadRequestException } from "src/core/exceptions/response.exception";
 import { Injectable } from "@nestjs/common";
 import EditLaundryRequestDTO from "./dto/request/editLaundry.request";
-import {  CreateLaundryServiceItemsArrayDTO } from "./dto/request/createLaundryServiceItem.request";
+import { CreateLaundryServiceItemsArrayDTO } from "./dto/request/createLaundryServiceItem.request";
 import { EditLaundryServiceItemRequestDTO } from "./dto/request/editlaundryServiceItem.request";
 import { CreateLaundryReponseDTO } from "./dto/response/createLaundry.response";
 import { GetAllLaundriesResponseDTO } from "./dto/response/getAllLaundry.response";
@@ -28,7 +28,7 @@ export default class VendorService {
     async getOrderRequests(user: User, param: GetOrderRequestDTO): Promise<GetOrderRequestsResponseDTO> {
         const orderRequests = await this._dbService.order.findMany({
             where: {
-                    OR: [
+                OR: [
                     {
                         laundryId: param.laundryId,
                         status: OrderStatus.IN_PROGRESS,
@@ -56,7 +56,7 @@ export default class VendorService {
                 userId: true,
                 totalAmount: true,
                 deliveryType: true,
-                orderNumber:true,
+                orderNumber: true,
                 services: {
                     select: {
                         laundryServiceId: true,
@@ -105,37 +105,43 @@ export default class VendorService {
             }
         })
 
-
-        const customerDeviceTokens = await this._dbService.user.findMany({
+        const customerDeviceTokens = await this._dbService.deviceToken.findMany({
             where: {
-                id: customer.userId,
-                DeviceToken: { some: { token: { not: "" } } }
+                userId: customer.userId,
+                deletedAt: null
             },
             select: {
-                DeviceToken: {
-                    select: {
-                        token: true,
-                    },
-                },
-            },
-        });
+                token: true
+            }
+        })
 
-        const riderDeviceTokens = await this._dbService.user.findMany({
+        const riderUsers = await this._dbService.user.findMany({
             where: {
-                type: UserType.RIDER,
-                DeviceToken: { some: { token: { not: "" } } }
+                type: UserType.RIDER, // assuming you have a UserType enum or similar
+                deletedAt: null       // ensuring the user is not marked as deleted
             },
             select: {
-                DeviceToken: {
-                    select: {
-                        token: true,
-                    },
-                },
-            },
+                id: true // only select the userId
+            }
         });
+
+        let allRiderDeviceTokens = [];
+
+        for (const rider of riderUsers) {
+            const deviceTokens = await this._dbService.deviceToken.findMany({
+                where: {
+                    userId: rider.id,
+                },
+                select: {
+                    token: true  // selects only the token field
+                }
+            });
+            allRiderDeviceTokens = allRiderDeviceTokens.concat(deviceTokens);
+        }
+
 
         const customerTokens = extractTokens(customerDeviceTokens);
-        const riderTokens = extractTokens(riderDeviceTokens);
+        const riderTokens = extractTokens(allRiderDeviceTokens);
 
         switch (params.status) {
             case OrderStatus.ACCEPTED:
@@ -232,15 +238,75 @@ export default class VendorService {
                 }
                 if (riderTokens?.length) {
                     const res = await this._notificationService.SendNotificationToMultipleTokens(riderAcceptedNotificationData);
-                    if(res){
+                    if (res) {
                         console.log("Rider notified")
                     }
-                
                 }
                 else {
                     console.log("No rider to notify")
                 }
                 return { message: 'SUCCESS' }
+
+            case OrderStatus.REJECTED:
+
+                const customerOrderRejectedNotificationData = {
+                    tokens: customerTokens,
+                    title: "Order Rejected!!",
+                    body: "Your order has been rejected by the vendor.",
+                    notificationData: {
+                        orderId: order.id,
+                        key: 'FETCH_ORDERS',
+                        route: 'Orders',
+                    }
+                };
+
+                const isOrderRejected = await this._dbService.order.findFirst({
+                    where: {
+                        id: params.orderId,
+                        status: OrderStatus.REJECTED,
+                    }
+                })
+
+                if (isOrderRejected) {
+                    throw new BadRequestException("Order already rejected")
+                }
+
+                await this._dbService.order.update({
+                    where: {
+                        id: params.orderId,
+                    },
+                    data: {
+                        status: OrderStatus.REJECTED,
+                    }
+                })
+
+                if (customerTokens?.length) {
+                    const res = await this._notificationService.SendNotificationToMultipleTokens(customerOrderRejectedNotificationData);
+                    if (res) {
+                        const createNotification = await this._dbService.notification.create({
+                            data: {
+                                userId: customer.userId,
+                                orderId: order.id,
+                                message: "Your order has been rejected by the vendor.",
+                                status: "UNREAD",
+                                data: {
+                                    orderId: order.id,
+                                    key: 'FETCH_ORDERS',
+                                    route: 'Orders',
+                                },
+                                type: "ORDER_REJECTED",
+                            }
+                        });
+                        if (createNotification) {
+                            console.log("Customer Notification created")
+                        }
+                        else {
+                            console.log("Failed to create notification")
+                        }
+                    }
+                }
+
+                return { message: "SUCCESS" }
 
             case OrderStatus.READY_FOR_PICKUP:
 
@@ -316,11 +382,11 @@ export default class VendorService {
                         }
                     }
                 }
-                if(riderTokens?.length) {
-                   const res = await this._notificationService.SendNotificationToMultipleTokens(riderReadyForPickupNotificationData);
-                   if(res){
-                          console.log("Rider notified")
-                   }
+                if (riderTokens?.length) {
+                    const res = await this._notificationService.SendNotificationToMultipleTokens(riderReadyForPickupNotificationData);
+                    if (res) {
+                        console.log("Rider notified")
+                    }
                 }
 
                 return { message: 'SUCCESS' }
@@ -372,14 +438,19 @@ export default class VendorService {
                 id: true,
                 name: true,
                 address: true,
-                vendor:{
-                    select:{
-                        addresses:{
-                            select:{
-                                lat:true,
-                                long:true
+                vendor: {
+                    select: {
+                        feedbacks: {
+                            select: {
+                                rating: true,
+                            },
+                        },
+                        addresses: {
+                            select: {
+                                lat: true,
+                                long: true
                             }
-                        }      
+                        }
                     }
                 },
                 laundryService: {
@@ -797,7 +868,7 @@ export default class VendorService {
                 vendorOrders: {
                     vendorId: user.id,
                 }
-            }
+            },
         })
 
         console.log(orders)
@@ -842,11 +913,29 @@ export default class VendorService {
                     vendorId: user.id,
                 },
             },
-            include: {
-                user: {
-                    select: {
+            select:{
+                id: true,
+                orderNumber: true,
+                userId: true,
+                laundryId: true,
+                status: true,
+                totalAmount: true,
+                deliveryType: true,
+                notes: true,
+                user:{
+                    select:{
                         firstName: true,
                         lastName: true,
+                    }
+                },
+                vendorOrders: {
+                    select: {
+                        feedbacks:{
+                            select:{
+                                rating: true,
+                                comments: true,
+                            }
+                        },
                     }
                 }
             }

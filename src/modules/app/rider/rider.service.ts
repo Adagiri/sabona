@@ -149,31 +149,23 @@ export default class RiderService {
 
         });
 
-        const vendorDeviceTokens = await this._dbService.user.findMany({
+        const vendorDeviceTokens = await this._dbService.deviceToken.findMany({
             where: {
-                id: vendorId[0]?.vendorId,
-                DeviceToken: { some: { token: { not: "" } } }
+                userId: vendorId[0]?.vendorId,
+                deletedAt: null
             },
             select: {
-                DeviceToken: {
-                    select: {
-                        token: true,
-                    },
-                },
+                token: true,
             },
         });
 
-        const customerDeviceTokens = await this._dbService.user.findMany({
+        const customerDeviceTokens = await this._dbService.deviceToken.findMany({
             where: {
-                id: customerId?.userId,
-                DeviceToken: { some: { token: { not: "" } } }
+                userId: customerId?.userId,
+                deletedAt: null,
             },
             select: {
-                DeviceToken: {
-                    select: {
-                        token: true,
-                    },
-                },
+                token: true,
             },
         });
 
@@ -185,10 +177,18 @@ export default class RiderService {
 
         switch (params.status) {
             case 'ACCEPT':
+
+                const haveOrder = await this._dbService.riderOrder.findFirst({
+                    where: {
+                        orderId: params.orderId,
+                    }
+                });
+
                 const riderOrder = await this._dbService.riderOrder.create({
                     data: {
                         orderId: params.orderId,
-                        riderId: user.id
+                        riderId: user.id,
+                        type: haveOrder ? 'RIDER_DELIVERY' : 'RIDER_PICKUP',
                     }
                 });
 
@@ -783,6 +783,12 @@ export default class RiderService {
             },
             select: {
                 orderId: true,
+                feedbacks:{
+                    select:{
+                        rating: true,
+                        comments: true,
+                    }
+                },
                 order: {
                     select: {
                         totalAmount: true,
@@ -812,6 +818,8 @@ export default class RiderService {
                 }
             }
         })
+
+
 
         return { data: deliveries };
     }
