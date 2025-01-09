@@ -1,17 +1,60 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
-import { OrderStatus, PaymentType, User } from '@prisma/client';
+import { OrderStatus, PaymentType, User, FeedbackType } from '@prisma/client';
 import CreateOrderRequestDTO from './dto/request/createOrder.request';
 import AcceptOrderRequestDTO from '../vendor/dto/request/acceptOrder.request';
 import CancelOrderResponseDTO from './dto/response/cancelOrder.response';
 import { OrderListDto } from './dto/response/orderlist.response.dto';
+import { extractTokens } from 'src/helpers/util.helper';
+import NotificationService from '../notification/notification.service';
+import { MultipleDeviceNotificationDto } from '../notification/dto/request/notification.request';
+import CreateFeedbackDTO from './dto/request/createFeeback.request';
+import CreateFeedbackResponseDTO from './dto/response/createFeedback.response';
+import { BadRequestException } from 'src/core/exceptions/response.exception';
+import { HasFeedBackRequestDTO } from './dto/request/hasFeedback.request';
+import { HasFeedbackResponseDTO } from './dto/response/hasFeedback.response.dto';
 
 @Injectable()
 export default class CustomerService {
-    constructor(private _dbService: DatabaseService) { }
+    constructor(
+        private _dbService: DatabaseService,
+        private _notificationService: NotificationService,
+    ) { }
 
     async CreateOrder(data: CreateOrderRequestDTO, user: User): Promise<any> {
-        const order = await this._dbService.order.create({
+        // Fetch customer device tokens
+        const customerDeviceTokensPromise = this._dbService.deviceToken.findMany({
+            where: {
+                userId: user.id,
+                deletedAt: null,
+            },
+            select: {
+                token: true,
+            },
+        });
+
+        const vendorId = await this._dbService.laundry.findMany({
+            where: {
+                id: data.laundryId,
+            },
+            select: {
+                vendorId: true,
+            }
+
+        });
+
+        const vendorsDeviceTokensPromise = await this._dbService.deviceToken.findMany({
+            where: {
+                userId: vendorId[0].vendorId,
+                deletedAt: null,
+            },
+            select: {
+                token: true,
+            },
+        });
+
+        // Create the order
+        const orderPromise = this._dbService.order.create({
             data: {
                 userId: user.id,
                 laundryId: data.laundryId,
@@ -25,41 +68,131 @@ export default class CustomerService {
                         pickupLat: data.pickupLat,
                         pickupLong: data.pickupLong,
                         pickupDate: data.pickupDate,
-                        pickupTime  : data.pickupTime,
-                    }
+                        pickupTime: data.pickupTime,
+                    },
                 },
                 delivery: {
                     create: {
                         deliveryAddress: data.deliveryAddress,
                         deliveryLat: data.deliveryLat,
                         deliveryLong: data.deliveryLong,
-                        // deliveryTime: data.pickupTime,
                         deliveryDate: data.deliveryDate,
-                    }
+                    },
                 },
                 deliveryType: data.deliveryType,
-                // detergentType: data.detergentType,
-                // colorType: data.colorType,
                 services: {
-                    create: data.services.map(service => ({
+                    create: data.services.map((service) => ({
                         laundryServiceId: service.serviceId,
                         items: {
-                            create: service.items.map(item => ({
+                            create: service.items.map((item) => ({
                                 laundryServiceItemId: item.id,
-                                quantity: item.quantity
-                            }))
-                        }
-                    }))
+                                quantity: item.quantity,
+                            })),
+                        },
+                    })),
+                },
+            },
+        });
+
+        // Execute promises in parallel
+        const [customerDeviceTokens, vendorsDeviceTokens, order] = await Promise.all([customerDeviceTokensPromise, vendorsDeviceTokensPromise, orderPromise]);
+
+        // Extract Customer tokens
+        const customserTokens = extractTokens(customerDeviceTokens);
+
+        // Extract Vendor tokens
+        const vendorTokens = extractTokens(vendorsDeviceTokens);
+
+        // Send Customer notification Data
+        const customerNotificationData: MultipleDeviceNotificationDto = {
+            tokens: customserTokens,
+            title: "Order Placed!!",
+            body: "Your order has been placed successfully.",
+            notificationData: {
+                orderId: order.id,
+                key: 'FETCH_ORDERS',
+                route: 'Orders',
+            },
+
+        };
+
+        // Send Vendor notification Data
+        const vendorNotificationData: MultipleDeviceNotificationDto = {
+            tokens: vendorTokens,
+            title: "New Order!!",
+            body: "You have recieved a new order.",
+            notificationData: {
+                orderId: order.id,
+                key: 'FETCH_ORDER_REQUESTS',
+                route: 'Home',
+            }
+        };
+
+        if (customserTokens?.length) {
+            const res = await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
+            if (res) {
+                const createNotification = await this._dbService.notification.create({
+                    data: {
+                        userId: user.id,
+                        orderId: order.id,
+                        message: "Your order has been placed successfully.",
+                        status: "UNREAD",
+                        data: {
+                            orderId: order.id,
+                            key: 'FETCH_ORDERS',
+                            route: 'Orders',
+                        },
+                        type: "ORDER_PLACED",
+                    }
+                });
+                if (createNotification) {
+                    console.log("Customer Notification created successfully");
+                }
+                else {
+                    console.log("Error creating notification");
+                }
+
+            }
+        }
+        else {
+            console.log("No customer tokens found");
+        }
+        if (vendorTokens?.length) {
+            const res = await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
+            if (res) {
+                const createNotification = await this._dbService.notification.create({
+                    data: {
+                        userId: vendorId[0].vendorId,
+                        orderId: order.id,
+                        message: "You have recieved a new order.",
+                        status: "UNREAD",
+                        data: {
+                            orderId: order.id,
+                            key: 'FETCH_ORDER_REQUESTS',
+                            route: 'Home',
+                        },
+                        type: "ORDER_PLACED",
+                    }
+                });
+                if (createNotification) {
+                    console.log("Vendor Notification created successfully");
+                }
+                else {
+                    console.log("Error creating notification");
                 }
             }
-        });
+        } else {
+            console.log("No vendor tokens found");
+        }
+
 
         if (!order) {
             throw new BadRequestException("Error creating order");
         }
 
         return { data: order };
-    };
+    }
+
 
 
     async CancelOrder(params: AcceptOrderRequestDTO, user: User): Promise<CancelOrderResponseDTO> {
@@ -141,12 +274,12 @@ export default class CustomerService {
                     },
                 },
                 laundry: {
-                    select:{
+                    select: {
                         name: true,
                     }
                 },
             },
-            orderBy:{
+            orderBy: {
                 createdAt: 'desc',
             }
         });
@@ -154,19 +287,100 @@ export default class CustomerService {
         if (!orders) {
             throw new BadRequestException("Error fetching orders");
         }
-        
+
         const ordersWithTotalQuantity = orders.map(order => {
             const totalQuantity = order.services.reduce((orderTotal, service) => {
                 const serviceTotal = service.items.reduce((itemTotal, item) => itemTotal + item.quantity, 0);
                 return orderTotal + serviceTotal;
             }, 0);
-        
+
             return {
                 ...order,
                 totalQuantity,
             };
         });
-        
+
         return ordersWithTotalQuantity;
+    }
+
+    async AddFeedback(data: CreateFeedbackDTO, user: User): Promise<CreateFeedbackResponseDTO> {
+
+        const {
+            pickupRiderRating,
+            deliveryRiderRating,
+            vendorRating,
+            orderId,
+            pickupRiderFeedback,
+            deliveryRiderFeedback,
+            vendorFeedback,
+            pickupRiderOrderId,
+            deliveryRiderOrderId,
+            vendorOrderId,
+        } = data;
+
+        const isOrderCompleted = await this._dbService.order.findFirst({
+            where: {
+                id: orderId,
+                status: "COMPLETED",
+            },
+        });
+
+        const createFeedback = async (
+            rating: number | undefined,
+            comments: string | undefined,
+            type: FeedbackType,
+        ) => {
+            if (rating !== 0) {
+                const res = await this._dbService.feedback.create({
+                    data: {
+                        userId: user.id,
+                        rating,
+                        comments: comments ?? "",
+                        type,
+                        orderId,
+                        riderOrderId: type === "RIDER_PICKUP" ? pickupRiderOrderId : type === "RIDER_DELIVERY" ? deliveryRiderOrderId : null,
+                        vendorOrderId: type === "VENDOR" ? vendorOrderId : null,
+                    },
+                });
+                if (res) {
+                    return true
+                }
+            }
+        };
+
+        if (isOrderCompleted) {
+            const feedbacksCreated = await Promise.all([
+                createFeedback(vendorRating, vendorFeedback, "VENDOR"),
+                createFeedback(pickupRiderRating, pickupRiderFeedback, "RIDER_PICKUP"),
+                createFeedback(deliveryRiderRating, deliveryRiderFeedback, "RIDER_DELIVERY"),
+            ]);
+
+            if (feedbacksCreated.some((feedback) => feedback === true)) {
+                return { message: "Feedback added successfully" };
+            }
+            else {
+                throw new BadRequestException("Error adding feedback");
+            }
+        }
+        else {
+            throw new BadRequestException("Order is not completed");
+        }
+
+    }
+
+    async HasFeedback(params: HasFeedBackRequestDTO, user: User): Promise<HasFeedbackResponseDTO> {
+        const feedback = await this._dbService.feedback.findFirst({
+            where: {
+                userId: user?.id,
+                orderId: params.orderId,
+            }
+        });
+
+        if (feedback) {
+            return { hasFeedback: true }
+        }
+        else {
+            return { hasFeedback: false }
+        }
     }
 }

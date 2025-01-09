@@ -6,15 +6,20 @@ import { AllUserListDto } from './dto/response/allCustomerList.response.dto';
 import FindUsersRequestDTO from '../user/dto/request/find.request';
 import FindUsersResponseDTO from '../user/dto/response/find.response';
 import { Prisma, UserStatus, UserType } from '@prisma/client';
-import { GetDateFilterOptions, GetOrderOptions, GetPaginationOptions } from 'src/helpers/util.helper';
+import { extractTokens, GetDateFilterOptions, GetOrderOptions, GetPaginationOptions } from 'src/helpers/util.helper';
 import FindOrderRequestDTO from './dto/request/find.request';
 import FindApplicationRequestDTO from './dto/request/application.request';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
 import ApplicationApproveMessageResponseDTO from './dto/response/approve.response.dto';
+import NotificationService from '../notification/notification.service';
+import { AllUserLocationsResponseDTO } from './dto/response/alluserlocation.response.dto';
 
 @Injectable()
 export default class AdminService {
-    constructor(private _dbService: DatabaseService) { }
+    constructor(
+        private _dbService: DatabaseService,
+        private _notificationService: NotificationService
+    ) { }
 
     async GetAllOrders(data: FindOrderRequestDTO): Promise<AllOrderListDto> {
 
@@ -32,18 +37,18 @@ export default class AdminService {
             select: {
                 id: true,
                 status: true,
-                user:{
-                    select:{
+                user: {
+                    select: {
                         firstName: true,
                         lastName: true,
                         phone: true,
                     }
                 },
                 totalAmount: true,
-                riderOrders:{
-                    select:{
-                        rider:{
-                            select:{
+                riderOrders: {
+                    select: {
+                        rider: {
+                            select: {
                                 firstName: true,
                                 lastName: true,
                                 phone: true,
@@ -64,16 +69,16 @@ export default class AdminService {
                     select: {
                         name: true,
                         vendor: {
-                            select:{
+                            select: {
                                 phone: true,
                             }
                         }
                     },
                 },
-                delivery:{
-                    select:{
-                        rider:{
-                            select:{
+                delivery: {
+                    select: {
+                        rider: {
+                            select: {
                                 firstName: true,
                                 lastName: true,
                                 phone: true,
@@ -81,7 +86,7 @@ export default class AdminService {
                         }
                     }
                 },
-                pickup:{
+                pickup: {
                     select: {
                         rider: {
                             select: {
@@ -137,17 +142,17 @@ export default class AdminService {
         const order = GetOrderOptions(data);
 
         const users = await this._dbService.user.findMany({
-            select:{
+            select: {
                 id: true,
                 firstName: true,
-                lastName : true,
+                lastName: true,
                 email: true,
                 type: true,
                 phone: true,
                 createdAt: true,
                 updatedAt: true,
                 status: true,
-                level : UserType.USER === data.type ? true : false,
+                level: UserType.USER === data.type ? true : false,
             },
             where,
             ...pagination,
@@ -170,10 +175,10 @@ export default class AdminService {
         const order = GetOrderOptions(data);
 
         const applications = await this._dbService.user.findMany({
-            select:{
+            select: {
                 id: true,
                 firstName: true,
-                lastName : true,
+                lastName: true,
                 email: true,
                 phone: true,
                 createdAt: true,
@@ -194,7 +199,6 @@ export default class AdminService {
     }
 
     async ApproveApplication(userId: string): Promise<ApplicationApproveMessageResponseDTO> {
-        
 
         const user = await this._dbService.user.findUnique({
             where: { id: userId },
@@ -214,21 +218,61 @@ export default class AdminService {
             data: { status: UserStatus.ACTIVE },
         });
 
+        const deviceTokens = await this._dbService.deviceToken.findMany({
+            where: {
+                userId: userId,
+                deletedAt:null
+            },
+            select: {
+                token: true,
+
+            }
+        });
+
+        const userTokens = extractTokens(deviceTokens);
+
+        const data = {
+            tokens : userTokens,
+            title: 'Application Approved',
+            body: 'Your application has been approved successfully',
+            notificationData: {
+                orderId: '',
+                key: 'FETCH_USER_DETAILS',
+                route: '',
+            },
+
+        };
+
+        if(userTokens?.length){
+            try{
+                const res = await this._notificationService.SendNotificationToMultipleTokens(data);
+                console.log("RESS" ,res?.responses?.map((e)=>{
+                    console.log('ERROR' , e)
+                }))
+            }
+            catch(error){
+                console.log('error' ,error)
+            }
+        }else{
+            console.log('NO TOKENS TO SEND NOTIFICAITON')
+        }
+
+
         return { message: 'Application approved successfully' };
     }
 
-    async GetCustomersLocation(): Promise<any> {
+    async GetCustomersLocation(): Promise<AllUserLocationsResponseDTO> {
         const users = await this._dbService.user.findMany({
-            select:{
-                id : true,
-                settings:{
-                    select:{
-                        lat:true,
-                        long :true
+            select: {
+                id: true,
+                settings: {
+                    select: {
+                        lat: true,
+                        long: true
                     }
                 }
             },
-            where:{
+            where: {
                 type: UserType.USER,
             }
         });

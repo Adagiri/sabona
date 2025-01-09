@@ -34,4 +34,16 @@ export default class DeviceController {
     ): Promise<CreateFCMTokenResponseDTO> {
         return this._deviceService.AddFCMToken(data , user);
     }
+
+    @Authorized()
+    @Post({
+        path: '/remove-fcm-token',
+        description: 'Remove FCM token from device',
+        response: CreateFCMTokenResponseDTO,
+    })
+    RemoveUserTokens(
+        @CurrentUser() user: User
+    ): Promise<CreateFCMTokenResponseDTO> {
+        return this._deviceService.RemoveUserTokens(user);
+    }
 }

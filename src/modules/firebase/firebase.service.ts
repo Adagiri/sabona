@@ -1,4 +1,4 @@
-import {  Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { SendMultipleNotificationResponseDTO } from '../app/notification/dto/response/notification.response';
 import SendNotificationRequestDTO, { MultipleDeviceNotificationDto } from '../app/notification/dto/request/notification.request';
@@ -21,9 +21,7 @@ export default class FirebaseService {
             const { token, title, body } = data;
             await admin.messaging().send({
                 token,
-                webpush: {
-                    notification: { title: title, body: body },
-                },
+                notification: { title: title, body: body },
             });
             return { message: 'Notification sent successfully' };
         } catch (error) {
@@ -34,14 +32,20 @@ export default class FirebaseService {
     async SendNotificationToMultipleTokens(data: MultipleDeviceNotificationDto) {
         try {
             const { tokens, title, body } = data;
+            const notificationData = data?.notificationData
             const message = {
                 notification: { title, body },
                 tokens,
+                data : notificationData && {
+                    orderId: notificationData.orderId,
+                    key: notificationData.key,
+                    route: notificationData.route,
+                } || {},
             };
             const res = await admin.messaging().sendEachForMulticast(message);
             return res as SendMultipleNotificationResponseDTO;
         } catch (error) {
-             throw new BadRequestException(`Failed to send notifications to multiple tokens: ${error.message}`);
+            throw new BadRequestException(`Failed to send notifications to multiple tokens: ${error.message}`);
         }
     }
 }

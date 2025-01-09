@@ -81,6 +81,7 @@ export default class CreateOrderRequestDTO {
     
     @ApiProperty()
     @IsString()
+    @IsOptional()
     deliveryDate: string;
 
     @ApiProperty()

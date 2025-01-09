@@ -1,4 +1,4 @@
-import { OrderStatus, User } from "@prisma/client";
+import { OrderStatus, User, UserType } from "@prisma/client";
 import DatabaseService from "src/database/database.service";
 import UpdateStatusRequestDTO from "./dto/request/updateStatus.request";
 import GetOrderRequestsResponseDTO from "./dto/response/getOrderRequests.response";
@@ -7,7 +7,7 @@ import CreateLaundryRequestDTO, { LaundryServiceDTO } from "./dto/request/create
 import { BadRequestException } from "src/core/exceptions/response.exception";
 import { Injectable } from "@nestjs/common";
 import EditLaundryRequestDTO from "./dto/request/editLaundry.request";
-import { CreateLaundryServiceItemRequestDTO, CreateLaundryServiceItemsArrayDTO } from "./dto/request/createLaundryServiceItem.request";
+import { CreateLaundryServiceItemsArrayDTO } from "./dto/request/createLaundryServiceItem.request";
 import { EditLaundryServiceItemRequestDTO } from "./dto/request/editlaundryServiceItem.request";
 import { CreateLaundryReponseDTO } from "./dto/response/createLaundry.response";
 import { GetAllLaundriesResponseDTO } from "./dto/response/getAllLaundry.response";
@@ -16,10 +16,14 @@ import LaundryMessageResponseDTO from "./dto/response/laundryMessage";
 import LaundryServiceMessageResponseDTO from "./dto/response/laundryServiceMessage.response";
 import GetOrderRequestDTO from "./dto/request/getOrder.request";
 import CancelOrderRequestDTO from "./dto/request/cancelOrder.request";
-
+import { extractTokens } from "src/helpers/util.helper";
+import NotificationService from "../notification/notification.service";
 @Injectable()
 export default class VendorService {
-    constructor(private _dbService: DatabaseService) { }
+    constructor(
+        private _dbService: DatabaseService,
+        private _notificationService: NotificationService,
+    ) { }
 
     async getOrderRequests(user: User, param: GetOrderRequestDTO): Promise<GetOrderRequestsResponseDTO> {
         const orderRequests = await this._dbService.order.findMany({
@@ -52,8 +56,9 @@ export default class VendorService {
                 userId: true,
                 totalAmount: true,
                 deliveryType: true,
+                orderNumber: true,
                 services: {
-                    select:{
+                    select: {
                         laundryServiceId: true,
                         laundryService: {
                             select: {
@@ -67,12 +72,12 @@ export default class VendorService {
                             }
                         }
                     },
-               },
-               vendorOrders:{
-                     select: {
-                          vendorId: true,
-                     }
-               }
+                },
+                vendorOrders: {
+                    select: {
+                        vendorId: true,
+                    }
+                }
             }
         })
 
@@ -89,6 +94,54 @@ export default class VendorService {
         if (!order) {
             throw new BadRequestException("Order does not exist")
         }
+
+
+        const customer = await this._dbService.order.findFirst({
+            where: {
+                id: params.orderId,
+            },
+            select: {
+                userId: true,
+            }
+        })
+
+        const customerDeviceTokens = await this._dbService.deviceToken.findMany({
+            where: {
+                userId: customer.userId,
+                deletedAt: null
+            },
+            select: {
+                token: true
+            }
+        })
+
+        const riderUsers = await this._dbService.user.findMany({
+            where: {
+                type: UserType.RIDER, // assuming you have a UserType enum or similar
+                deletedAt: null       // ensuring the user is not marked as deleted
+            },
+            select: {
+                id: true // only select the userId
+            }
+        });
+
+        let allRiderDeviceTokens = [];
+
+        for (const rider of riderUsers) {
+            const deviceTokens = await this._dbService.deviceToken.findMany({
+                where: {
+                    userId: rider.id,
+                },
+                select: {
+                    token: true  // selects only the token field
+                }
+            });
+            allRiderDeviceTokens = allRiderDeviceTokens.concat(deviceTokens);
+        }
+
+
+        const customerTokens = extractTokens(customerDeviceTokens);
+        const riderTokens = extractTokens(allRiderDeviceTokens);
 
         switch (params.status) {
             case OrderStatus.ACCEPTED:
@@ -136,9 +189,149 @@ export default class VendorService {
                     throw new BadRequestException("Failed to accept order")
                 }
 
+                const customerAcceptedNotificationData = {
+                    tokens: customerTokens,
+                    title: "Order Accepted!!",
+                    body: "Your order has been accepted successfully.",
+                    notificationData: {
+                        orderId: order.id,
+                        key: 'GET_ORDER_BY_ID',
+                        route: 'TrackOrder',
+                    },
+                };
+
+                const riderAcceptedNotificationData = {
+                    tokens: riderTokens,
+                    title: "New Order!!",
+                    body: "You have recieved a new order.",
+                    notificationData: {
+                        orderId: order.id,
+                        key: 'FETCH_RIDER_REQUESTS',
+                        route: 'Home',
+                    }
+                };
+
+                if (customerTokens?.length) {
+                    const res = await this._notificationService.SendNotificationToMultipleTokens(customerAcceptedNotificationData);
+                    if (res) {
+                        const createNotification = await this._dbService.notification.create({
+                            data: {
+                                orderId: order.id,
+                                userId: customer.userId,
+                                type: "ORDER_ACCEPTED",
+                                message: "Your order has been accepted successfully.",
+                                status: "UNREAD",
+                                data: {
+                                    orderId: order.id,
+                                    key: 'FETCH_RIDER_REQUESTS',
+                                    route: 'Home',
+                                },
+                            }
+                        })
+                        if (createNotification) {
+                            console.log("Notification created")
+                        }
+                        else {
+                            console.log("Failed to create notification")
+                        }
+                    }
+                }
+                if (riderTokens?.length) {
+                    const res = await this._notificationService.SendNotificationToMultipleTokens(riderAcceptedNotificationData);
+                    if (res) {
+                        console.log("Rider notified")
+                    }
+                }
+                else {
+                    console.log("No rider to notify")
+                }
                 return { message: 'SUCCESS' }
 
+            case OrderStatus.REJECTED:
+
+                const customerOrderRejectedNotificationData = {
+                    tokens: customerTokens,
+                    title: "Order Rejected!!",
+                    body: "Your order has been rejected by the vendor.",
+                    notificationData: {
+                        orderId: order.id,
+                        key: 'FETCH_ORDERS',
+                        route: 'Orders',
+                    }
+                };
+
+                const isOrderRejected = await this._dbService.order.findFirst({
+                    where: {
+                        id: params.orderId,
+                        status: OrderStatus.REJECTED,
+                    }
+                })
+
+                if (isOrderRejected) {
+                    throw new BadRequestException("Order already rejected")
+                }
+
+                await this._dbService.order.update({
+                    where: {
+                        id: params.orderId,
+                    },
+                    data: {
+                        status: OrderStatus.REJECTED,
+                    }
+                })
+
+                if (customerTokens?.length) {
+                    const res = await this._notificationService.SendNotificationToMultipleTokens(customerOrderRejectedNotificationData);
+                    if (res) {
+                        const createNotification = await this._dbService.notification.create({
+                            data: {
+                                userId: customer.userId,
+                                orderId: order.id,
+                                message: "Your order has been rejected by the vendor.",
+                                status: "UNREAD",
+                                data: {
+                                    orderId: order.id,
+                                    key: 'FETCH_ORDERS',
+                                    route: 'Orders',
+                                },
+                                type: "ORDER_REJECTED",
+                            }
+                        });
+                        if (createNotification) {
+                            console.log("Customer Notification created")
+                        }
+                        else {
+                            console.log("Failed to create notification")
+                        }
+                    }
+                }
+
+                return { message: "SUCCESS" }
+
             case OrderStatus.READY_FOR_PICKUP:
+
+                const customerReadyForPickupNotificationData = {
+                    tokens: customerTokens,
+                    title: "Order Processed!!",
+                    body: "Your order is processed and will be delivered soon.",
+                    notificationData: {
+                        orderId: order.id,
+                        key: 'GET_ORDER_BY_ID',
+                        route: 'TrackOrder',
+                    }
+                };
+
+                const riderReadyForPickupNotificationData = {
+                    tokens: riderTokens,
+                    title: "New Order!!",
+                    body: "You have recieved a new order.",
+                    notificationData: {
+                        orderId: order.id,
+                        key: 'FETCH_RIDER_REQUESTS',
+                        route: 'Home',
+                    }
+                };
+
                 const isVendorsOrder = await this._dbService.vendorOrder.findFirst({
                     where: {
                         AND: {
@@ -163,6 +356,37 @@ export default class VendorService {
 
                 if (!updatedOrder) {
                     throw new Error("Failed to update order")
+                }
+                if (customerTokens?.length) {
+                    const res = await this._notificationService.SendNotificationToMultipleTokens(customerReadyForPickupNotificationData);
+                    if (res) {
+                        const createNotification = await this._dbService.notification.create({
+                            data: {
+                                userId: customer.userId,
+                                orderId: order.id,
+                                message: "Your order is processed and will be delivered soon.",
+                                status: "UNREAD",
+                                data: {
+                                    orderId: order.id,
+                                    key: 'GET_ORDER_BY_ID',
+                                    route: 'TrackOrder',
+                                },
+                                type: "ORDER_PROCESSING",
+                            }
+                        });
+                        if (createNotification) {
+                            console.log("Customer Notification created")
+                        }
+                        else {
+                            console.log("Failed to create notification")
+                        }
+                    }
+                }
+                if (riderTokens?.length) {
+                    const res = await this._notificationService.SendNotificationToMultipleTokens(riderReadyForPickupNotificationData);
+                    if (res) {
+                        console.log("Rider notified")
+                    }
                 }
 
                 return { message: 'SUCCESS' }
@@ -214,8 +438,23 @@ export default class VendorService {
                 id: true,
                 name: true,
                 address: true,
+                vendor: {
+                    select: {
+                        feedbacks: {
+                            select: {
+                                rating: true,
+                            },
+                        },
+                        addresses: {
+                            select: {
+                                lat: true,
+                                long: true
+                            }
+                        }
+                    }
+                },
                 laundryService: {
-                    select:{
+                    select: {
                         id: true,
                         name: true,
                         description: true,
@@ -249,7 +488,7 @@ export default class VendorService {
                         id: true,
                         name: true,
                         description: true,
-                        laundryServiceItems:{
+                        laundryServiceItems: {
                             select: {
                                 name: true,
                                 price: true,
@@ -491,7 +730,7 @@ export default class VendorService {
             select: {
                 id: true,
                 name: true,
-                price:true
+                price: true
             }
         })
 
@@ -623,13 +862,13 @@ export default class VendorService {
         return { message: 'SUCCESS' }
     }
 
-    async getAllOrders (user: User): Promise<any> {
+    async getAllOrders(user: User): Promise<any> {
         const orders = await this._dbService.order.findMany({
             where: {
                 vendorOrders: {
                     vendorId: user.id,
                 }
-            }
+            },
         })
 
         console.log(orders)
@@ -674,12 +913,30 @@ export default class VendorService {
                     vendorId: user.id,
                 },
             },
-            include: {
-                user: {
-                   select: {
-                    firstName: true,
-                    lastName: true,
-                   }
+            select:{
+                id: true,
+                orderNumber: true,
+                userId: true,
+                laundryId: true,
+                status: true,
+                totalAmount: true,
+                deliveryType: true,
+                notes: true,
+                user:{
+                    select:{
+                        firstName: true,
+                        lastName: true,
+                    }
+                },
+                vendorOrders: {
+                    select: {
+                        feedbacks:{
+                            select:{
+                                rating: true,
+                                comments: true,
+                            }
+                        },
+                    }
                 }
             }
         })

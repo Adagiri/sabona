@@ -42,6 +42,17 @@ enum DeviceType {
   IOS
 }
 
+enum FeedbackType {
+  RIDER_PICKUP
+  RIDER_DELIVERY
+  VENDOR
+}
+
+enum RiderOrderType {
+  RIDER_PICKUP
+  RIDER_DELIVERY
+}
+
 // OrderStatus enum to track the different stages of an order
 enum OrderStatus {
   PENDING_PAYMENT // When the order is created and awaiting payment
@@ -54,9 +65,11 @@ enum OrderStatus {
   COMPLETED // When the entire process is completed
 }
 
-// NotificationType enum to define the different types of notifications
+// NotificationType enum to define the different types of notificationsnotification
 enum NotificationType {
+  ORDER_PLACED
   ORDER_ACCEPTED
+  ORDER_PROCESSING
   ORDER_REJECTED
   ORDER_PICKED_UP
   ORDER_DELIVERED
@@ -126,7 +139,7 @@ model User {
   deletedAt        DateTime?  @db.Timestamptz() // Optional deleted at timestamp
   profilePicture   Media?     @relation(fields: [profilePictureId], references: [id])
 
-  level            LEVEL? @default(BASIC)// User level
+  level LEVEL? @default(BASIC) // User level
 
   addresses UserAddress[] // A user can have multiple addresses
 
@@ -141,7 +154,9 @@ model User {
   Notification Notification[]
   Pickup       Pickup[]
   Delivery     Delivery[]
-  laundry      Laundry[]       @relation("VendorLaundry")
+  laundry      Laundry[]      @relation("VendorLaundry")
+
+  feedbacks Feedback[]
 }
 
 model UserAddress {
@@ -173,12 +188,13 @@ model UserSettings {
 
 // DeviceToken model to store device tokens for push notifications
 model DeviceToken {
-  id        Int      @id @default(autoincrement()) // Using Int for device token ID
+  id        Int       @id @default(autoincrement()) // Using Int for device token ID
   userId    String // Changed to String to match User's UUID
-  user      User     @relation(fields: [userId], references: [id])
-  token     String   @unique // Unique push token for each device
-  createdAt DateTime @default(now()) @db.Timestamptz()
-  deletedAt DateTime?  @db.Timestamptz() // Optional deletion timestamp
+  user      User      @relation(fields: [userId], references: [id])
+  token     String
+  deviceId  String
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  deletedAt DateTime? @db.Timestamptz() // Optional deletion timestamp
 }
 
 // Device model to store devices used by users (for web, iOS, Android)
@@ -263,6 +279,7 @@ enum DeliveryType {
   NORMAL
   EXPRESS
 }
+
 // Pickup model to track the pickup of the order from the user to the vendor
 model Pickup {
   id      String  @id @default(uuid()) // UUID for pickup ID
@@ -314,7 +331,7 @@ model Laundry {
   name           String // Name of the laundry
   address        String // Address of the laundry
   vendor         User?            @relation("VendorLaundry", fields: [vendorId], references: [id])
-  vendorId       String?          
+  vendorId       String?
   createdAt      DateTime         @default(now()) @db.Timestamptz()
   updatedAt      DateTime         @default(now()) @updatedAt @db.Timestamptz()
   deletedAt      DateTime?        @db.Timestamptz()
@@ -377,6 +394,7 @@ model OrderLaundryServiceItem {
 // Order model to represent a user's order
 model Order {
   id          String                @id @default(uuid()) // UUID for order ID
+  orderNumber Int?                  @default(autoincrement()) // Auto-incrementing order number
   userId      String // User who placed the order
   user        User                  @relation(fields: [userId], references: [id])
   laundryId   String // Foreign key to the Laundry model
@@ -391,43 +409,44 @@ model Order {
   riderOrders   RiderOrder[] // Existing relation with riders for order management
   vendorOrders  VendorOrder? // Existing relation with vendors for order management
   Notification  Notification[] // Notifications related to the order
-  feedback      Feedback? // Optional feedback from the customer
+  feedbacks     Feedback[] // Multiple feedbacks related to the order
   statusHistory OrderStatusHistory[] // History of order status changes
   pickup        Pickup? // Relation to the pickup tracking
   delivery      Delivery? // Relation to the delivery tracking
-  deliveryType  DeliveryType @default(NORMAL) // Type of delivery (normal/express)
+  deliveryType  DeliveryType         @default(NORMAL) // Type of delivery (normal/express)
   detergentType DetergentType? // Type of detergent used
   colorType     ColorType? // Type of color (light/dark/mixed)
   notes         String? // Additional notes for the order
-
-  createdAt DateTime  @default(now()) @db.Timestamptz()
-  updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt DateTime? @db.Timestamptz()
+  createdAt     DateTime             @default(now()) @db.Timestamptz()
+  updatedAt     DateTime             @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt     DateTime?            @db.Timestamptz()
 }
 
 // RiderOrder model to manage assignments between riders and orders
 model RiderOrder {
-  id         String    @id @default(uuid()) // Now using UUID for rider-order relation ID
+  id         String          @id @default(uuid()) // Now using UUID for rider-order relation ID
   riderId    String
-  rider      User      @relation(fields: [riderId], references: [id])
+  rider      User            @relation(fields: [riderId], references: [id])
   orderId    String
-  order      Order     @relation(fields: [orderId], references: [id])
-  assignedAt DateTime  @default(now()) @db.Timestamptz() // When the rider was assigned
-  deletedAt  DateTime? @db.Timestamptz()
+  order      Order           @relation(fields: [orderId], references: [id])
+  assignedAt DateTime        @default(now()) @db.Timestamptz() // When the rider was assigned
+  deletedAt  DateTime?       @db.Timestamptz()
+  type       RiderOrderType? // Optional field to specify the type of assignment
+  feedbacks  Feedback[]
 
   @@index([riderId, orderId]) // Optional: Index for efficient querying on riderId and orderId
 }
 
-
 // VendorOrder model to manage assignments between vendors and orders
 model VendorOrder {
-  id         String    @id @default(uuid()) // Now using UUID for vendor-order relation ID
+  id         String     @id @default(uuid()) // Now using UUID for vendor-order relation ID
   vendorId   String // Vendor assigned to the order
-  vendor     User      @relation(fields: [vendorId], references: [id])
-  orderId    String    @unique // Using UUID for orderId field
-  order      Order     @relation(fields: [orderId], references: [id])
-  acceptedAt DateTime  @default(now()) @db.Timestamptz() // When the vendor accepted the order
-  deletedAt  DateTime? @db.Timestamptz()
+  vendor     User       @relation(fields: [vendorId], references: [id])
+  orderId    String     @unique // Using UUID for orderId field
+  order      Order      @relation(fields: [orderId], references: [id])
+  acceptedAt DateTime   @default(now()) @db.Timestamptz() // When the vendor accepted the order
+  deletedAt  DateTime?  @db.Timestamptz()
+  feedbacks  Feedback[] // Feedback related to the order
 }
 
 // OrderStatusHistory model to track all status changes for an order
@@ -441,12 +460,20 @@ model OrderStatusHistory {
 
 // Feedback model to store user feedback on completed orders
 model Feedback {
-  id        String   @id @default(uuid()) // Now using UUID for feedback ID
-  orderId   String   @unique // Ensuring only one feedback per order
-  order     Order    @relation(fields: [orderId], references: [id])
-  rating    Int // Numerical rating, for example, 1-5 stars
-  comments  String? // Optional text feedback from the user
-  createdAt DateTime @default(now()) @db.Timestamptz() // Timestamp for feedback creation
+  id            String       @id @default(uuid()) // Now using UUID for feedback ID
+  orderId       String
+  order         Order        @relation(fields: [orderId], references: [id])
+  userId        String // ID of the rider or vendor who provided the service
+  user          User         @relation(fields: [userId], references: [id])
+  type          FeedbackType // Type of feedback (RIDER_PICKUP, RIDER_DELIVERY, VENDOR)
+  rating        Int // Numerical rating, for example, 1-5 stars
+  comments      String? // Optional text feedback from the user
+  createdAt     DateTime     @default(now()) @db.Timestamptz() // Timestamp for feedback creation
+  VendorOrder   VendorOrder? @relation(fields: [vendorOrderId], references: [id])
+  vendorOrderId String?
+  RiderOrder    RiderOrder?  @relation(fields: [riderOrderId], references: [id])
+  riderOrderId  String?
+  deletedAt     DateTime?    @db.Timestamptz()
 }
 
 // Notification model to track in-app, push, and email notifications
@@ -457,9 +484,11 @@ model Notification {
   type      NotificationType // Type of notification (order accepted, feedback, etc.)
   status    NotificationStatus @default(UNREAD) // Status of the notification (read/unread)
   message   String // Custom message for the notification
-  orderId   String?            @unique // Ensuring only one notification per order if applicable
+  orderId   String?
   order     Order?             @relation(fields: [orderId], references: [id])
   createdAt DateTime           @default(now()) @db.Timestamptz() // Timestamp for notification creation
+  data      Json?              @db.JsonB // Additional data for the notification
+  deletedAt DateTime?          @db.Timestamptz()
 }
 
 model Payment {
