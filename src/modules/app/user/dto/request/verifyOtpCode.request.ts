@@ -18,7 +18,6 @@ export class VerifyOtpRequestDTO {
 
   @ApiProperty({ enum: UserType })
   @IsString()
-  @IsOptional()
   type: UserType;
 
   @ApiProperty()

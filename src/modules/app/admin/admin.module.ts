@@ -4,10 +4,11 @@ import AdminService from './admin.service';
 import AdminController from './admin.controller';
 import UserService from '../user/user.service';
 import OrderModule from '../order/order.module';
+import { NotificationModule } from '../notification/notification.module';
 
 
 @Module({
-    imports: [DatabaseModule , OrderModule],
+    imports: [DatabaseModule , OrderModule , NotificationModule],
     exports: [AdminService],
     providers: [AdminService],
     controllers: [AdminController],

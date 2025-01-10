@@ -277,6 +277,16 @@ export function GetOrderOptions(options: GetOrderOptionsArgs) {
     return databaseOptions;
 }
 
+type DeviceToken = {
+    token: string;
+};
+
+// Since your input is a direct array of DeviceToken objects
+export const extractTokens = (deviceTokens: DeviceToken[]): string[] => {
+    return deviceTokens.map(deviceToken => deviceToken.token);
+};
+
+
 export function GetDateFilterOptions(filter?: DateFilter): Prisma.UserWhereInput {
     if (!filter) return {};
 

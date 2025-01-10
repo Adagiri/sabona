@@ -17,9 +17,13 @@ export default class CreateDeviceRequestDTO {
     userAgent?: string;
 }
 
-export class CreateFCMTokenRequestDTO  {
+export class CreateFCMTokenRequestDTO {
     @ApiProperty()
     @IsString()
     token: string;
+
+    @ApiProperty()
+    @IsString()
+    deviceId: string;
 }
 

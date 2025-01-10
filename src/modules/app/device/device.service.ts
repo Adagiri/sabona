@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
 import { GenerateUUID } from '../../../helpers/util.helper';
-import CreateDeviceRequestDTO from './dto/request/create.request';
+import CreateDeviceRequestDTO, { CreateFCMTokenRequestDTO } from './dto/request/create.request';
 import CreateDeviceResponseDTO, { CreateFCMTokenResponseDTO } from './dto/response/create.response';
 import { User } from '@prisma/client';
 
@@ -21,43 +21,61 @@ export default class DeviceService {
     }
 
     async AddFCMToken(
-        data: { token: string },
+        data: CreateFCMTokenRequestDTO,
         user: User
     ): Promise<CreateFCMTokenResponseDTO> {
-        // Fetch all FCM tokens for the user
-        // const userFcmTokens = await this._dbService.deviceToken.findMany({
-        //     where: { userId: user.id },
-        // });
-        const alreadyExist = await this._dbService.deviceToken.findFirst({
-            where: {
-                AND: {
-                    token: data.token,
-                    userId: user.id
-                }
-            }
-        })
-
-
-        if (alreadyExist) {
-            return { message: 'Token already exists' };
-        }
-
-        // Create a new FCM token
         try {
-            await this._dbService.deviceToken.create({
-                data: {
-                    token: data.token,
-                    userId: user.id,
+            const conflictingToken = await this._dbService.deviceToken.findFirst({
+                where: {
+                    deviceId: data.deviceId,
+                    userId: { not: user.id }, // Token is linked to another user
+                    user:{
+                        type: user.type
+                    }
                 },
             });
-
-            return { message: 'FCM token added successfully' };
+    
+            if (conflictingToken) {
+                // Step 2: Remove the conflicting token
+                await this._dbService.deviceToken.delete({
+                    where: { id: conflictingToken.id },
+                });
+            }
+    
+            // Step 3: Delete existing token for the current user and device
+            await this._dbService.deviceToken.deleteMany({
+                where: {
+                    userId: user.id,
+                    deviceId: data.deviceId,
+                },
+            });
+    
+            // Step 4: Create a new token
+            await this._dbService.deviceToken.create({
+                data: {
+                    userId: user.id,
+                    deviceId: data.deviceId,
+                    token: data.token,
+                },
+            });
+    
+            return { message: 'Token added successfully' };
         } catch (error) {
-            console.error('Failed to add FCM token:', error);
-            throw new Error('An error occurred while adding the FCM token');
+            console.error('Failed to process FCM token:', error);
+            throw new Error('An error occurred while processing the FCM token');
         }
     }
+    
 
+    async RemoveUserTokens(user: User): Promise<CreateFCMTokenResponseDTO> {
+        const res = await this._dbService.deviceToken.deleteMany({
+            where: { userId: user.id },
+        });
+
+        if (res) {
+            return { message: 'Tokens removed successfully' };
+        }
+    }
 
     async FindById(id: number): Promise<CreateDeviceResponseDTO> {
         return await this._dbService.device.findFirst({ where: { id } });
