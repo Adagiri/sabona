@@ -36,7 +36,7 @@ export default class FirebaseService {
             const message = {
                 notification: { title, body },
                 tokens,
-                data : notificationData && {
+                data: notificationData && {
                     orderId: notificationData.orderId,
                     key: notificationData.key,
                     route: notificationData.route,
@@ -47,5 +47,9 @@ export default class FirebaseService {
         } catch (error) {
             throw new BadRequestException(`Failed to send notifications to multiple tokens: ${error.message}`);
         }
+    }
+
+    async verifyToken(token: string) {
+        return await admin.auth().verifyIdToken(token);
     }
 }

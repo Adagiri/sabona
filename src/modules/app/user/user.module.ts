@@ -9,6 +9,7 @@ import UserController from './user.controller';
 import UserService from './user.service';
 import OAuthModule from '../../../modules/oauth/oauth.module';
 import SMSModule from 'src/modules/sms/sms.module';
+import { FirebaseModule } from 'src/modules/firebase/firebase.module';
 
 @Module({
     imports: [
@@ -18,7 +19,8 @@ import SMSModule from 'src/modules/sms/sms.module';
         QueueModule,
         UserSettingsModule,
         OAuthModule,
-        SMSModule
+        SMSModule,
+        FirebaseModule
     ],
     exports: [UserService],
     providers: [UserService],
