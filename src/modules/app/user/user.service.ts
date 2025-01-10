@@ -70,7 +70,7 @@ export default class UserService {
         console.log("IN SOCIAL LOGIN")
 
         const user = await this._dbService.user.findFirst({
-            where: { phone: data?.email },
+            where: { email: data?.email },
             select: { id: true, email: true },
         });
 
@@ -381,7 +381,8 @@ export default class UserService {
             data: {
                 email: data.email && data.email,
                 firstName: data.firstName && data.firstName,
-                lastName: data.lastName && data.lastName
+                lastName: data.lastName && data.lastName,
+                phone: data.phone && data.phone
             }
         })
 
@@ -517,7 +518,6 @@ export default class UserService {
         if (user) {
             return (
                 { isExist: true }
-
             )
         }
         return (
