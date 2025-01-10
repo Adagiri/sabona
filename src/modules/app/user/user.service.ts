@@ -364,14 +364,26 @@ export default class UserService {
     async UpdateUserDetails(data: UpdateUserDetailsRequestDTO, user: User): Promise<UpdateUserDetailsResponseDTO> {
         const userDetails = await this._dbService.user.findFirst({
             where: {
-                id: user.id
+                id: user.id,
             }
         })
 
+        const isUserExist = await this._dbService.user.findFirst({
+            where: {
+                OR: [
+                {phone: data.email},
+                {email : data.email}
+                ]
+            }
+        })
         if (!userDetails) {
             throw new BadRequestException(
                 "User not found"
             )
+        }
+
+        if(isUserExist){
+            throw new BadRequestException("User with this email or phone already exists")
         }
 
         await this._dbService.user.update({

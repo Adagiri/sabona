@@ -337,6 +337,8 @@ model Laundry {
   deletedAt      DateTime?        @db.Timestamptz()
   Order          Order[]
   laundryService LaundryService[]
+
+  feedbacks Feedback[]
 }
 
 model LaundryService {
@@ -472,6 +474,8 @@ model Feedback {
   VendorOrder   VendorOrder? @relation(fields: [vendorOrderId], references: [id])
   vendorOrderId String?
   RiderOrder    RiderOrder?  @relation(fields: [riderOrderId], references: [id])
+  laundryId     String?
+  Laundry      Laundry?     @relation(fields: [laundryId], references: [id])
   riderOrderId  String?
   deletedAt     DateTime?    @db.Timestamptz()
 }

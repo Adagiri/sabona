@@ -316,6 +316,7 @@ export default class CustomerService {
             pickupRiderOrderId,
             deliveryRiderOrderId,
             vendorOrderId,
+            laundryId
         } = data;
 
         const isOrderCompleted = await this._dbService.order.findFirst({
@@ -340,6 +341,7 @@ export default class CustomerService {
                         orderId,
                         riderOrderId: type === "RIDER_PICKUP" ? pickupRiderOrderId : type === "RIDER_DELIVERY" ? deliveryRiderOrderId : null,
                         vendorOrderId: type === "VENDOR" ? vendorOrderId : null,
+                        laundryId:type === "VENDOR" ? laundryId : null,
                     },
                 });
                 if (res) {

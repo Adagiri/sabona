@@ -438,13 +438,14 @@ export default class VendorService {
                 id: true,
                 name: true,
                 address: true,
+                feedbacks:{
+                    select:{
+                        rating: true,
+                        comments: true,
+                    }
+                },
                 vendor: {
                     select: {
-                        feedbacks: {
-                            select: {
-                                rating: true,
-                            },
-                        },
                         addresses: {
                             select: {
                                 lat: true,

@@ -51,6 +51,11 @@ export default class CreateFeedbackDTO {
     @IsString()
     @IsOptional()
     vendorOrderId?: string;
+
+    @ApiProperty()
+    @IsString()
+    @IsOptional()
+    laundryId?: string;
     
     @ApiProperty()
     @IsString()
