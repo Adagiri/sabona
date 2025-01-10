@@ -41,6 +41,10 @@ export class GetOrderRequestsDTO {
 
     @ApiProperty()
     @IsNumber()
+    orderNumber: number;
+
+    @ApiProperty()
+    @IsNumber()
     totalAmount: number;
 
     @ApiProperty({ type: [Services] })

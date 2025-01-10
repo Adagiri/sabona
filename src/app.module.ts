@@ -23,6 +23,7 @@ import OrderModule from './modules/app/order/order.module';
 import AdminModule from './modules/app/admin/admin.module';
 import { NotificationModule } from './modules/app/notification/notification.module';
 import { FirebaseModule } from './modules/firebase/firebase.module';
+import PaymentsModule from './modules/app/payments/payments.module';
 @Module({
     imports: [
         TranslatorModule.forRoot({
@@ -51,6 +52,7 @@ import { FirebaseModule } from './modules/firebase/firebase.module';
         AdminModule,
         NotificationModule,
         FirebaseModule,
+        PaymentsModule,
     ],
     controllers: [AppController],
     providers: [

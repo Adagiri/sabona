@@ -9,6 +9,8 @@ import VerifyOtpResponseDTO from './dto/response/verifyOtp.response';
 import { VerifyOtpRequestDTO } from './dto/request/verifyOtpCode.request';
 import { isUserExistResponseDTO } from './dto/response/isUserExist.response';
 import IsUserExistRequestDTO from './dto/request/isUserExist.request';
+import { SocialVerificationRequestDTO } from './dto/request/socialVerification.request';
+import IsUserWithEmailExistRequestDTO from './dto/request/isUserWithEmailExist.request';
 
 @ApiController({ version: '1', tag: 'auth', path: '/auth' })
 export default class AuthController {
@@ -69,6 +71,31 @@ export default class AuthController {
         @Body() data: IsUserExistRequestDTO,
     ): Promise<isUserExistResponseDTO> {
         return this._userService.checkIsUserExist(data);
+    }
+
+    @Post({
+        path: 'isUserWithEmailExist',
+        description: 'Check if user with email exist',
+        response: isUserExistResponseDTO
+    })
+
+    IsUserWithEmailExist(
+        @Body() data: IsUserWithEmailExistRequestDTO,
+    ): Promise<isUserExistResponseDTO> {
+        return this._userService.checkIsUserWithEmailExist(data);
+    }
+
+
+    @Post({
+        path: 'social-verification',
+        description: 'Check if user exist',
+        response: VerifyOtpResponseDTO
+    })
+
+    SocialVerification(
+        @Body() data: SocialVerificationRequestDTO,
+    ): Promise<VerifyOtpResponseDTO> {
+        return this._userService.socialVerification(data);
     }
 
 

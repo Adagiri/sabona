@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsString } from 'class-validator';
+import { IsArray, IsObject, IsOptional, IsString } from 'class-validator';
 
 export default class SendNotificationRequestDTO {
     @ApiProperty()
@@ -16,6 +16,25 @@ export default class SendNotificationRequestDTO {
 
 }
 
+class NotificationData {
+    @ApiProperty()
+    @IsString()
+    @IsOptional()
+    orderId?: string;
+
+    @ApiProperty()
+    @IsString()
+    @IsOptional()
+    key?: string;
+
+    @ApiProperty()
+    @IsString()
+    @IsOptional()
+    route?: string;
+
+
+}
+
 export class MultipleDeviceNotificationDto {
     @ApiProperty()
     @IsArray()
@@ -28,6 +47,11 @@ export class MultipleDeviceNotificationDto {
     @ApiProperty()
     @IsString()
     body: string;
+
+    @ApiProperty()
+    @IsObject()
+    @IsOptional()
+    notificationData?: NotificationData;
 
   
 }

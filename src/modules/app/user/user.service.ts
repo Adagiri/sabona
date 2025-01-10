@@ -36,6 +36,9 @@ import LoginResponseDTO from './dto/response/login.response';
 import addCustomerAddressRequestDTO from './dto/request/addAddress.request';
 import IsUserExistRequestDTO from './dto/request/isUserExist.request';
 import { isUserExistResponseDTO } from './dto/response/isUserExist.response';
+import FirebaseService from 'src/modules/firebase/firebase.service';
+import { SocialVerificationRequestDTO } from './dto/request/socialVerification.request';
+import IsUserWithEmailExistRequestDTO from './dto/request/isUserWithEmailExist.request';
 
 @Injectable()
 export default class UserService {
@@ -44,7 +47,8 @@ export default class UserService {
         private _authService: AuthService,
         private _tokenService: TokenService,
         private _oauthService: OAuthService,
-        private _smsService: SMSService
+        private _smsService: SMSService,
+        private _firebaseService: FirebaseService,
     ) { }
 
     async Login(data: LoginRequestDTO): Promise<string> {
@@ -61,13 +65,62 @@ export default class UserService {
         return token;
     }
 
+    async SocialLogin(data: SocialVerificationRequestDTO): Promise<string> {
+
+        console.log("IN SOCIAL LOGIN")
+
+        const user = await this._dbService.user.findFirst({
+            where: { email: data?.email },
+            select: { id: true, email: true },
+        });
+
+        console.log("USER", user)
+
+        const token = await this._authService.CreateSession(user.id);
+
+        return token;
+    }
+
+    async SocialSignup(data: SocialVerificationRequestDTO): Promise<string> {
+
+        console.log("IN SOCIAL SIGNUPPP")
+
+        const user = await this._dbService.user.create({
+            data: {
+                firstName : data?.firstName,
+                lastName : data?.lastName,
+                email: data?.email,
+                type: data.type!,
+                status: data.type === UserType.USER ? UserStatus.ACTIVE : UserStatus.INACTIVE,
+                settings: {
+                    create: {
+                        lat: data.latitude || 0,
+                        long: data.longitude || 0,
+                    },
+                },
+                // password: data.password,
+            },
+            select: { id: true, email: true }
+        })
+
+        console.log("USER", user)
+
+        if (!user) {
+            throw new BadRequestException('auth.error_creating_user');
+        }
+
+        const token = await this._authService.CreateSession(user.id);
+
+        return token;
+    }
+
     async Signup(data: SignupRequestDTO): Promise<string> {
         const existingUser = await this._dbService.user.findFirst({
             where: { phone: data.phone },
             select: { id: true },
         });
         if (existingUser) {
-            throw new BadRequestException('auth.phone_already_exist');
+            throw new BadRequestException('This phone number is already registered');
         }
 
 
@@ -219,7 +272,7 @@ export default class UserService {
     async VerifyCode(data: VerifyOtpRequestDTO): Promise<VerifyOtpResponseDTO> {
         if (AppConfig.APP.ENV !== APP_ENV.PROD && data.otp === OTP_CODE_FOR_DEV) {
             const existingUser = await this._dbService.user.findFirst({
-                where: { phone: data.phone },
+                where: { phone: data.phone, type: data?.type },
                 select: { id: true },
             });
             if (existingUser) {
@@ -256,6 +309,34 @@ export default class UserService {
         }
     }
 
+    async socialVerification(data: SocialVerificationRequestDTO): Promise<VerifyOtpResponseDTO> {
+
+        const decodedToken = await this._firebaseService.verifyToken(data.token);
+
+        console.log("DECODED TOKENN",decodedToken)
+        console.log("DATAAA" , data)
+        if (decodedToken) {
+            const existingUser = await this._dbService.user.findFirst({
+                where: { email: decodedToken?.email },
+                select: { id: true },
+            });
+
+            if (existingUser) {
+                console.log("EXISTING USER", existingUser)
+                const token = await this.SocialLogin(data);
+                return { token }
+            } else {
+                console.log("NEW USER")
+                const token = await this.SocialSignup(data);
+                return { token }
+            }
+
+        }
+        else{
+            throw new BadRequestException("Invalid token")
+        }
+    }
+
     async LoginWithEmailPassword(data: LoginRequestDTO): Promise<LoginResponseDTO> {
         const doesUserExist = await this._dbService.user.findUnique({
             where: {
@@ -283,14 +364,26 @@ export default class UserService {
     async UpdateUserDetails(data: UpdateUserDetailsRequestDTO, user: User): Promise<UpdateUserDetailsResponseDTO> {
         const userDetails = await this._dbService.user.findFirst({
             where: {
-                id: user.id
+                id: user.id,
             }
         })
 
+        const isUserExist = await this._dbService.user.findFirst({
+            where: {
+                OR: [
+                {phone: data.email},
+                {email : data.email}
+                ]
+            }
+        })
         if (!userDetails) {
             throw new BadRequestException(
                 "User not found"
             )
+        }
+
+        if(isUserExist){
+            throw new BadRequestException("User with this email or phone already exists")
         }
 
         await this._dbService.user.update({
@@ -300,7 +393,8 @@ export default class UserService {
             data: {
                 email: data.email && data.email,
                 firstName: data.firstName && data.firstName,
-                lastName: data.lastName && data.lastName
+                lastName: data.lastName && data.lastName,
+                phone: data.phone && data.phone
             }
         })
 
@@ -422,6 +516,20 @@ export default class UserService {
             return (
                 { isExist: true }
 
+            )
+        }
+        return (
+            { isExist: false }
+        )
+    }
+
+    async checkIsUserWithEmailExist(data: IsUserWithEmailExistRequestDTO): Promise<isUserExistResponseDTO> {
+        const user = await this._dbService.user.findFirst({
+            where: { email: data.email },
+        })
+        if (user) {
+            return (
+                { isExist: true }
             )
         }
         return (

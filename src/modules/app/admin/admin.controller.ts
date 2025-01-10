@@ -1,5 +1,5 @@
 import { User, UserType } from '@prisma/client';
-import { ApiController, Authorized, CurrentUser, Get, Patch, Post } from '../../../core/decorators';
+import { ApiController, Authorized, CurrentUser, Get, Post } from '../../../core/decorators';
 import { Body, Param, Query } from '@nestjs/common';
 import AdminService from './admin.service';
 import { OrderListDto } from '../customer/dto/response/orderlist.response.dto';
@@ -15,6 +15,7 @@ import ApplicationApproveMessageResponseDTO from './dto/response/approve.respons
 import GetOrderByIdRequestDTO from '../order/dto/request/getOrderById.request';
 import GetOrderByIdResponseDTO from '../order/dto/response/getOrderById.response';
 import OrderService from '../order/order.service';
+import { AllUserLocationsResponseDTO } from './dto/response/alluserlocation.response.dto';
 
 @ApiController({
     path: '/admin',
@@ -93,9 +94,9 @@ export default class AdminController {
     @Get({
         path: '/users/location',
         description: 'Get Users Location',
-        response: Promise<any>,
+        response: AllUserLocationsResponseDTO,
     })
-    async getUsersLocation(): Promise<any> {
+    async getUsersLocation(): Promise<AllUserLocationsResponseDTO> {
         return this._adminService.GetCustomersLocation();
     }
 
