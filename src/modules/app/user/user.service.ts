@@ -83,7 +83,14 @@ export default class UserService {
 
     async SocialSignup(data: SocialVerificationRequestDTO): Promise<string> {
 
-        console.log("IN SOCIAL SIGNUPPP")
+        const existingUser = await this._dbService.user.findFirst({
+            where: { email: data.email },
+            select: { id: true },
+        });
+
+        if (existingUser) {
+            throw new BadRequestException('This email is already registered');
+        }
 
         const user = await this._dbService.user.create({
             data: {
@@ -317,7 +324,7 @@ export default class UserService {
         console.log("DATAAA" , data)
         if (decodedToken) {
             const existingUser = await this._dbService.user.findFirst({
-                where: { email: decodedToken?.email },
+                where: { email: decodedToken?.email , type : data?.type},
                 select: { id: true },
             });
 
