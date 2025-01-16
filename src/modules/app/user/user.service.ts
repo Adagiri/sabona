@@ -378,7 +378,7 @@ export default class UserService {
         const isUserExist = await this._dbService.user.findFirst({
             where: {
                 OR: [
-                {phone: data.email},
+                {phone: data.phone},
                 {email : data.email}
                 ]
             }
@@ -390,7 +390,12 @@ export default class UserService {
         }
 
         if(isUserExist){
-            throw new BadRequestException("User with this email or phone already exists")
+            if(data?.email){
+                throw new BadRequestException("User with this email already exists")
+            }
+            else if (data?.phone){
+                throw new BadRequestException("User with this phone number already exists")
+            }
         }
 
         await this._dbService.user.update({
