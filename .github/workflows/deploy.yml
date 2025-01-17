@@ -43,6 +43,12 @@ jobs:
           echo APP_FIREBASE_CLIENT_EMAIL=${{ vars.APP_FIREBASE_CLIENT_EMAIL }} >> .env
           echo APP_FIREBASE_PRIVATE_KEY=${{ vars.APP_FIREBASE_PRIVATE_KEY }} >> .env
           echo APP_FIREBASE_PROJECT_ID=${{ vars.APP_FIREBASE_PROJECT_ID }} >> .env
+          echo APP_AWS_ACCESS_KEY=${{ secrets.APP_AWS_ACCESS_KEY }} >> .env
+          echo APP_AWS_SECRET_KEY=${{ secrets.APP_AWS_SECRET_KEY }} >> .env
+          echo APP_AWS_REGION=${{ vars.APP_AWS_REGION }} >> .env
+          echo APP_AWS_BUCKET=${{ vars.APP_AWS_BUCKET }} >> .env
+          echo APP_AWS_BUCKET_BASE_URL=${{ vars.APP_AWS_BUCKET_BASE_URL }} >> .env
+          echo APP_AWS_STS_ROLE_ARN=${{ vars.APP_AWS_STS_ROLE_ARN }} >> .env
       - name: Build, tag, and push image to Amazon ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}

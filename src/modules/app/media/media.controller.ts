@@ -1,8 +1,10 @@
-import { Body } from '@nestjs/common';
+import { Body, Param } from '@nestjs/common';
 import { User } from '@prisma/client';
-import { ApiController, Authorized, CurrentUser, Post } from '../../../core/decorators';
+import { ApiController, Authorized, CurrentUser, Delete, Post } from '../../../core/decorators';
 import {
+    UploadFinalizeAdminMediaRequestDTO,
     UploadFinalizeMediaRequestDTO,
+    UploadInitiateAdminMediaRequestDTO,
     UploadInitiateMediaRequestDTO,
 } from './dto/request/upload.request';
 import {
@@ -10,6 +12,7 @@ import {
     UploadInitiateMediaResponseDTO,
 } from './dto/response/upload.response';
 import MediaService from './media.service';
+import { DeleteMediaResponseDto } from './dto/response/deleteMedia.response';
 
 @ApiController({
     path: '/media',
@@ -28,6 +31,28 @@ export default class MediaController {
         @Body() data: UploadInitiateMediaRequestDTO,
     ): Promise<UploadInitiateMediaResponseDTO> {
         return this._mediaService.UploadInitiate(data);
+    }
+
+    @Post({
+        path: '/application/init',
+        description: 'Upload public media application',
+        response: UploadInitiateMediaResponseDTO,
+    })
+    UploadAdminInitiate(
+        @Body() data: UploadInitiateAdminMediaRequestDTO,
+    ): Promise<UploadInitiateMediaResponseDTO> {
+        return this._mediaService.UploadAdminInitiate(data);
+    }
+
+    @Post({
+        path: '/application/finalize',
+        description: 'Finalize public media',
+        response: UploadFinalizeMediaResponseDTO,
+    })
+    UploadAdminFinalize(
+        @Body() data: UploadFinalizeAdminMediaRequestDTO,
+    ): Promise<UploadFinalizeMediaResponseDTO> {
+        return this._mediaService.UploadAdminFinalize(data);
     }
 
     @Post({
@@ -65,5 +90,30 @@ export default class MediaController {
         @CurrentUser() user: User,
     ): Promise<UploadFinalizeMediaResponseDTO> {
         return this._mediaService.UploadFinalize(data, user);
+    }
+
+    @Authorized()
+    @Delete({
+        path: '/:mediaId',
+        description: 'Delete Media',
+        response: DeleteMediaResponseDto
+    })
+    async DeleteMedia(
+        @Param('mediaId') mediaId: number
+        ): Promise<DeleteMediaResponseDto> {
+        return await this._mediaService.DeleteMedia(mediaId)
+    }
+
+
+    @Authorized()
+    @Post({
+        path: '/getSignedUrl/:location',
+        description: 'Get signed url',
+        response: DeleteMediaResponseDto
+    })
+    async GetSignedUrl(
+        @Param('location') location: string
+    ): Promise<DeleteMediaResponseDto> {
+        return this._mediaService.GetSignedUrl(location);
     }
 }

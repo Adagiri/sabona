@@ -157,6 +157,8 @@ model User {
   laundry      Laundry[]      @relation("VendorLaundry")
 
   feedbacks Feedback[]
+
+  reward Reward[]
 }
 
 model UserAddress {
@@ -242,6 +244,16 @@ model Media {
   deletedAt DateTime?   @db.Timestamptz()
   user      User?       @relation("MediaOwner", fields: [userId], references: [id])
   users     User[] // Users related to this media (for example, profile pictures)
+}
+
+model Reward {
+  id        String    @id @default(uuid()) // UUID for reward ID
+  userId    String    @unique // Foreign key to the User model
+  user      User      @relation(fields: [userId], references: [id])
+  points    Int       @default(0) // Reward points earned by the user
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime? @db.Timestamptz()
 }
 
 // Order model to represent a user's order

@@ -36,4 +36,9 @@ export class SocialVerificationRequestDTO {
     @IsOptional()
     latitude: number;
 
+    @ApiProperty()
+    @IsOptional()
+    @IsOptional()
+    referrerId: string;
+
 }
