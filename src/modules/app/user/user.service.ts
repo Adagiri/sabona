@@ -451,12 +451,12 @@ export default class UserService {
             )
         }
 
-        if (isUserExist) {
-            if(data.phone){
-                throw new BadRequestException("User with this phone already exists")
-            }
-            else if(data.email){
+        if(isUserExist){
+            if(data?.email){
                 throw new BadRequestException("User with this email already exists")
+            }
+            else if (data?.phone){
+                throw new BadRequestException("User with this phone number already exists")
             }
         }
 
