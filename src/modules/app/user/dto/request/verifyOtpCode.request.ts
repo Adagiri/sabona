@@ -31,4 +31,9 @@ export class VerifyOtpRequestDTO {
   @ApiPropertyOptional()
   @IsOptional()
   password: string;
+
+  @ApiProperty()
+  @IsOptional()
+  @IsString()
+  referrerId: string;
 }

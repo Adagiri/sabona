@@ -40,14 +40,13 @@ export default class UserController {
         return this._userService.Find(data);
     }
 
-    @Authorized()
     @Get({
         path: '/user/:id',
         description: 'Get user by id',
         response: GetUserByIdResponseDTO,
     })
     Get(
-        @Param('id', ParseIntPipe) id: string,
+        @Param('id') id: string
     ): Promise<GetUserByIdResponseDTO> {
         return this._userService.Get(id);
     }

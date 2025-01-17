@@ -67,8 +67,6 @@ export default class UserService {
 
     async SocialLogin(data: SocialVerificationRequestDTO): Promise<string> {
 
-        console.log("IN SOCIAL LOGIN")
-
         const user = await this._dbService.user.findFirst({
             where: { email: data?.email },
             select: { id: true, email: true },
@@ -94,8 +92,8 @@ export default class UserService {
 
         const user = await this._dbService.user.create({
             data: {
-                firstName : data?.firstName,
-                lastName : data?.lastName,
+                firstName: data?.firstName,
+                lastName: data?.lastName,
                 email: data?.email,
                 type: data.type!,
                 status: data.type === UserType.USER ? UserStatus.ACTIVE : UserStatus.INACTIVE,
@@ -110,7 +108,36 @@ export default class UserService {
             select: { id: true, email: true }
         })
 
-        console.log("USER", user)
+        if (data?.referrerId && user) {
+            const reward = await this._dbService.reward.findFirst({
+                where: {
+                    userId: data.referrerId
+                }
+            })
+
+            if (reward) {
+                await this._dbService.reward.update({
+                    data: {
+                        userId: data.referrerId,
+                        points: reward?.points + 5,
+                        updatedAt: new Date()
+                    },
+                    where: {
+                        userId: data.referrerId
+                    }
+                })
+            }
+            else {
+                await this._dbService.reward.create({
+                    data: {
+                        userId: data.referrerId,
+                        points: 5,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    }
+                })
+            }
+        }
 
         if (!user) {
             throw new BadRequestException('auth.error_creating_user');
@@ -147,6 +174,40 @@ export default class UserService {
             select: { id: true, email: true }
         })
 
+        if (data?.referrerId && user) {
+            const reward = await this._dbService.reward.findFirst({
+                where: {
+                    userId: data.referrerId
+                }
+            })
+
+            if (reward) {
+                await this._dbService.reward.update({
+                    data: {
+                        userId: data.referrerId,
+                        points: reward?.points + 5,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    },
+                    where: {
+                        userId: data.referrerId
+                    }
+                })
+
+            }
+            else {
+                await this._dbService.reward.create({
+                    data: {
+                        userId: data.referrerId,
+                        points: 5,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    }
+                })
+
+            }
+        }
+
         if (!user) {
             throw new BadRequestException('auth.error_creating_user');
         }
@@ -182,6 +243,11 @@ export default class UserService {
                 settings: true,
                 profilePicture: { select: { id: true, path: true, thumbPath: true } },
                 addresses: true,
+                reward:{
+                    select:{
+                        points:true
+                    }
+                },
                 laundry: {
                     select: {
                         laundryService: {
@@ -320,8 +386,6 @@ export default class UserService {
 
         const decodedToken = await this._firebaseService.verifyToken(data.token);
 
-        console.log("DECODED TOKENN",decodedToken)
-        console.log("DATAAA" , data)
         if (decodedToken) {
             const existingUser = await this._dbService.user.findFirst({
                 where: { email: decodedToken?.email , type : data?.type},
@@ -329,11 +393,9 @@ export default class UserService {
             });
 
             if (existingUser) {
-                console.log("EXISTING USER", existingUser)
                 const token = await this.SocialLogin(data);
                 return { token }
             } else {
-                console.log("NEW USER")
                 const token = await this.SocialSignup(data);
                 return { token }
             }

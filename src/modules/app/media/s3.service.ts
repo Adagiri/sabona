@@ -69,9 +69,9 @@ export default class S3Service {
                         's3:GetObject',
                         's3:ListMultipartUploadParts',
                     ],
+                    Resource: this._generateS3ResourceARN(resource),
                 },
             ],
-            Resource: this._generateS3ResourceARN(resource),
         };
     }
 
@@ -86,17 +86,23 @@ export default class S3Service {
         const command = new AssumeRoleCommand({
             RoleArn: AppConfig.AWS.STS_ROLE_ARN,
             RoleSessionName: this._generateUniqueRoleSessionName(mediaId),
-            DurationSeconds: 60 * 60 * 4,
+            DurationSeconds: 2 * 60 * 60 * 4,
             Policy: JSON.stringify(this._generateSTSPolicy(path)),
         });
-        const { Credentials } = await this._stsClient.send(command);
+        try {
+            const { Credentials } = await this._stsClient.send(command);
 
-        return {
-            accessKeyId: Credentials.AccessKeyId,
-            secretAccessKey: Credentials.SecretAccessKey,
-            sessionToken: Credentials.SessionToken,
-            filePath: path,
-        };
+            return {
+                accessKeyId: Credentials.AccessKeyId,
+                secretAccessKey: Credentials.SecretAccessKey,
+                sessionToken: Credentials.SessionToken,
+                filePath: path,
+            };
+
+        }
+        catch (e) {
+            console.log('error', e);
+        }
     }
 
     async GetObjectHead(path: string) {
@@ -116,13 +122,18 @@ export default class S3Service {
     }
 
     async UpdateObjectIdTag(path: string, id: number) {
-        const command = new PutObjectTaggingCommand({
-            Bucket: AppConfig.AWS.BUCKET,
-            Key: path,
-            Tagging: { TagSet: [{ Key: 'id', Value: `${id}` }] },
-        });
+        try{
+            const command = new PutObjectTaggingCommand({
+                Bucket: AppConfig.AWS.BUCKET,
+                Key: path,
+                Tagging: { TagSet: [{ Key: 'id', Value: `${id}` }] },
+            });
+            await this._s3Client.send(command);
+        }
+        catch(e){
+            console.log("ERROR",e);
+        }
 
-        await this._s3Client.send(command);
     }
 
     async UpdateObjectStaleTag(path: string) {
@@ -135,14 +146,19 @@ export default class S3Service {
         await this._s3Client.send(command);
     }
 
-    async UpdateObjectAccess(path: string, access: 'public-read' | 'private') {
-        const command = new PutObjectAclCommand({
-            Bucket: AppConfig.AWS.BUCKET,
-            Key: path,
-            ACL: access,
-        });
-        await this._s3Client.send(command);
-        return true;
+    async UpdateObjectAccess(path: string, access: "public-read" | "private") {
+        try {
+            const command = new PutObjectAclCommand({
+                Bucket: AppConfig.AWS.BUCKET,
+                Key: path,
+                ACL: access,
+            });
+            await this._s3Client.send(command);
+            return true;
+        } catch (e) {
+            console.log("ERROR",e);
+            return false;
+        }
     }
 
     async GetSignedUrl(path: string) {
