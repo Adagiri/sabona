@@ -8,7 +8,9 @@ import {
     NotFoundException,
 } from '../../../core/exceptions/response.exception';
 import {
+    UploadFinalizeAdminMediaRequestDTO,
     UploadFinalizeMediaRequestDTO,
+    UploadInitiateAdminMediaRequestDTO,
     UploadInitiateMediaRequestDTO,
 } from './dto/request/upload.request';
 import {
@@ -16,10 +18,11 @@ import {
     UploadInitiateMediaResponseDTO,
 } from './dto/response/upload.response';
 import S3Service from './s3.service';
+import { DeleteMediaResponseDto } from './dto/response/deleteMedia.response';
 
 @Injectable()
 export default class MediaService {
-    constructor(private _dbService: DatabaseService, private _s3Service: S3Service) {}
+    constructor(private _dbService: DatabaseService, private _s3Service: S3Service) { }
 
     private _allowedMediaExtensions = {
         [MediaType.IMAGE]: ['png', 'jpg', 'bmp', 'jpeg', 'gif'],
@@ -41,12 +44,118 @@ export default class MediaService {
         return fileName.slice(((fileName.lastIndexOf('.') - 1) >>> 0) + 2).toLowerCase();
     }
 
+    async UploadAdminInitiate(
+        data: UploadInitiateAdminMediaRequestDTO
+    ): Promise<UploadInitiateMediaResponseDTO> {
+        const extension = this._getMediaExtension(data.name);
+
+        if (!this._allowedMediaExtensions[data.type].includes(extension)) {
+            throw new BadRequestException('media.not_supported');
+        }
+
+        const sizeAllowed = data.size <= this._allowedMediaSize[data.type];
+        if (!sizeAllowed) {
+            throw new BadRequestException('media.too_large');
+        }
+
+        const location = this._s3Service.CreateUniqueFilePath(data.name, data.type);
+        const path = `${AppConfig.AWS.BUCKET_BASE_URL}/${location}`;
+
+        const media = await this._dbService.media.create({
+            data: {
+                name: data.name,
+                extension,
+                location,
+                path,
+                thumbPath: path,
+                type: data.type,
+                status: MediaStatus.UPLOADING,
+                access: data.public ? MediaAccess.PUBLIC : MediaAccess.PRIVATE,
+                userId: data.userId,
+                size: data.size,
+            },
+        });
+
+        const credentials = await this._s3Service.GetFileUploadPermissions(location, media.id);
+
+        return {
+            accessKeyId: credentials.accessKeyId,
+            secretAccessKey: credentials.secretAccessKey,
+            sessionToken: credentials.sessionToken,
+            mediaId: media.id,
+            bucket: AppConfig.AWS.BUCKET,
+            location,
+            region: AppConfig.AWS.REGION,
+        };
+    }
+
+    async UploadAdminFinalize(
+        data: UploadFinalizeAdminMediaRequestDTO
+    ): Promise<UploadFinalizeMediaResponseDTO> {
+        const media = await this._dbService.media.findFirst({
+            where: { id: data.id },
+        });
+
+
+        if (!media) {
+            throw new NotFoundException('media.not_found');
+        }
+
+        if (
+            media.access === MediaAccess.PRIVATE &&
+            (!data || data?.userId !== media.userId)
+        ) {
+            throw new ForbiddenException('media.not_allowed');
+        }
+
+        const s3Object = await this._s3Service.GetObjectHead(media.location);
+        if (!s3Object) {
+            throw new NotFoundException('media.not_found');
+        }
+
+        const sizeAllowed =
+            s3Object.contentLength <= this._allowedMediaSize[media.type];
+        if (!sizeAllowed) {
+            await this._dbService.media.update({
+                where: { id: media.id },
+                data: { status: MediaStatus.STALE },
+            });
+            
+            await this._s3Service.UpdateObjectStaleTag(media.location);
+            throw new BadRequestException('media.too_large');
+        }
+
+        if (media.access === MediaAccess.PUBLIC) {
+            try{
+                await this._s3Service.UpdateObjectAccess(media.location, 'public-read');
+            }
+            catch(e){
+                console.log("SADASDASD",e);
+            }
+        }
+
+        await this._dbService.media.update({
+            where: { id: media.id },
+            data: {
+                status: MediaStatus.READY,
+                meta: {
+                    ...(!!s3Object.duration && { duration: s3Object.duration }),
+                },
+            },
+        });
+        media.status = MediaStatus.READY;
+
+        await this._s3Service.UpdateObjectIdTag(media.location, media.id);
+
+        return media;
+    }
+
     async UploadInitiate(
         data: UploadInitiateMediaRequestDTO,
         user?: User,
     ): Promise<UploadInitiateMediaResponseDTO> {
         const extension = this._getMediaExtension(data.name);
-        if (!this._allowedMediaExtensions[data.type].includes(data.name)) {
+        if (!this._allowedMediaExtensions[data.type].includes(extension)) {
             throw new BadRequestException('media.not_supported');
         }
 
@@ -134,5 +243,41 @@ export default class MediaService {
         await this._s3Service.UpdateObjectIdTag(media.location, media.id);
 
         return media;
+    }
+
+    async GetSignedUrl(location: string): Promise<DeleteMediaResponseDto> {
+      
+        try{
+            const url = await this._s3Service.GetSignedUrl(location);
+            return {
+                message : url
+            };
+        }
+        catch(e){
+            throw new NotFoundException('media.not_found');
+        }
+
+
+    }
+
+    async DeleteMedia(mediaId: number): Promise<DeleteMediaResponseDto> {
+
+        const mediaid = Number(mediaId);
+
+        const media = await this._dbService.media.findFirst({
+            where: { id: mediaid },
+        });
+
+        if (!media) {
+            throw new NotFoundException('media.not_found');
+        }
+
+        const res = await this._dbService.media.delete({
+            where: { id: mediaid },
+        });
+
+        if (res) {
+            return { message: 'Media deleted successfully' };
+        }
     }
 }
