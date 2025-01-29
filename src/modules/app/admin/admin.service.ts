@@ -17,12 +17,15 @@ import { CreateCouponRequest } from './dto/request/createCoupon.request';
 import { CreateCouponResponseDTO } from './dto/response/createCoupon.response';
 import PaginatedRequest from 'src/core/request/paginated.request';
 import { CouponUsagePaginatedResponseDTO } from './dto/response/couponUsage.response';
+import S3Service from '../media/s3.service';
+import { UserDto } from './dto/response/userdetails.response';
 
 @Injectable()
 export default class AdminService {
     constructor(
         private _dbService: DatabaseService,
-        private _notificationService: NotificationService
+        private _notificationService: NotificationService,
+        private _s3service: S3Service
     ) { }
 
     async GetAllOrders(data: FindOrderRequestDTO): Promise<AllOrderListDto> {
@@ -157,6 +160,16 @@ export default class AdminService {
                 updatedAt: true,
                 status: true,
                 level: UserType.USER === data.type ? true : false,
+                medias: {
+                    where: {
+                        deletedAt: null
+                    },
+                    select: {
+                        id: true,
+                        location: true,
+                        status: true
+                    }
+                }
             },
             where,
             ...pagination,
@@ -225,7 +238,7 @@ export default class AdminService {
         const deviceTokens = await this._dbService.deviceToken.findMany({
             where: {
                 userId: userId,
-                deletedAt:null
+                deletedAt: null
             },
             select: {
                 token: true,
@@ -236,7 +249,7 @@ export default class AdminService {
         const userTokens = extractTokens(deviceTokens);
 
         const data = {
-            tokens : userTokens,
+            tokens: userTokens,
             title: 'Application Approved',
             body: 'Your application has been approved successfully',
             notificationData: {
@@ -247,17 +260,17 @@ export default class AdminService {
 
         };
 
-        if(userTokens?.length){
-            try{
+        if (userTokens?.length) {
+            try {
                 const res = await this._notificationService.SendNotificationToMultipleTokens(data);
-                console.log("RESS" ,res?.responses?.map((e)=>{
-                    console.log('ERROR' , e)
+                console.log("RESS", res?.responses?.map((e) => {
+                    console.log('ERROR', e)
                 }))
             }
-            catch(error){
-                console.log('error' ,error)
+            catch (error) {
+                console.log('error', error)
             }
-        }else{
+        } else {
             console.log('NO TOKENS TO SEND NOTIFICAITON')
         }
 
@@ -472,6 +485,45 @@ export default class AdminService {
                 coupon,
             }
         }
+    }
+
+    async GetUserDetails(userId: string): Promise<UserDto> {
+
+        const user = await this._dbService.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+                type: true,
+                status: true,
+                medias: {
+                    where: { deletedAt: null },
+                    select: {
+                        id: true,
+                        location: true,
+                        status: true
+                    }
+                }
+            }
+        });
+
+        if (user.medias?.length) {
+            user.medias = await Promise.all(
+                user.medias.map(async (media) => ({
+                    ...media,
+                    location: await this._s3service.GetSignedUrl(media.location),
+                }))
+            );
+        }
+
+        if (!user) {
+            throw new BadRequestException('User not found');
+        }
+
+        return user
     }
 }
 

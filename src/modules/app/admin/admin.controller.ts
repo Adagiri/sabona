@@ -2,15 +2,11 @@ import { User, UserType } from '@prisma/client';
 import { ApiController, Authorized, CurrentUser, Get, Post } from '../../../core/decorators';
 import { Body, Param, Query } from '@nestjs/common';
 import AdminService from './admin.service';
-import { OrderListDto } from '../customer/dto/response/orderlist.response.dto';
 import { AllOrderListDto } from './dto/response/allorderlist.response.dto';
-import { AllUserListDto } from './dto/response/allCustomerList.response.dto';
 import FindUsersResponseDTO from '../user/dto/response/find.response';
 import FindUsersRequestDTO from '../user/dto/request/find.request';
-import UserService from '../user/user.service';
 import FindOrderRequestDTO from './dto/request/find.request';
 import FindApplicationRequestDTO from './dto/request/application.request';
-import { ApproveApplicationDTO } from './dto/request/application.approve.request';
 import ApplicationApproveMessageResponseDTO from './dto/response/approve.response.dto';
 import GetOrderByIdRequestDTO from '../order/dto/request/getOrderById.request';
 import GetOrderByIdResponseDTO from '../order/dto/response/getOrderById.response';
@@ -22,6 +18,7 @@ import { GetAllCouponsResponseArrayDTO, GetAllCouponsResponseDTO } from './dto/r
 import PaginatedRequest from 'src/core/request/paginated.request';
 import { CouponUsagePaginatedResponseDTO } from './dto/response/couponUsage.response';
 
+import { UserDto } from './dto/response/userdetails.response';
 
 @ApiController({
     path: '/admin',
@@ -135,4 +132,16 @@ export default class AdminController {
     async getCouponUsage(@Param('id') id: string, @Query() data: PaginatedRequest): Promise<CouponUsagePaginatedResponseDTO>{
         return this._adminService.getCouponUsage(id, data);
     }
+    @Get({
+        path: '/user-details/:userId',
+        description: 'Get Users Details',
+        response: UserDto,
+    })
+    async getUserDetails(
+        @Param('userId') userId: string
+    ): Promise<UserDto> {
+        return this._adminService.GetUserDetails(userId);
+    }
+    
+
 }

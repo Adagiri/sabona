@@ -30,4 +30,9 @@ export class SignupRequestDTO {
     @ApiPropertyOptional()
     @IsOptional()
     password: string;
+
+    @ApiProperty()
+    @IsOptional()
+    @IsString()
+    referrerId: string;
 }

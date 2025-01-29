@@ -2,15 +2,16 @@ import { Module } from '@nestjs/common';
 import DatabaseModule from '../../../database/database.module';
 import AdminService from './admin.service';
 import AdminController from './admin.controller';
-import UserService from '../user/user.service';
 import OrderModule from '../order/order.module';
 import { NotificationModule } from '../notification/notification.module';
+import MediaModule from '../media/media.module';
+import S3Service from '../media/s3.service';
 
 
 @Module({
-    imports: [DatabaseModule , OrderModule , NotificationModule],
+    imports: [DatabaseModule , OrderModule , NotificationModule , MediaModule],
     exports: [AdminService],
-    providers: [AdminService],
+    providers: [AdminService, S3Service],
     controllers: [AdminController],
 })
 export default class AdminModule {}
