@@ -1,7 +1,7 @@
 import { User } from '@prisma/client';
 import { ApiController, Authorized, CurrentUser, Get, Patch, Post } from '../../../core/decorators';
 import CustomerService from './customer.service';
-import { Body, Param } from '@nestjs/common';
+import { Body, Param, Query } from '@nestjs/common';
 import CreateOrderResponseDTO from './dto/response/createOrder.response';
 import CreateOrderRequestDTO from './dto/request/createOrder.request';
 import AcceptOrderRequestDTO from '../vendor/dto/request/acceptOrder.request';
@@ -11,6 +11,10 @@ import CreateFeedbackDTO from './dto/request/createFeeback.request';
 import CreateFeedbackResponseDTO from './dto/response/createFeedback.response';
 import { HasFeedBackRequestDTO } from './dto/request/hasFeedback.request';
 import { HasFeedbackResponseDTO } from './dto/response/hasFeedback.response.dto';
+import { ValidateCouponQueryRequestDTO, ValidateCouponRequestDTO } from './dto/request/validateCoupon.request';
+import { ValidateCouponResponseDTO } from './dto/response/validateCoupon.response';
+import { getUserCouponsQueryDTO } from './dto/request/getUserCoupons.request';
+import { GetUserCouponsResponseDTO } from './dto/response/getUserCoupons.response';
 
 @ApiController({
     path: '/customer',
@@ -79,6 +83,32 @@ export default class CustomerController {
         @Param() params: HasFeedBackRequestDTO)
         : Promise<HasFeedbackResponseDTO> {
         return await this._customerService.HasFeedback(params, user)
+    }
+
+    @Authorized()
+    @Get({
+        path: '/validateCoupon/:code',
+        description: 'Validate coupon',
+        response: ValidateCouponResponseDTO,
+    })
+    async validateCoupon(
+        @CurrentUser() user: User,
+        @Param() params:ValidateCouponRequestDTO,
+        @Query() query: ValidateCouponQueryRequestDTO): Promise<ValidateCouponResponseDTO> {
+        return await this._customerService.validateCoupon(user, params, query)
+    }
+
+    @Authorized()
+    @Get({
+        path: '/coupons',
+        description: 'Get all user coupons',
+        response: GetUserCouponsResponseDTO,
+    })
+    async GetUserCoupons(
+        @CurrentUser() user: User,
+        @Query() query: getUserCouponsQueryDTO,
+    ) : Promise<GetUserCouponsResponseDTO> {
+        return await this._customerService.getUserCoupons(user, query)
     }
 
 

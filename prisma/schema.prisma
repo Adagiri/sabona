@@ -157,6 +157,7 @@ model User {
   laundry      Laundry[]      @relation("VendorLaundry")
 
   feedbacks Feedback[]
+  couponUsage  CouponUsage[]
 
   reward Reward[]
 }
@@ -414,7 +415,11 @@ model Order {
   laundryId   String // Foreign key to the Laundry model
   laundry     Laundry               @relation(fields: [laundryId], references: [id])
   status      OrderStatus           @default(PENDING) // High-level status of the order
+  baseAmount   Float? // Base amount before discounts
+  discountAmount Float?              // Amount discounted due to the coupon
   totalAmount Float // Total amount for the order
+  couponId         String?               // Nullable coupon ID field
+  coupon           Coupon?               @relation(fields: [couponId], references: [id])
   services    OrderLaundryService[]
   payment     Payment? // Payment details for the order
   paymentType PaymentType? // Payment type for the order
@@ -520,4 +525,39 @@ model Payment {
 
   createdAt            DateTime @default(now()) @db.Timestamptz() // Timestamp of creation
   updatedAt            DateTime @default(now()) @updatedAt @db.Timestamptz() // Timestamp of last update
+}
+
+enum CouponType {
+  PERCENTAGE
+  FIXED
+}
+
+model Coupon {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name      String
+  discount     Float
+  type         CouponType
+  maxDiscount Float?      // For percentage-based discounts
+  minOrderAmount Float?      // Minimum order amount required to apply this coupon
+  expiryDate  DateTime
+  startDate  DateTime?
+  isActive    Boolean  @default(true)
+  usageLimit  Int?     // Maximum allowed uses for this coupon
+  singleUse   Boolean  @default(true) // True for single-use per user
+  orders            Order[]   
+  couponUsage  CouponUsage[]  // Relation to track usage by individual users
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+}
+
+model CouponUsage {
+  id        String   @id @default(uuid())
+  userId    String   // User ID who used the coupon
+  user      User     @relation(fields: [userId], references: [id]) // Relation to the User table
+  couponId  String   // Coupon ID
+  coupon    Coupon   @relation(fields: [couponId], references: [id]) // Relation to the Coupon table
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
 }

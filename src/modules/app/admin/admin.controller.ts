@@ -1,6 +1,6 @@
 import { User, UserType } from '@prisma/client';
 import { ApiController, Authorized, CurrentUser, Get, Post } from '../../../core/decorators';
-import { Param, Query } from '@nestjs/common';
+import { Body, Param, Query } from '@nestjs/common';
 import AdminService from './admin.service';
 import { AllOrderListDto } from './dto/response/allorderlist.response.dto';
 import FindUsersResponseDTO from '../user/dto/response/find.response';
@@ -12,6 +12,12 @@ import GetOrderByIdRequestDTO from '../order/dto/request/getOrderById.request';
 import GetOrderByIdResponseDTO from '../order/dto/response/getOrderById.response';
 import OrderService from '../order/order.service';
 import { AllUserLocationsResponseDTO } from './dto/response/alluserlocation.response.dto';
+import { CreateCouponRequest } from './dto/request/createCoupon.request';
+import { CreateCouponResponseDTO } from './dto/response/createCoupon.response';
+import { GetAllCouponsResponseArrayDTO, GetAllCouponsResponseDTO } from './dto/response/getAllCoupons.response';
+import PaginatedRequest from 'src/core/request/paginated.request';
+import { CouponUsagePaginatedResponseDTO } from './dto/response/couponUsage.response';
+
 import { UserDto } from './dto/response/userdetails.response';
 
 @ApiController({
@@ -98,6 +104,34 @@ export default class AdminController {
     }
 
     @Authorized(UserType.ADMIN)
+    @Post({
+        path: '/create/coupon',
+        description: 'Create Coupon',
+        response: CreateCouponResponseDTO,
+    })
+    async createCoupon(@Body() data: CreateCouponRequest): Promise<CreateCouponResponseDTO> {
+        return this._adminService.createCoupon(data);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/coupons/all',
+        description: 'Get All Coupons',
+        response: GetAllCouponsResponseArrayDTO,
+    })
+    async getCoupons(@Query() data: PaginatedRequest): Promise<GetAllCouponsResponseDTO[]> {
+        return this._adminService.getCoupons(data);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/coupons/:id/usage',
+        description: 'Get Coupon Usage By Id',
+        response: CouponUsagePaginatedResponseDTO
+    })
+    async getCouponUsage(@Param('id') id: string, @Query() data: PaginatedRequest): Promise<CouponUsagePaginatedResponseDTO>{
+        return this._adminService.getCouponUsage(id, data);
+    }
     @Get({
         path: '/user-details/:userId',
         description: 'Get Users Details',
