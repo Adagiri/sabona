@@ -41,3 +41,10 @@ export enum APP_ENV {
     DEV = 'dev',
     PROD = 'prod',
 }
+
+export const DELIVERY_CHARGES = {
+    NORMAL: 10,
+    EXPRESS: 20,
+}
+
+export const SERVICE_CHARGES = 7;

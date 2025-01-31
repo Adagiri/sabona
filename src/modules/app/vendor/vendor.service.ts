@@ -833,7 +833,6 @@ export default class VendorService {
     }
 
     async cancelOrder(params: CancelOrderRequestDTO, user: User): Promise<UpdateStatusResponseDTO> {
-        console.log("params", params)
         const order = await this._dbService.order.findUnique({
             where: {
                 id: params.orderId,

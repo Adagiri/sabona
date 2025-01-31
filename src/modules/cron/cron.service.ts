@@ -192,4 +192,69 @@ export default class CronService {
         console.log("++++++++++ Cron Job: Cancel Unpaid Card Orders Finished ++++++++++");
 
     }
+
+    @Cron(CronExpression.EVERY_HOUR, { name: 'deactivate-exprired-coupons' })
+    async deactivateExpiredCoupons() {
+        console.log("++++++++++ Cron Job: Deactivate Expired Coupons Started ++++++++++");
+        try {
+            const expiredCoupons = await this._dbService.coupon.findMany({
+                where: {
+                    expiryDate: { lte: new Date() },
+                    isActive: true,
+                },
+            });
+
+            console.log(`Found ${expiredCoupons.length} expired coupons to deactivate.`);
+
+            const chunkedCoupons = chunk(expiredCoupons, 50);
+
+            for (const chunkCoupons of chunkedCoupons) {
+                const deactivatePromises = chunkCoupons.map(coupon =>
+                    this._dbService.coupon.update({
+                        where: { id: coupon.id },
+                        data: { isActive: false },
+                    })
+                );
+                await Promise.all(deactivatePromises); // Run updates concurrently
+
+                console.log(`${chunkCoupons.length} coupons have been deactivated.`);
+            }
+        } catch (error) {
+            console.error("Error during the deactivate expired coupons cron job:", error);
+        }
+
+        console.log("++++++++++ Cron Job: Deactivate Expired Coupons Finished ++++++++++");
+    }
+
+    @Cron(CronExpression.EVERY_HOUR, { name: 'activate-coupons' })
+    async activateCoupons() {
+        console.log("++++++++++ Cron Job: Activate Coupons Started ++++++++++");
+        try {
+            const readyToActivateCoupons = await this._dbService.coupon.findMany({
+                where: {
+                    startDate: { lte: new Date() },
+                    isActive: false,
+                    expiryDate: { gte: new Date() },
+                },
+            });
+            console.log(`Found ${readyToActivateCoupons.length} coupons to activate.`);
+
+            const chunkedCoupons = chunk(readyToActivateCoupons, 50);
+
+            for (const chunkCoupons of chunkedCoupons) {
+                const activatePromises = chunkCoupons.map(coupon =>
+                    this._dbService.coupon.update({
+                        where: { id: coupon.id },
+                        data: { isActive: true },
+                    })
+                );
+                await Promise.all(activatePromises);
+                console.log(`${chunkCoupons.length} coupons have been activated.`);
+            }
+        } catch (error) {
+            console.error("Error during the activate coupons cron job:", error);
+        }
+
+        console.log("++++++++++ Cron Job: Activate Coupons Finished ++++++++++");
+    }
 }

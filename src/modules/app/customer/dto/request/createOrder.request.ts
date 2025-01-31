@@ -35,6 +35,18 @@ export default class CreateOrderRequestDTO {
     totalAmount: number;
 
     @ApiProperty()
+    @IsOptional()
+    baseAmount: number;
+
+    @ApiProperty()
+    @IsOptional()
+    discountAmount: number;
+
+    @ApiProperty()
+    @IsOptional()
+    couponId: string;
+
+    @ApiProperty()
     @IsEnum(PaymentType)
     paymentType: PaymentType
 
