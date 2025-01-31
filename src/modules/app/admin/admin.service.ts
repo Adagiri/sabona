@@ -52,6 +52,12 @@ export default class AdminService {
                     }
                 },
                 totalAmount: true,
+                coupon: {
+                    select: {
+                        code: true,
+                        id: true,
+                    }
+                },
                 riderOrders: {
                     select: {
                         rider: {
@@ -304,7 +310,7 @@ export default class AdminService {
     async createCoupon(data: CreateCouponRequest): Promise<CreateCouponResponseDTO> {
         const couponCodeAlreadyExists = await this._dbService.coupon.findUnique({
             where: {
-                code: data.code,
+                code: data.code.toUpperCase(),
             }
         })
 

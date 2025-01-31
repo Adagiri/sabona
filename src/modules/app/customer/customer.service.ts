@@ -532,9 +532,12 @@ export default class CustomerService {
         if (coupon.type === CouponType.FIXED && !query.cartAmount){
             throw new BadRequestException("Cart amount required for fixed coupon");
         }
-
+       
         if (coupon.minOrderAmount && query.cartAmount < coupon.minOrderAmount) {
             throw new BadRequestException(`Minimum order amount should be ${coupon.minOrderAmount}SAR to use the ${coupon.code} coupon`);
+        }
+        if (coupon.type === CouponType.FIXED && query.cartAmount < coupon.discount){
+            throw new BadRequestException(`Minimum cart amount should be ${coupon.discount}SAR to use the ${coupon.code} coupon`);
         }
 
         return coupon;
