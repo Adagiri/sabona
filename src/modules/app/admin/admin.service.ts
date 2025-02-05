@@ -54,6 +54,12 @@ export default class AdminService {
                     }
                 },
                 totalAmount: true,
+                coupon: {
+                    select: {
+                        code: true,
+                        id: true,
+                    }
+                },
                 riderOrders: {
                     select: {
                         rider: {
