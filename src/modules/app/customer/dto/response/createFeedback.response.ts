@@ -5,6 +5,6 @@ export default class CreateFeedbackResponseDTO {
     @ApiProperty()
     @IsString()
     message: string
-    
 
+    
 }

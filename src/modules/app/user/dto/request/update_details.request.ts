@@ -22,4 +22,16 @@ export default class UpdateUserDetailsRequestDTO {
         message: 'Phone number must start with +92 or +966 followed by the correct format',
     })
     phone: string;
+
+    @ApiProperty()
+    @IsString()
+    city: string;
+
+    @ApiProperty()
+    @IsString()
+    state: string;
+
+    @ApiProperty()
+    @IsString()
+    postalCode: string;
 }

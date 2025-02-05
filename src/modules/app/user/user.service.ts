@@ -472,6 +472,17 @@ export default class UserService {
             }
         })
 
+        await this._dbService.userSettings.update({
+            where: {
+                userId: userDetails.id
+            },
+            data: {
+                city: data.city,
+                state: data.state,
+                postalCode: data.postalCode,
+            }
+        })
+
         const updatedUser = await this._dbService.user.findFirst({
             where: {
                 id: userDetails.id

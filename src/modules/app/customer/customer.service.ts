@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
-import { OrderStatus, PaymentType, User, FeedbackType, CouponType, DeliveryType } from '@prisma/client';
+import { OrderStatus, PaymentType, User, FeedbackType, CouponType, DeliveryType, TipType } from '@prisma/client';
 import CreateOrderRequestDTO from './dto/request/createOrder.request';
 import AcceptOrderRequestDTO from '../vendor/dto/request/acceptOrder.request';
 import CancelOrderResponseDTO from './dto/response/cancelOrder.response';
@@ -18,6 +18,9 @@ import { ValidateCouponResponseDTO } from './dto/response/validateCoupon.respons
 import { DELIVERY_CHARGES, SERVICE_CHARGES } from 'src/constants';
 import { coupon, getUserCouponsQueryDTO } from './dto/request/getUserCoupons.request';
 import { GetUserCouponsResponseDTO } from './dto/response/getUserCoupons.response';
+import { CreateTipDTO } from './dto/request/createTip.request';
+import { HasTippedResponseDTO } from './dto/response/hasTipped.response';
+import { AddTipResponseDto } from './dto/response/addTip.response';
 
 @Injectable()
 export default class CustomerService {
@@ -720,5 +723,106 @@ export default class CustomerService {
             }
         }
         }
+
+        async AddTip(data: CreateTipDTO, user: User): Promise<AddTipResponseDto> {
+            const order = await this._dbService.order.findFirst({
+                where: {
+                    id: data.orderId,
+                    userId: user.id,
+                },
+                select: {
+                    id: true,
+                    status: true,
+                    totalAmount: true,
+                }
+            });
+
+            if (!order) {
+                throw new BadRequestException("Order not found");
+            }
+
+            if (order.status !== "COMPLETED") {
+                throw new BadRequestException("Order not completed");
+            }
+
+            const createTip = async (riderId: string | null, amount: number, type: TipType)=> {
+                if (!riderId) return null
+                   return await this._dbService.tip.create({
+                        data: {
+                            orderId: data.orderId,
+                            userId: user.id,
+                            riderId,
+                            amount,
+                            type,
+                        },
+                        select : {
+                            id: true,
+                        }
+                    })
+                    // if (tip) {
+                    //     return true
+                    // }
+            }
+
+            const [pickupTip, deliveryTip] = await Promise.all([
+                createTip(data.pickupRiderId, data.pickupRiderAmount, TipType.RIDER_PICKUP),
+                createTip(data.deliveryRiderId, data.deliveryRiderAmount, TipType.RIDER_DELIVERY)
+            ]);
+
+            const createdTips = [pickupTip, deliveryTip].filter(Boolean);
+
+            if (createdTips.length > 0) {
+                // Create Tip Transaction
+                const tipTransaction = await this._dbService.tipTransaction.create({
+                    data: {
+                        amount: (data.pickupRiderAmount ?? 0) + (data.deliveryRiderAmount ?? 0),
+                    },
+                    select: {
+                        id: true,
+                        amount: true,
+                    }
+                });
+
+                if (!tipTransaction) {
+                    throw new BadRequestException("Error adding tip");
+                }
+
+                // Update tips with transaction ID
+                await this._dbService.tip.updateMany({
+                    where: {
+                        id: { in: createdTips.map((tip) => tip.id) },
+                    },
+                    data: {
+                        transactionId: tipTransaction.id,
+                    }
+                });
+
+                const res= {
+                    transactionId: tipTransaction.id,
+                    amount: tipTransaction.amount,
+                }
+
+                return { data: res };
+            }
+            else {
+                throw new BadRequestException("Error adding feedback");
+            }
+        }
+
+        async HasTipped(params: HasFeedBackRequestDTO, user: User): Promise<HasTippedResponseDTO> {
+            const tip = await this._dbService.tip.findFirst({
+                where: {
+                    userId: user.id,
+                    orderId: params.orderId,
+                    paid: true,
+                }
+            });
+            if (tip) {
+                return { hasTipped: true }
+            }
+            else {
+                return { hasTipped: false }
+        }
+    }
 
 }

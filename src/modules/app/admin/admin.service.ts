@@ -6,7 +6,7 @@ import { AllUserListDto } from './dto/response/allCustomerList.response.dto';
 import FindUsersRequestDTO from '../user/dto/request/find.request';
 import FindUsersResponseDTO from '../user/dto/response/find.response';
 import { CouponType, Prisma, UserStatus, UserType } from '@prisma/client';
-import { extractTokens, GetDateFilterOptions, GetOrderOptions, GetPaginationOptions } from 'src/helpers/util.helper';
+import { DateFilter, extractTokens, GetDateFilterOptions, GetOrderOptions, GetPaginationOptions, GetSlotFilterOptions, SlotFilter } from 'src/helpers/util.helper';
 import FindOrderRequestDTO from './dto/request/find.request';
 import FindApplicationRequestDTO from './dto/request/application.request';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
@@ -19,6 +19,8 @@ import PaginatedRequest from 'src/core/request/paginated.request';
 import { CouponUsagePaginatedResponseDTO } from './dto/response/couponUsage.response';
 import S3Service from '../media/s3.service';
 import { UserDto } from './dto/response/userdetails.response';
+import { SlotRequest } from '../customer/dto/request/slotRequest';
+import { AllTipsResponseDTO } from './dto/response/allTips.response';
 
 @Injectable()
 export default class AdminService {
@@ -304,7 +306,7 @@ export default class AdminService {
     async createCoupon(data: CreateCouponRequest): Promise<CreateCouponResponseDTO> {
         const couponCodeAlreadyExists = await this._dbService.coupon.findUnique({
             where: {
-                code: data.code,
+                code: data.code.toUpperCase(),
             }
         })
 
@@ -499,6 +501,7 @@ export default class AdminService {
                 phone: true,
                 type: true,
                 status: true,
+                receivedTips: true,
                 medias: {
                     where: { deletedAt: null },
                     select: {
@@ -524,6 +527,74 @@ export default class AdminService {
         }
 
         return user
+    }
+
+    async GetDriverTips(userId:string, data:SlotRequest): Promise<any> {
+        const slotFilter = GetSlotFilterOptions(data.startDate, data.endDate);
+   
+        const driver = await this._dbService.user.findFirst({
+            where: {
+                id: userId,
+            },
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                receivedTips: {
+                    where: {
+                        paid: true,
+                        ...slotFilter
+                    },
+                    select: {
+                        id: true,
+                        amount: true,
+                        paid: true,
+                        orderId: true,
+                        createdAt: true,
+                    }
+                }
+            }
+        });
+
+        if (!driver) {
+            throw new BadRequestException('Driver not found');
+        }
+
+        return driver;
+    }
+
+    async GetAllTips(data: PaginatedRequest): Promise<AllTipsResponseDTO> {
+        const pagination = GetPaginationOptions(data);
+
+        const tips = await this._dbService.tip.findMany({
+            where: {
+                paid: true,
+            }
+        })
+
+        const paginatedTips = await this._dbService.tip.findMany({
+            where:{
+                paid: true,
+            },
+            select: {
+                id: true,
+                amount: true,
+                createdAt: true,
+                riderId: true,
+                transactionId: true,
+                orderId: true,
+            },
+            ...pagination,
+            orderBy: {
+                createdAt: 'desc',
+            }
+        });
+
+        if (!paginatedTips) {
+            throw new BadRequestException('Error fetching tips');
+        }
+
+        return { data: paginatedTips, count: tips.length };
     }
 }
 

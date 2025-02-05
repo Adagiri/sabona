@@ -160,6 +160,9 @@ model User {
   couponUsage  CouponUsage[]
 
   reward Reward[]
+
+  givenTips    Tip[] @relation("GivenTips") // Tips the user has given
+  receivedTips Tip[] @relation("ReceivedTips") // Tips the user has received
 }
 
 model UserAddress {
@@ -184,6 +187,9 @@ model UserSettings {
   userId                String    @unique // Changed to String to match User's UUID
   user                  User      @relation(fields: [userId], references: [id])
   isOnboardingCompleted Boolean   @default(false) // Flag to track onboarding completion
+  state                 String?
+  city                  String?
+  postalCode            String?
   createdAt             DateTime  @default(now()) @db.Timestamptz()
   updatedAt             DateTime  @default(now()) @updatedAt @db.Timestamptz()
   deletedAt             DateTime? @db.Timestamptz()
@@ -423,7 +429,9 @@ model Order {
   services    OrderLaundryService[]
   payment     Payment? // Payment details for the order
   paymentType PaymentType? // Payment type for the order
-  paid        Boolean? 
+  paid        Boolean?
+
+  tip Tip[] // Tip details for the order
 
   riderOrders   RiderOrder[] // Existing relation with riders for order management
   vendorOrders  VendorOrder? // Existing relation with vendors for order management
@@ -512,12 +520,21 @@ model Notification {
   deletedAt DateTime?          @db.Timestamptz()
 }
 
+enum PaymentTransactionType {
+  ORDER
+  TIP
+}
 model Payment {
   id                   String   @id @default(uuid()) // UUID for payment ID
-  orderId              String   @unique
-  order                Order    @relation(fields: [orderId], references: [id])
+  orderId              String?   @unique
+  order                Order?  @relation(fields: [orderId], references: [id])
 
-  transactionRef       String   // PayTabs transaction reference
+  tipTransactionId String? @unique // Foreign key to TipTransaction
+  tipTransaction   TipTransaction? @relation(fields: [tipTransactionId], references: [id])
+
+  paymentType PaymentTransactionType?  @default(ORDER)// Type of payment (e.g., Order payment , Tip payment)
+
+  transactionRef String // PayTabs transaction reference
   amount     Float    // Total transaction amount
   type      String   // Type of transaction (e.g., Sale, Refund)
   status        String   // Payment Status 
@@ -560,4 +577,44 @@ model CouponUsage {
   coupon    Coupon   @relation(fields: [couponId], references: [id]) // Relation to the Coupon table
   createdAt DateTime @default(now())
   deletedAt DateTime?
+}
+
+enum TipType {
+  RIDER_PICKUP
+  RIDER_DELIVERY
+}
+
+model Tip {
+  id      String @id @default(uuid()) // Unique tip ID
+  orderId String // The order associated with this tip
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  userId String // The customer who gave the tip
+  user   User   @relation(fields: [userId], references: [id], name: "GivenTips")
+
+  riderId String? // The rider who received the tip
+  rider   User?   @relation(fields: [riderId], references: [id], name: "ReceivedTips")
+
+  transactionId String? // Foreign key to TipTransaction
+  transaction   TipTransaction? @relation(fields: [transactionId], references: [id])
+
+  amount    Float // Tip amount
+  type      TipType // Type of tip (PICKUP_RIDER, DROPOFF_RIDER)
+  paid      Boolean   @default(false) // Whether the tip was successfully paid
+  // tipPayment    TipPayment? // Payment details for the tip
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  deletedAt DateTime? @db.Timestamptz()
+}
+
+model TipTransaction {
+  id        String      @id @default(uuid()) // Unique transaction ID
+  // transactionRef String   @unique
+  // transactionId  String   @unique             // Unique transaction reference (PayTabs)
+  amount    Float // Total amount for all tips in this transaction
+  tips      Tip[] // Connects to multiple tips
+
+  payment  Payment?
+
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
 }
