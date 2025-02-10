@@ -118,6 +118,17 @@ export default class OrderService {
                             }
                         }
                     },
+                },
+                tip: {
+                    where:{
+                        paid: true,
+                    },
+                    select: {
+                        amount: true,
+                        paid: true,
+                        riderId: true,
+                        type: true,
+                    },
                 }
             }
         })

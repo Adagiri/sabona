@@ -1,4 +1,4 @@
-import { User } from '@prisma/client';
+import { User, UserType } from '@prisma/client';
 import { ApiController, Authorized, CurrentUser, Get, Patch, Post } from '../../../core/decorators';
 import CustomerService from './customer.service';
 import { Body, Param, Query } from '@nestjs/common';
@@ -15,6 +15,9 @@ import { ValidateCouponQueryRequestDTO, ValidateCouponRequestDTO } from './dto/r
 import { ValidateCouponResponseDTO } from './dto/response/validateCoupon.response';
 import { getUserCouponsQueryDTO } from './dto/request/getUserCoupons.request';
 import { GetUserCouponsResponseDTO } from './dto/response/getUserCoupons.response';
+import { CreateTipDTO } from './dto/request/createTip.request';
+import { HasTippedResponseDTO } from './dto/response/hasTipped.response';
+import { AddTipResponseDto } from './dto/response/addTip.response';
 
 @ApiController({
     path: '/customer',
@@ -111,5 +114,31 @@ export default class CustomerController {
         return await this._customerService.getUserCoupons(user, query)
     }
 
+    @Authorized(UserType.USER)
+    @Post({
+        path: '/addTip',
+        description: 'Add Tip',
+        response: CreateFeedbackResponseDTO,
+    })
+    async AddTip(
+        @Body() data: CreateTipDTO,
+        @CurrentUser() user: User): Promise<AddTipResponseDto> {
+        return await this._customerService.AddTip(data, user)
+    }
+
+    @Authorized()
+    @Get({
+        path: '/has-tipped/:orderId',
+        description: 'Check if user has tipped',
+        response: HasTippedResponseDTO,
+    })
+    async HasTipped(
+        @CurrentUser() user: User,
+        @Param() params: HasFeedBackRequestDTO)
+        : Promise<HasTippedResponseDTO> {
+        return await this._customerService.HasTipped(params, user)
+    }
+
+    
 
 }
