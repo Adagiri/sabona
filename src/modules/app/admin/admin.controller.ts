@@ -19,6 +19,8 @@ import PaginatedRequest from 'src/core/request/paginated.request';
 import { CouponUsagePaginatedResponseDTO } from './dto/response/couponUsage.response';
 
 import { UserDto } from './dto/response/userdetails.response';
+import { SlotRequest } from '../customer/dto/request/slotRequest';
+import { AllTipsResponseDTO } from './dto/response/allTips.response';
 
 @ApiController({
     path: '/admin',
@@ -142,6 +144,26 @@ export default class AdminController {
     ): Promise<UserDto> {
         return this._adminService.GetUserDetails(userId);
     }
+
+    @Get({
+        path: '/driver-tips/:userId',
+        description: 'Get Driver Tips',
+        response: {},
+    })
+    async getDriverTips(
+        @Param('userId') userId: string,
+        @Query() data: SlotRequest,
+    ): Promise<any> {
+        return this._adminService.GetDriverTips(userId, data);
+    }
     
+    @Get({
+        path: '/tips/all',
+        description: 'Get All Tips',
+        response: AllTipsResponseDTO,
+    })
+    async getAllTips(@Query() data: PaginatedRequest): Promise<AllTipsResponseDTO> {
+        return this._adminService.GetAllTips(data);
+    }
 
 }

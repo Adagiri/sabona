@@ -60,6 +60,11 @@ export enum DateFilter {
     ByYear = 'ByYear',
 }
 
+export enum SlotFilter {
+    startDate = 'startDate',
+    endDate = 'endDate',
+}
+
 /**
  * Casts PaginationRequestParams to PaginationDBParams
  * @param {PaginationRequestParams} params
@@ -327,6 +332,20 @@ export function GetDateFilterOptions(filter?: DateFilter): Prisma.UserWhereInput
         default:
             return {};
     }
+}
+
+export function GetSlotFilterOptions(
+    startDate?: Date,
+    endDate?: Date
+) {
+    if (!startDate || !endDate) return {};
+
+    return {
+        createdAt: {
+            gte: new Date(startDate).toISOString(),
+            lte: new Date(endDate).toISOString(),
+        },
+    };
 }
 
 export function ExcludeFields<T, Key extends keyof T>(model: T, keys: Key[]): Omit<T, Key> {
