@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { TranslatorModule } from 'nestjs-translator';
 import RedisModule from './core/cache/redis.module';
 import DatabaseModule from './database/database.module';
 import AuthModule from './modules/app/auth/auth.module';
@@ -24,15 +23,18 @@ import AdminModule from './modules/app/admin/admin.module';
 import { NotificationModule } from './modules/app/notification/notification.module';
 import { FirebaseModule } from './modules/firebase/firebase.module';
 import PaymentsModule from './modules/app/payments/payments.module';
+import { I18nModule, HeaderResolver } from 'nestjs-i18n';
+import * as path from 'path';
+
 @Module({
     imports: [
-        TranslatorModule.forRoot({
-            defaultLang: 'en',
-            global: true,
-            requestKeyExtractor(req) {
-                return req.headers['locale'];
+        I18nModule.forRoot({
+            fallbackLanguage: 'en',
+            loaderOptions: {
+                path: path.join(__dirname, '/i18n/'),
+                watch: true,
             },
-            translationSource: './dist/i18n',
+            resolvers: [new HeaderResolver(['locale'])],
         }),
         EventEmitterModule.forRoot(),
         RedisModule,
