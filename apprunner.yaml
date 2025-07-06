@@ -1,31 +1,11 @@
 version: 1.0
-runtime: nodejs18
+runtime: nodejs18 
 build:
   commands:
     build:
-      - echo "Installing dependencies with npx pnpm"
       - npx pnpm install
-      - echo "Generating Prisma client"
-      - npm run db:generate
-      - echo "Building application"
-      - npx pnpm run build
-      - echo "Deploying database migrations"
+      - npx pnpm run db:generate
+      - npx pnpm build
       - npx pnpm run db:deploy
-      - echo "Build completed"
-  env:
-    - name: NODE_ENV
-      value: production
-run:
-  runtime-context:
-    runtime-version: 18
-  commands:
-    start:
-      - npx pnpm run start
-  network:
-    port: 8080
-    env: PORT
-  env:
-    - name: NODE_ENV
-      value: production
-    - name: PORT
-      value: 8080
+run: 
+  command: python app.py
