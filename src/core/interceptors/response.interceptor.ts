@@ -1,16 +1,13 @@
-import { CallHandler, ExecutionContext, Inject, Injectable, NestInterceptor } from '@nestjs/common';
-import { TranslatorService } from 'nestjs-translator';
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { LocaleTranslation } from 'i18n';
+import { I18nService } from 'nestjs-i18n';
 @Injectable()
 export class ResponseInterceptor<T> implements NestInterceptor<T, any> {
-    constructor(@Inject(TranslatorService) private _translatorService: TranslatorService) {}
+    constructor(private readonly i18n: I18nService) {}
 
-    intercept(
-        context: ExecutionContext,
-        next: CallHandler<T>,
-    ): Observable<any> | Promise<Observable<any>> {
+    intercept(context: ExecutionContext, next: CallHandler<T>): Observable<any> | Promise<Observable<any>> {
         const ctx = context.switchToHttp();
         const response: any = ctx.getResponse<Response>();
         const request = ctx.getRequest<Request>();
@@ -20,8 +17,8 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, any> {
                 if (data.Message && data.Message instanceof LocaleTranslation) {
                     data = {
                         ...data,
-                        Message: this._translatorService.translate(data.Message.getKey(), {
-                            replace: data.Message.getData(),
+                        Message: this.i18n.translate(data.Message.getKey(), {
+                            args: data.Message.getData(),
                             lang: locale,
                         }),
                     };
