@@ -7,5 +7,63 @@ build:
       - npx pnpm run db:generate
       - npx pnpm build
       - npx pnpm run db:deploy
-run: 
-  command: python app.py
+run:
+  runtime-version: latest
+  command: npm run start
+  network:
+    port: 8080
+    env: APP_PORT
+  env:
+    # From Secrets Manager
+    - name: APP_DATABASE_URL
+      value: "{{resolve:secretsmanager:sabonah/database:SecretString:url}}"
+    - name: APP_AWS_ACCESS_KEY
+      value: "{{resolve:secretsmanager:sabonah/aws-credentials:SecretString:access_key}}"
+    - name: APP_AWS_SECRET_KEY
+      value: "{{resolve:secretsmanager:sabonah/aws-credentials:SecretString:secret_key}}"
+    - name: APP_TWILIO_AUTH_TOKEN
+      value: "{{resolve:secretsmanager:sabonah/twilio:SecretString:auth_token}}"
+    
+    # From Parameter Store - App Configuration
+    - name: APP_ENV
+      value: "{{resolve:ssm:/sabonah/app/env}}"
+    - name: APP_PORT
+      value: "{{resolve:ssm:/sabonah/app/port}}"
+    - name: APP_DEBUG
+      value: "{{resolve:ssm:/sabonah/app/debug}}"
+    - name: APP_LOG_LEVEL
+      value: "{{resolve:ssm:/sabonah/app/log-level}}"
+    - name: APP_TOKEN_EXPIRATION
+      value: "{{resolve:ssm:/sabonah/app/token-expiration}}"
+    
+    # From Parameter Store - Redis
+    - name: APP_REDIS_HOST
+      value: "{{resolve:ssm:/sabonah/redis/host}}"
+    - name: APP_REDIS_PORT
+      value: "{{resolve:ssm:/sabonah/redis/port}}"
+    
+    # From Parameter Store - AWS Configuration
+    - name: APP_AWS_REGION
+      value: "{{resolve:ssm:/sabonah/aws/region}}"
+    - name: APP_AWS_BUCKET
+      value: "{{resolve:ssm:/sabonah/aws/bucket}}"
+    - name: APP_AWS_BUCKET_BASE_URL
+      value: "{{resolve:ssm:/sabonah/aws/bucket-base-url}}"
+    - name: APP_AWS_STS_ROLE_ARN
+      value: "{{resolve:ssm:/sabonah/aws/sts-role-arn}}"
+    - name: APP_AWS_QUEUE_URL
+      value: "{{resolve:ssm:/sabonah/aws/queue-url}}"
+    - name: APP_AWS_SES_FROM_EMAIL
+      value: "{{resolve:ssm:/sabonah/aws/ses-from-email}}"
+    
+    # From Parameter Store - Twilio
+    - name: APP_TWILIO_ACCOUNT_SID
+      value: "{{resolve:ssm:/sabonah/twilio/account-sid}}"
+    - name: APP_VERIFY_SERVICE_SID
+      value: "{{resolve:ssm:/sabonah/twilio/verify-service-sid}}"
+    
+    # From Parameter Store - OAuth
+    - name: APP_GOOGLE_OAUTH_ENDPOINT
+      value: "{{resolve:ssm:/sabonah/oauth/google-endpoint}}"
+    - name: APP_APPLE_OAUTH_ENDPOINT
+      value: "{{resolve:ssm:/sabonah/oauth/apple-endpoint}}"
