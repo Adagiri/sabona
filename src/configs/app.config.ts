@@ -1,4 +1,4 @@
-import { config } from 'dotenv'
+import { config } from 'dotenv';
 config();
 
 const AppConfig = {
@@ -30,7 +30,7 @@ const AppConfig = {
     TWILIO: {
         ACCOUNT_SID: process.env.APP_TWILIO_ACCOUNT_SID,
         AUTH_TOKEN: process.env.APP_TWILIO_AUTH_TOKEN,
-        VERIFY_SERVICE_SID: process.env.APP_VERIFY_SERVICE_SID
+        VERIFY_SERVICE_SID: process.env.APP_VERIFY_SERVICE_SID,
     },
     OAUTH: {
         GOOGLE: process.env.APP_GOOGLE_OAUTH_ENDPOINT,
@@ -40,6 +40,12 @@ const AppConfig = {
         APP_ID: process.env.APP_AGORA_APP_ID,
         APP_CERTIFICATE: process.env.APP_AGORA_APP_CERTIFICATE,
         LIVE_SESSION_TOKEN_EXPIRATION: Number(process.env.APP_AGORA_LIVE_SESSION_TOKEN_EXPIRATION),
+    },
+
+    FIREBASE: {
+        PROJECT_ID: process.env.APP_FIREBASE_PROJECT_ID,
+        CLIENT_EMAIL: process.env.APP_FIREBASE_CLIENT_EMAIL,
+        PRIVATE_KEY: process.env.APP_FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     },
 };
 

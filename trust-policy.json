@@ -4,7 +4,7 @@
         {
             "Effect": "Allow",
             "Principal": {
-                "Service": "ecs-tasks.amazonaws.com"
+                "Service": "apprunner.amazonaws.com"
             },
             "Action": "sts:AssumeRole"
         }

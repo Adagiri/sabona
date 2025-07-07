@@ -3,17 +3,19 @@ import { Module } from '@nestjs/common';
 import { redisStore } from 'cache-manager-redis-yet';
 import AppConfig from '../../configs/app.config';
 import RedisService from './redis.service';
-import { RedisClientOptions } from "redis";
+import { RedisClientOptions } from 'redis';
 
 @Module({
-  imports: [
-    CacheModule.register<RedisClientOptions>({
-      isGlobal: true,
-      store: redisStore,
-      url: `rediss://${AppConfig.REDIS.HOST}:${AppConfig.REDIS.PORT}`,
-    }),
-  ],
-  exports: [RedisService],
-  providers: [RedisService],
+    imports: [
+        CacheModule.register<RedisClientOptions>({
+            isGlobal: true,
+            store: redisStore,
+            url: AppConfig.REDIS.HOST.includes('localhost')
+                ? `redis://${AppConfig.REDIS.HOST}:${AppConfig.REDIS.PORT}` 
+                : `rediss://${AppConfig.REDIS.HOST}:${AppConfig.REDIS.PORT}`,
+        }),
+    ],
+    exports: [RedisService],
+    providers: [RedisService],
 })
 export default class RedisModule {}
