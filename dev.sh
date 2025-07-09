@@ -101,8 +101,9 @@ start_services() {
     echo "   🔧 pgAdmin:         http://localhost:8080 (admin@sabonah.com / admin123)"
     echo "   📱 Redis GUI:       http://localhost:8081"
     echo ""
-    echo "🚀 To start your app:"
-    echo "   pnpm run start:dev"
+    echo "🚀 To setup and start your app:"
+    echo "   ./dev.sh app         # Setup app (install deps, migrations)"
+    echo "   pnpm run start:dev   # Start app in interactive mode"
     echo ""
     echo "📝 Database commands:"
     echo "   pnpm run db:generate  # Generate Prisma client"
@@ -121,6 +122,7 @@ stop_services() {
         pkill -f "nest start" 2>/dev/null || true
         pkill -f "pnpm.*start:dev" 2>/dev/null || true
         pkill -f "pnpm run start:dev" 2>/dev/null || true
+        sleep 2
         print_success "Node.js app stopped"
     fi
     
@@ -171,18 +173,12 @@ show_status() {
 
 # Function to start the application
 start_app() {
-    print_status "Starting Sabonah application..."
+    print_status "Starting Sabonah application setup..."
     
     # Check if Docker services are running first
     if ! docker-compose ps | grep -q "Up"; then
         print_error "Docker services are not running. Please run './dev.sh start' first."
         exit 1
-    fi
-    
-    # Check if app is already running
-    if lsof -Pi :$APP_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
-        print_warning "Application is already running on port $APP_PORT"
-        return
     fi
     
     # Check if node_modules exist
@@ -199,13 +195,16 @@ start_app() {
     print_status "Running database migrations..."
     pnpm run db:migrate
     
-    # Start the application
-    print_success "Starting application in development mode..."
+    # Application setup complete
+    print_success "Application setup completed!"
     echo ""
-    print_status "🚀 Application starting on http://localhost:$APP_PORT"
-    print_status "📖 API Docs available at http://localhost:$APP_PORT/v1/api"
+    print_status "🚀 To start your application, run:"
+    echo "   pnpm run start:dev"
     echo ""
-    pnpm run start:dev
+    print_status "📖 Your app will be available at:"
+    echo "   http://localhost:$APP_PORT"
+    echo "   http://localhost:$APP_PORT/v1/api (API Docs)"
+    echo ""
 }
 
 # Function to build for production (testing)
@@ -232,11 +231,11 @@ build_app() {
     echo "   pnpm run start:prod"
 }
 
-# Function to start everything (Docker + App)
+# Function to start everything (Docker + App Setup)
 start_full() {
     start_services
     echo ""
-    print_status "Now starting the application..."
+    print_status "Now setting up the application..."
     sleep 3
     start_app
 }
@@ -269,18 +268,22 @@ show_help() {
     echo "  start     Start the development environment (Docker services only)"
     echo "  stop      Stop the development environment"
     echo "  restart   Restart the development environment"
-    echo "  app       Start the Sabonah application (requires Docker services to be running)"
-    echo "  dev       Start everything (Docker services + Sabonah application)"
+    echo "  app       Setup the Sabonah application (install deps, generate Prisma, run migrations)"
+    echo "  dev       Start Docker services + setup Sabonah application"
     echo "  build     Build the application for production (testing)"
     echo "  status    Show current status"
     echo "  cleanup   Remove all data volumes (⚠️  DELETES ALL DATA)"
     echo "  help      Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0 start    # Start PostgreSQL, Redis, pgAdmin, Redis GUI"
-    echo "  $0 app      # Start the Sabonah NestJS application"
-    echo "  $0 dev      # Start everything at once"
-    echo "  $0 build    # Test production build locally"
+    echo "  $0 start           # Start PostgreSQL, Redis, pgAdmin, Redis GUI"
+    echo "  $0 app             # Setup the Sabonah NestJS application"
+    echo "  $0 dev             # Start everything and setup app"
+    echo "  pnpm run start:dev # Start the application (run this manually after setup)"
+    echo ""
+    echo "Typical workflow:"
+    echo "  1. $0 dev          # Setup everything"
+    echo "  2. pnpm run start:dev  # Start the app in interactive mode"
     echo ""
     echo "If no command is provided, 'start' is assumed."
 }
