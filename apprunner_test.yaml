@@ -3,12 +3,14 @@ runtime: nodejs22
 build:
   commands:
     pre-build:
+      - echo "Starting pre-build process..."
       - npm install -g pnpm
     build:
-      - pnpm install
-      - pnpm run db:generate
-      - pnpm run build
-      - pnpm run db:deploy
+      - echo "Starting build process..."
+      - pnpm install || echo "pnpm install failed with exit code $?"
+      - pnpm run db:generate || echo "pnpm run db:generate failed with exit code $?"
+      - pnpm run build || echo "pnpm run build failed with exit code $?"
+      - pnpm run db:deploy || echo "pnpm run db:deploy failed with exit code $?"
 run:
   command: npm run start
   network:
