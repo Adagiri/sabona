@@ -1,0 +1,15 @@
+version: 1.0
+runtime: nodejs22
+build:
+  commands:
+    pre-build:
+      - npm install -g pnpm
+    build:
+      - pnpm install
+      - pnpm run db:generate
+      - pnpm run build
+      - pnpm run db:deploy
+run:
+  command: npm run start
+  network:
+    port: 3001
