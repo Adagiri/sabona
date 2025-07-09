@@ -8,6 +8,9 @@ build:
       - npx pnpm run db:generate || echo "pnpm run db:generate failed with exit code $?"
       - npx pnpm run build || echo "pnpm run build failed with exit code $?"
       - npx pnpm run db:deploy || echo "pnpm run db:deploy failed with exit code $?"
+  secrets:
+    - name: APP_DATABASE_URL
+      value-from: "arn:aws:secretsmanager:us-east-1:529088254775:secret:sabonah/database:url::"
 run:
   command: npm run start
   network:
