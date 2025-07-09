@@ -1,5 +1,5 @@
 version: 1.0
-runtime: nodejs22
+runtime: nodejs20
 build:
   commands:
     pre-build:
@@ -11,7 +11,7 @@ build:
       - pnpm run build
       - pnpm run db:deploy
 run:
-  runtime-version: 22
+  runtime-version: 20
   command: npm run start
   network:
     port: 3001
