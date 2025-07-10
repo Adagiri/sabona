@@ -254,6 +254,7 @@ export default class MediaService {
             };
         }
         catch(e){
+            console.log(e)
             throw new NotFoundException('media.not_found');
         }
 

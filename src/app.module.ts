@@ -9,8 +9,6 @@ import UserModule from './modules/app/user/user.module';
 import DeviceModule from './modules/app/device/device.module';
 import MediaModule from './modules/app/media/media.module';
 import CronModule from './modules/cron/cron.module';
-import QueueModule from './modules/queue/queue.module';
-import EmailModule from './modules/email/email.module';
 import OAuthModule from './modules/oauth/oauth.module';
 import { HttpExceptionFilter } from './core/exceptions/http.exception';
 import AuthGuard from './modules/app/auth/auth.guard';
@@ -44,8 +42,6 @@ import * as path from 'path';
         DeviceModule,
         MediaModule,
         CronModule,
-        QueueModule,
-        EmailModule,
         OAuthModule,
         CustomerModule,
         RiderModule,

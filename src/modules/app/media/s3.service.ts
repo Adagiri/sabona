@@ -26,21 +26,21 @@ export default class S3Service {
     private _stsClient: STSClient = null;
 
     constructor() {
-        this._s3Client = new S3Client({
-            credentials: {
-                accessKeyId: AppConfig.AWS.ACCESS_KEY,
-                secretAccessKey: AppConfig.AWS.SECRET_KEY,
-            },
+        
+        const clientConfig = {
             region: AppConfig.AWS.REGION,
-        });
+            ...(AppConfig.AWS.ACCESS_KEY && AppConfig.AWS.SECRET_KEY
+                ? {
+                      credentials: {
+                          accessKeyId: AppConfig.AWS.ACCESS_KEY,
+                          secretAccessKey: AppConfig.AWS.SECRET_KEY,
+                      },
+                  }
+                : {}),
+        };
 
-        this._stsClient = new STSClient({
-            credentials: {
-                accessKeyId: AppConfig.AWS.ACCESS_KEY,
-                secretAccessKey: AppConfig.AWS.SECRET_KEY,
-            },
-            region: AppConfig.AWS.REGION,
-        });
+        this._s3Client = new S3Client(clientConfig);
+        this._stsClient = new STSClient(clientConfig);
     }
 
     private _createUniqueFileName(name: string): string {
@@ -98,9 +98,7 @@ export default class S3Service {
                 sessionToken: Credentials.SessionToken,
                 filePath: path,
             };
-
-        }
-        catch (e) {
+        } catch (e) {
             console.log('error', e);
         }
     }
@@ -122,18 +120,16 @@ export default class S3Service {
     }
 
     async UpdateObjectIdTag(path: string, id: number) {
-        try{
+        try {
             const command = new PutObjectTaggingCommand({
                 Bucket: AppConfig.AWS.BUCKET,
                 Key: path,
                 Tagging: { TagSet: [{ Key: 'id', Value: `${id}` }] },
             });
             await this._s3Client.send(command);
+        } catch (e) {
+            console.log('ERROR', e);
         }
-        catch(e){
-            console.log("ERROR",e);
-        }
-
     }
 
     async UpdateObjectStaleTag(path: string) {
@@ -146,7 +142,7 @@ export default class S3Service {
         await this._s3Client.send(command);
     }
 
-    async UpdateObjectAccess(path: string, access: "public-read" | "private") {
+    async UpdateObjectAccess(path: string, access: 'public-read' | 'private') {
         try {
             const command = new PutObjectAclCommand({
                 Bucket: AppConfig.AWS.BUCKET,
@@ -156,7 +152,7 @@ export default class S3Service {
             await this._s3Client.send(command);
             return true;
         } catch (e) {
-            console.log("ERROR",e);
+            console.log('ERROR', e);
             return false;
         }
     }
