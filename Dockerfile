@@ -13,8 +13,6 @@ RUN pnpm run db:generate
 
 RUN pnpm run build
 
-RUN pnpm run db:deploy
-
 EXPOSE 3001
 
 CMD ["pnpm", "run", "start"]

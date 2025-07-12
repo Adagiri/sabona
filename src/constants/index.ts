@@ -10,15 +10,7 @@ export enum EventType {
     GENERATE_CERTIFICATE = 'GENERATE_CERTIFICATE',
 }
 
-export const AVAILABILITY_DAYS = [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday',
-];
+export const AVAILABILITY_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export const DEFAULT_AVAILABLITY = {
     DAYS: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
@@ -31,20 +23,20 @@ export const DEFAULT_AVAILABLITY = {
 export enum VerificationStatus {
     APPROVED = 'approved',
     PENDING = 'pending',
-  }
+}
 
 export const QUIZ_CLEARENCE_PERCENTAGE = 60;
 
-export const OTP_CODE_FOR_DEV = '123456';
+export const OTP_CODE_FOR_TEST = '123456';
 
 export enum APP_ENV {
-    DEV = 'dev',
+    TEST = 'test',
     PROD = 'prod',
 }
 
 export const DELIVERY_CHARGES = {
     NORMAL: 10,
     EXPRESS: 20,
-}
+};
 
 export const SERVICE_CHARGES = 7;

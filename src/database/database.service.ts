@@ -1,5 +1,12 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import  {PrismaClient}  from '@prisma/client';
+import { exec } from 'child_process';
+
+import { PrismaClient } from '@prisma/client';
+import { promisify } from 'util';
+import AppConfig from 'src/configs/app.config';
+import { APP_ENV } from 'src/constants';
+
+const execAsync = promisify(exec);
 
 @Injectable()
 export default class DatabaseService extends PrismaClient implements OnModuleInit {
@@ -8,6 +15,22 @@ export default class DatabaseService extends PrismaClient implements OnModuleIni
             errorFormat: 'pretty',
             log: ['warn', 'error', 'info', { emit: 'event', level: 'query' }],
         });
+    }
+
+    private async runMigrations() {
+        try {
+            console.log('🔄 Running database migrations...');
+            const { stdout } = await execAsync('npx prisma migrate deploy');
+
+            if (stdout.includes('No pending migrations')) {
+                console.log('📝 No pending migrations');
+            } else {
+                console.log('✅ Migrations applied successfully');
+            }
+        } catch (error) {
+            console.error('❌ Migration error:', error);
+            throw new Error(`Database migration failed: ${error.message}`);
+        }
     }
 
     private _applySoftDeleteMiddleware() {
@@ -74,6 +97,10 @@ export default class DatabaseService extends PrismaClient implements OnModuleIni
     }
 
     async onModuleInit() {
+        if (AppConfig.APP.ENV === APP_ENV.PROD) {
+            await this.runMigrations();
+        }
+
         this._applySoftDeleteMiddleware();
         await this.$connect();
     }
