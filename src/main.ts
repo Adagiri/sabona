@@ -1,29 +1,17 @@
-import { VersioningType } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { NestExpressApplication } from '@nestjs/platform-express';
-import AppConfig from './configs/app.config';
-import { InjectSwagger, InjectPipes, InjectInterceptors } from './core/injectors';
-import { AppModule } from './app.module';
+import { loadSecrets } from './load-secrets';
+import { bootstrap } from './bootstrap';
 
-async function bootstrap() {
-    /* Bootstrap express application */
-    const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-        rawBody: true,
-        cors: true,
-    });
+async function main() {
+    try {
+        await loadSecrets();
 
-    /* Enable API versioning */
-    app.enableVersioning({ type: VersioningType.URI });
-
-    /* Set proxy as trustful to forward IP address */
-    app.set('trust proxy', 1);
-
-    /* Add custom Injectors here */
-    InjectPipes(app);
-    InjectInterceptors(app);
-    InjectSwagger(app);
-
-    /* Start the application on a specified port */
-    await app.listen(AppConfig.APP.PORT || 3001);
+        await bootstrap();
+    } catch (error) {
+        console.error('❌ Application startup failed:', error);
+        process.exit(1);
+    }
 }
-bootstrap();
+
+if (require.main === module) {
+    main();
+}

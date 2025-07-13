@@ -8,9 +8,6 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-COMPOSE_FILE="docker-compose.yml"
-POSTGRES_VOLUME="sabonah_postgres_data"
-REDIS_VOLUME="sabonah_redis_data"
 APP_PORT="3001"
 
 # Function to print colored output
@@ -30,90 +27,155 @@ print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-# Function to check if volumes exist and create them
-setup_volumes() {
-    print_status "Setting up Docker volumes..."
+# Function to check environment configuration
+check_environment() {
+    print_status "Checking environment configuration..."
     
-    if ! docker volume inspect $POSTGRES_VOLUME >/dev/null 2>&1; then
-        print_status "Creating PostgreSQL volume: $POSTGRES_VOLUME"
-        docker volume create $POSTGRES_VOLUME
-    else
-        print_success "PostgreSQL volume already exists"
-    fi
-    
-    if ! docker volume inspect $REDIS_VOLUME >/dev/null 2>&1; then
-        print_status "Creating Redis volume: $REDIS_VOLUME"
-        docker volume create $REDIS_VOLUME
-    else
-        print_success "Redis volume already exists"
-    fi
-}
-
-# Function to start services
-start_services() {
-    print_status "Starting development environment..."
-    
-    # Check if Docker is running
-    if ! docker info >/dev/null 2>&1; then
-        print_error "Docker is not running. Please start Docker Desktop or Docker daemon."
+    # Check if .env file exists
+    if [ ! -f ".env" ]; then
+        print_error ".env file not found!"
+        echo ""
+        echo "📋 Create a .env file with the following variables:"
+        echo "   APP_ENV=test"
+        echo "   APP_AWS_ACCESS_KEY=your_access_key"
+        echo "   APP_AWS_SECRET_KEY=your_secret_key"
+        echo ""
+        echo "💡 All other configuration is loaded from AWS Secrets Manager and Parameter Store"
         exit 1
     fi
     
-    # Setup volumes
-    setup_volumes
-    
-    # Start Docker Compose services
-    print_status "Starting Docker services..."
-    if docker-compose up -d; then
-        print_success "Docker services started successfully"
-    else
-        print_error "Failed to start Docker services"
+    # Check required environment variables
+    if ! grep -q "APP_ENV=" .env; then
+        print_error "APP_ENV not found in .env file"
         exit 1
     fi
     
-    # Wait for services to be ready
-    print_status "Waiting for services to be ready..."
-    sleep 5
-    
-    # Check PostgreSQL
-    print_status "Checking PostgreSQL connection..."
-    if docker exec sabonah.db pg_isready -U sabonah_postgres >/dev/null 2>&1; then
-        print_success "PostgreSQL is ready"
-    else
-        print_warning "PostgreSQL might still be starting up"
+    if ! grep -q "APP_AWS_ACCESS_KEY=" .env; then
+        print_warning "APP_AWS_ACCESS_KEY not found in .env file"
+        echo "   This is needed to fetch configuration from AWS"
     fi
     
-    # Check Redis
-    print_status "Checking Redis connection..."
-    if docker exec sabonah.redis redis-cli ping >/dev/null 2>&1; then
-        print_success "Redis is ready"
+    APP_ENV=$(grep "APP_ENV=" .env | cut -d '=' -f2)
+    print_success "Environment configured for: $APP_ENV"
+}
+
+# Function to test cloud services connectivity
+test_connections() {
+    print_status "Testing cloud services connectivity..."
+    
+    # This would require the app to be built, so we'll skip detailed testing
+    # and just check basic AWS connectivity if AWS CLI is available
+    if command -v aws >/dev/null 2>&1; then
+        print_status "Testing AWS connectivity..."
+        if aws sts get-caller-identity >/dev/null 2>&1; then
+            print_success "AWS connectivity confirmed"
+        else
+            print_warning "Could not verify AWS connectivity (credentials may not be configured)"
+        fi
     else
-        print_warning "Redis might still be starting up"
+        print_status "AWS CLI not found - skipping connectivity test"
     fi
     
-    # Show service URLs
+    print_success "Cloud services check completed"
+}
+
+# Function to setup the application
+setup_app() {
+    print_status "Setting up Sabonah application..."
+    
+    # Check environment first
+    check_environment
+    
+    # Check if node_modules exist
+    if [ ! -d "node_modules" ]; then
+        print_status "Installing dependencies..."
+        if command -v pnpm >/dev/null 2>&1; then
+            pnpm install
+        elif command -v npm >/dev/null 2>&1; then
+            npm install
+        else
+            print_error "Neither pnpm nor npm found. Please install Node.js and pnpm"
+            exit 1
+        fi
+        print_success "Dependencies installed"
+    else
+        print_success "Dependencies already installed"
+    fi
+    
+    # Generate Prisma client
+    print_status "Generating Prisma client..."
+    if command -v pnpm >/dev/null 2>&1; then
+        pnpm run db:generate
+    else
+        npm run db:generate
+    fi
+    print_success "Prisma client generated"
+    
+    # Test cloud connectivity
+    test_connections
+    
+    print_success "Application setup completed!"
     echo ""
-    print_success "Development environment is ready!"
+    echo "☁️ Cloud Services:"
+    echo "   🗄️  Database: AWS RDS PostgreSQL (configured via AWS)"
+    echo "   🔴 Redis: Redis Cloud (configured via AWS)"
+    echo "   🔐 Config: AWS Secrets Manager + Parameter Store"
     echo ""
-    echo "📊 Service URLs:"
-    echo "   🗄️  PostgreSQL:     localhost:5432"
-    echo "   🔴 Redis:           localhost:6379"
-    echo "   🔧 pgAdmin:         http://localhost:8080 (admin@sabonah.com / admin123)"
-    echo "   📱 Redis GUI:       http://localhost:8081"
+    echo "🚀 To start your application:"
+    if command -v pnpm >/dev/null 2>&1; then
+        echo "   pnpm run start:dev   # Development mode with hot reload"
+        echo "   pnpm run start:prod  # Production mode"
+    else
+        echo "   npm run start:dev    # Development mode with hot reload"
+        echo "   npm run start:prod   # Production mode"
+    fi
     echo ""
-    echo "🚀 To setup and start your app:"
-    echo "   ./dev.sh app         # Setup app (install deps, migrations)"
-    echo "   pnpm run start:dev   # Start app in interactive mode"
-    echo ""
-    echo "📝 Database commands:"
-    echo "   pnpm run db:generate  # Generate Prisma client"
-    echo "   pnpm run db:migrate   # Run migrations"
+    echo "📖 Your app will be available at:"
+    echo "   http://localhost:$APP_PORT"
+    echo "   http://localhost:$APP_PORT/v1/api (API Documentation)"
     echo ""
 }
 
-# Function to stop services
-stop_services() {
-    print_status "Stopping development environment..."
+# Function to run database migrations
+run_migrations() {
+    print_status "Running database migrations..."
+    
+    check_environment
+    
+    if command -v pnpm >/dev/null 2>&1; then
+        pnpm run db:migrate
+    else
+        npm run db:migrate
+    fi
+    
+    print_success "Database migrations completed"
+}
+
+# Function to start the application
+start_app() {
+    print_status "Starting Sabonah application..."
+    
+    # Check if app is already running
+    if lsof -Pi :$APP_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+        print_warning "Application is already running on port $APP_PORT"
+        echo "Use './dev.sh stop' to stop it first"
+        exit 1
+    fi
+    
+    check_environment
+    
+    # Start the application
+    print_status "Starting application in development mode..."
+    if command -v pnpm >/dev/null 2>&1; then
+        pnpm run start:dev
+    else
+        npm run start:dev
+    fi
+}
+
+# Function to stop the application
+stop_app() {
+    print_status "Stopping Sabonah application..."
     
     # Stop Node.js app if running on the specified port
     if lsof -Pi :$APP_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
@@ -121,189 +183,147 @@ stop_services() {
         pkill -f "node.*$APP_PORT" 2>/dev/null || true
         pkill -f "nest start" 2>/dev/null || true
         pkill -f "pnpm.*start:dev" 2>/dev/null || true
-        pkill -f "pnpm run start:dev" 2>/dev/null || true
+        pkill -f "npm.*start:dev" 2>/dev/null || true
         sleep 2
-        print_success "Node.js app stopped"
-    fi
-    
-    # Stop Docker services
-    print_status "Stopping Docker services..."
-    if docker-compose down; then
-        print_success "Docker services stopped successfully"
+        print_success "Application stopped"
     else
-        print_warning "Some issues occurred while stopping Docker services"
+        print_warning "No application found running on port $APP_PORT"
     fi
-    
-    print_success "Development environment stopped"
 }
 
-# Function to restart services
-restart_services() {
-    print_status "Restarting development environment..."
-    stop_services
-    sleep 2
-    start_services
-}
-
-# Function to show status
-show_status() {
-    print_status "Development environment status:"
-    echo ""
-    
-    # Docker services status
-    if docker-compose ps 2>/dev/null; then
-        echo ""
-    else
-        print_warning "Docker services are not running"
-    fi
-    
-    # Check if app is running
-    if lsof -Pi :$APP_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
-        print_success "Node.js app is running on port $APP_PORT"
-    else
-        print_warning "Node.js app is not running on port $APP_PORT"
-    fi
-    
-    echo ""
-    echo "📊 Service URLs:"
-    echo "   🔧 pgAdmin:         http://localhost:8080"
-    echo "   📱 Redis GUI:       http://localhost:8081"
-    echo ""
-}
-
-# Function to start the application
-start_app() {
-    print_status "Starting Sabonah application setup..."
-    
-    # Check if Docker services are running first
-    if ! docker-compose ps | grep -q "Up"; then
-        print_error "Docker services are not running. Please run './dev.sh start' first."
-        exit 1
-    fi
-    
-    # Check if node_modules exist
-    if [ ! -d "node_modules" ]; then
-        print_status "Installing dependencies..."
-        pnpm install
-    fi
-    
-    # Generate Prisma client if needed
-    print_status "Generating Prisma client..."
-    pnpm run db:generate
-    
-    # Run migrations
-    print_status "Running database migrations..."
-    pnpm run db:migrate
-    
-    # Application setup complete
-    print_success "Application setup completed!"
-    echo ""
-    print_status "🚀 To start your application, run:"
-    echo "   pnpm run start:dev"
-    echo ""
-    print_status "📖 Your app will be available at:"
-    echo "   http://localhost:$APP_PORT"
-    echo "   http://localhost:$APP_PORT/v1/api (API Docs)"
-    echo ""
-}
-
-# Function to build for production (testing)
+# Function to build for production
 build_app() {
     print_status "Building Sabonah application for production..."
     
-    # Check if node_modules exist
-    if [ ! -d "node_modules" ]; then
-        print_status "Installing dependencies..."
-        pnpm install
-    fi
+    check_environment
     
     # Generate Prisma client
     print_status "Generating Prisma client..."
-    pnpm run db:generate
-    
-    # Build the application
-    print_status "Building application..."
-    pnpm run build
+    if command -v pnpm >/dev/null 2>&1; then
+        pnpm run db:generate
+        print_status "Building application..."
+        pnpm run build
+    else
+        npm run db:generate
+        print_status "Building application..."
+        npm run build
+    fi
     
     print_success "Build completed! Built files are in ./dist/"
     echo ""
     echo "🚀 To test production build:"
-    echo "   pnpm run start:prod"
-}
-
-# Function to start everything (Docker + App Setup)
-start_full() {
-    start_services
-    echo ""
-    print_status "Now setting up the application..."
-    sleep 3
-    start_app
-}
-
-# Function to clean up (remove volumes)
-cleanup() {
-    print_warning "This will remove all data volumes. Are you sure? (y/N)"
-    read -r response
-    if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-        print_status "Cleaning up..."
-        stop_services
-        
-        print_status "Removing volumes..."
-        docker volume rm $POSTGRES_VOLUME $REDIS_VOLUME 2>/dev/null || true
-        docker volume rm backend_pgadmin_data 2>/dev/null || true
-        
-        print_success "Cleanup completed"
+    if command -v pnpm >/dev/null 2>&1; then
+        echo "   pnpm run start:prod"
     else
-        print_status "Cleanup cancelled"
+        echo "   npm run start:prod"
     fi
+}
+
+# Function to show status
+show_status() {
+    print_status "Application status:"
+    echo ""
+    
+    # Check environment
+    if [ -f ".env" ]; then
+        APP_ENV=$(grep "APP_ENV=" .env | cut -d '=' -f2)
+        print_success "Environment: $APP_ENV"
+    else
+        print_error ".env file not found"
+    fi
+    
+    # Check if app is running
+    if lsof -Pi :$APP_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+        print_success "Application is running on port $APP_PORT"
+        echo "   🌐 App URL: http://localhost:$APP_PORT"
+        echo "   📖 API Docs: http://localhost:$APP_PORT/v1/api"
+    else
+        print_warning "Application is not running"
+    fi
+    
+    # Check dependencies
+    if [ -d "node_modules" ]; then
+        print_success "Dependencies installed"
+    else
+        print_warning "Dependencies not installed (run './dev.sh setup')"
+    fi
+    
+    echo ""
+    echo "☁️ Cloud Services:"
+    echo "   🗄️  Database: AWS RDS PostgreSQL"
+    echo "   🔴 Redis: Redis Cloud"
+    echo "   🔐 Configuration: AWS Secrets Manager + Parameter Store"
+    echo ""
+}
+
+# Function to show logs
+show_logs() {
+    print_status "Application logs:"
+    echo ""
+    echo "💡 For real-time logs, run your application with:"
+    if command -v pnpm >/dev/null 2>&1; then
+        echo "   pnpm run start:dev"
+    else
+        echo "   npm run start:dev"
+    fi
+    echo ""
+    echo "📊 For production logs, check:"
+    echo "   • Application logs in your terminal"
+    echo "   • AWS CloudWatch logs (if configured)"
+    echo "   • App Runner logs (for production deployment)"
 }
 
 # Function to show help
 show_help() {
-    echo "Development Environment Script"
+    echo "Sabonah Development Script (Cloud Services)"
     echo ""
     echo "Usage: $0 [COMMAND]"
     echo ""
     echo "Commands:"
-    echo "  start     Start the development environment (Docker services only)"
-    echo "  stop      Stop the development environment"
-    echo "  restart   Restart the development environment"
-    echo "  app       Setup the Sabonah application (install deps, generate Prisma, run migrations)"
-    echo "  dev       Start Docker services + setup Sabonah application"
-    echo "  build     Build the application for production (testing)"
-    echo "  status    Show current status"
-    echo "  cleanup   Remove all data volumes (⚠️  DELETES ALL DATA)"
+    echo "  setup     Setup the application (install deps, generate Prisma client)"
+    echo "  migrate   Run database migrations"
+    echo "  start     Start the application in development mode"
+    echo "  stop      Stop the running application"
+    echo "  build     Build the application for production"
+    echo "  status    Show current application status"
+    echo "  logs      Show information about application logs"
     echo "  help      Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0 start           # Start PostgreSQL, Redis, pgAdmin, Redis GUI"
-    echo "  $0 app             # Setup the Sabonah NestJS application"
-    echo "  $0 dev             # Start everything and setup app"
-    echo "  pnpm run start:dev # Start the application (run this manually after setup)"
+    echo "  $0 setup           # Setup application dependencies"
+    echo "  $0 migrate         # Run database migrations"
+    echo "  $0 start           # Start in development mode"
+    echo "  $0 build           # Build for production"
     echo ""
     echo "Typical workflow:"
-    echo "  1. $0 dev          # Setup everything"
-    echo "  2. pnpm run start:dev  # Start the app in interactive mode"
+    echo "  1. Create .env file with APP_ENV and AWS credentials"
+    echo "  2. $0 setup        # Setup dependencies and Prisma"
+    echo "  3. $0 migrate      # Run database migrations"
+    echo "  4. $0 start        # Start the application"
     echo ""
-    echo "If no command is provided, 'start' is assumed."
+    echo "📋 Required .env variables:"
+    echo "  APP_ENV=test"
+    echo "  APP_AWS_ACCESS_KEY=your_key"
+    echo "  APP_AWS_SECRET_KEY=your_secret"
+    echo ""
+    echo "💡 All other configuration is loaded from AWS cloud services"
+    echo ""
+    echo "If no command is provided, 'setup' is assumed."
 }
 
 # Main script logic
-case ${1:-start} in
+case ${1:-setup} in
+    setup)
+        setup_app
+        ;;
+    migrate)
+        run_migrations
+        ;;
     start)
-        start_services
-        ;;
-    stop)
-        stop_services
-        ;;
-    restart)
-        restart_services
-        ;;
-    app)
         start_app
         ;;
-    dev)
-        start_full
+    stop)
+        stop_app
         ;;
     build)
         build_app
@@ -311,8 +331,8 @@ case ${1:-start} in
     status)
         show_status
         ;;
-    cleanup)
-        cleanup
+    logs)
+        show_logs
         ;;
     help|--help|-h)
         show_help

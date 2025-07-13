@@ -26,14 +26,16 @@ export default class S3Service {
     private _stsClient: STSClient = null;
 
     constructor() {
-        
+        const APP_AWS_ACCESS_KEY = process.env.APP_AWS_ACCESS_KEY;
+        const APP_AWS_SECRET_KEY = process.env.APP_AWS_SECRET_KEY;
+
         const clientConfig = {
             region: AppConfig.AWS.REGION,
-            ...(AppConfig.AWS.ACCESS_KEY && AppConfig.AWS.SECRET_KEY
+            ...(APP_AWS_ACCESS_KEY && APP_AWS_SECRET_KEY
                 ? {
                       credentials: {
-                          accessKeyId: AppConfig.AWS.ACCESS_KEY,
-                          secretAccessKey: AppConfig.AWS.SECRET_KEY,
+                          accessKeyId: APP_AWS_ACCESS_KEY,
+                          secretAccessKey: APP_AWS_SECRET_KEY,
                       },
                   }
                 : {}),
