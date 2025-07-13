@@ -98,7 +98,6 @@ export class SecretLoaderService {
                     // If it's JSON, map each key
                     for (const [key, value] of Object.entries(secretData)) {
                         const envVarName = this.pathToEnvVar(`${secretName}/${key}`);
-                        console.log(envVarName, value);
                         process.env[envVarName] = value as string;
                         this.loadedCount++;
                     }
@@ -149,7 +148,6 @@ export class SecretLoaderService {
                     if (param.Name && param.Value) {
                         const envVarName = this.pathToEnvVar(param.Name.replace(/^\//, ''));
                         process.env[envVarName] = param.Value;
-                        console.log(`${envVarName} → ${param.Value}`);
                         this.loadedCount++;
                     }
                 }
@@ -187,8 +185,6 @@ export class SecretLoaderService {
         try {
             await Promise.all([this.loadSecretsManager(), this.loadParameterStore()]);
             this.validateRequiredSecrets();
-            console.log(process.env.APP_FIREBASE_PROJECT_ID);
-            console.log(AppConfig.FIREBASE.PROJECT_ID);
             const duration = Date.now() - startTime;
             console.log(`✅ Loaded ${this.loadedCount} secrets in ${duration}ms\n`);
         } catch (error) {
