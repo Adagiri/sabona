@@ -310,7 +310,7 @@ export default class UserService {
         //         "Phone number is already registered"
         //     );
         // }
-        if (AppConfig.APP.ENV === 'dev') {
+        if (AppConfig.APP.ENV === APP_ENV.TEST) {
             return {
                 message: 'OTP sent successfully',
             };
@@ -545,7 +545,7 @@ export default class UserService {
     }
 
     async ResendVerificationCode(data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
-        if (AppConfig.APP.ENV === 'dev') {
+        if (AppConfig.APP.ENV === APP_ENV.TEST) {
             return {
                 message: 'OTP sent successfully',
             };
