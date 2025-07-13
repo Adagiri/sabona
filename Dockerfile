@@ -13,6 +13,6 @@ RUN pnpm run db:generate
 
 RUN pnpm run build
 
-EXPOSE 3001
+EXPOSE 8080
 
 CMD ["pnpm", "run", "start"]
