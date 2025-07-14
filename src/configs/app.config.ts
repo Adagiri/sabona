@@ -34,6 +34,9 @@ const AppConfig = {
         get PORT() {
             return Number(process.env.APP_REDIS_PORT);
         },
+        get AUTH_TOKEN() {
+            return process.env.APP_REDIS_AUTH_TOKEN;
+        },
     },
     AWS: {
         get REGION() {
