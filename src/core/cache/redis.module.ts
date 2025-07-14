@@ -15,7 +15,7 @@ import { APP_ENV } from 'src/constants';
             socket: {
                 host: AppConfig.REDIS.HOST,
                 port: AppConfig.REDIS.PORT,
-                tls: AppConfig.APP.ENV === APP_ENV.PROD, // TLS enabled in prod
+                // tls: AppConfig.APP.ENV === APP_ENV.PROD, // TLS enabled in prod
             },
             password: AppConfig.REDIS.AUTH_TOKEN, // required if --auth-token is set
         }),
