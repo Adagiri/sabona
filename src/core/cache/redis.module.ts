@@ -11,7 +11,13 @@ import { APP_ENV } from 'src/constants';
         CacheModule.register<RedisClientOptions>({
             isGlobal: true,
             store: redisStore,
-            url: `${AppConfig.APP.ENV === APP_ENV.PROD ? 'rediss' : 'redis'}://${AppConfig.REDIS.HOST}:${AppConfig.REDIS.PORT}`,
+
+            socket: {
+                host: AppConfig.REDIS.HOST,
+                port: AppConfig.REDIS.PORT,
+                tls: AppConfig.APP.ENV === APP_ENV.PROD, // TLS enabled in prod
+            },
+            password: AppConfig.REDIS.AUTH_TOKEN, // required if --auth-token is set
         }),
     ],
     exports: [RedisService],
