@@ -144,6 +144,8 @@ export default class UserService {
             where: { phone: data.phone },
             select: { id: true },
         });
+
+        
         if (existingUser) {
             throw new BadRequestException('This phone number is already registered');
         }
@@ -159,7 +161,7 @@ export default class UserService {
                         long: data.longitude || 0,
                     },
                 },
-                // password: data.password,
+                password: data.password,
             },
             select: { id: true, email: true },
         });
@@ -335,6 +337,7 @@ export default class UserService {
                 const token = await this.Login(data);
                 return { token };
             } else {
+                console.log(data)
                 const token = await this.Signup(data);
                 return { token };
             }
@@ -388,9 +391,13 @@ export default class UserService {
             },
         });
 
+        console.log("data: ", data)
+        console.log('doesUserExist: ', doesUserExist);
+
         if (!doesUserExist) {
             throw new BadRequestException('User not registered');
         }
+
         const user = await this._dbService.user.findFirst({
             where: { phone: data.phone, password: data.password },
 

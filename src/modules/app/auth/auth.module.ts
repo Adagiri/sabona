@@ -10,4 +10,5 @@ import AuthGuard from './auth.guard';
     providers: [AuthService, AuthGuard],
     controllers: [],
 })
+
 export default class AuthModule {}
