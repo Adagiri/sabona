@@ -1,5 +1,5 @@
-import { User, UserType } from '@prisma/client';
-import { ApiController, Authorized, CurrentUser, Get, Post } from '../../../core/decorators';
+import { UserType } from '@prisma/client';
+import { ApiController, Authorized, Get, Post } from '../../../core/decorators';
 import { Body, Param, Query } from '@nestjs/common';
 import AdminService from './admin.service';
 import { AllOrderListDto } from './dto/response/allorderlist.response.dto';
@@ -30,9 +30,8 @@ import { AllTipsResponseDTO } from './dto/response/allTips.response';
 export default class AdminController {
     constructor(
         private _adminService: AdminService,
-        private _orderService: OrderService
-
-    ) { }
+        private _orderService: OrderService,
+    ) {}
 
     // Get All orders
     @Authorized(UserType.ADMIN)
@@ -42,9 +41,8 @@ export default class AdminController {
         response: AllOrderListDto,
     })
     async GetAllOrders(@Query() data: FindOrderRequestDTO): Promise<AllOrderListDto> {
-        return await this._adminService.GetAllOrders(data)
+        return await this._adminService.GetAllOrders(data);
     }
-
 
     @Authorized(UserType.ADMIN)
     @Get({
@@ -53,9 +51,8 @@ export default class AdminController {
         response: GetOrderByIdResponseDTO,
     })
     async getOrderById(@Param() params: GetOrderByIdRequestDTO): Promise<GetOrderByIdResponseDTO> {
-        return await this._orderService.getOrderById(params)
+        return await this._orderService.getOrderById(params);
     }
-
 
     // Get all user list
     @Authorized(UserType.ADMIN)
@@ -68,7 +65,6 @@ export default class AdminController {
         return this._adminService.Find(data);
     }
 
-
     // Get all applications
     @Authorized(UserType.ADMIN)
     @Get({
@@ -80,19 +76,15 @@ export default class AdminController {
         return this._adminService.GetAllApplications(data);
     }
 
-
     // Approve Applications
     @Authorized(UserType.ADMIN)
     @Post({
         path: '/application/approve/:userId',
         description: 'Approve Applications',
-        response: ApplicationApproveMessageResponseDTO
+        response: ApplicationApproveMessageResponseDTO,
     })
-
-    async approveApplication(
-        @Param('userId') userId: string
-    ): Promise<ApplicationApproveMessageResponseDTO> {
-        return await this._adminService.ApproveApplication(userId)
+    async approveApplication(@Param('userId') userId: string): Promise<ApplicationApproveMessageResponseDTO> {
+        return await this._adminService.ApproveApplication(userId);
     }
 
     @Authorized(UserType.ADMIN)
@@ -129,9 +121,12 @@ export default class AdminController {
     @Get({
         path: '/coupons/:id/usage',
         description: 'Get Coupon Usage By Id',
-        response: CouponUsagePaginatedResponseDTO
+        response: CouponUsagePaginatedResponseDTO,
     })
-    async getCouponUsage(@Param('id') id: string, @Query() data: PaginatedRequest): Promise<CouponUsagePaginatedResponseDTO>{
+    async getCouponUsage(
+        @Param('id') id: string,
+        @Query() data: PaginatedRequest,
+    ): Promise<CouponUsagePaginatedResponseDTO> {
         return this._adminService.getCouponUsage(id, data);
     }
     @Get({
@@ -139,9 +134,7 @@ export default class AdminController {
         description: 'Get Users Details',
         response: UserDto,
     })
-    async getUserDetails(
-        @Param('userId') userId: string
-    ): Promise<UserDto> {
+    async getUserDetails(@Param('userId') userId: string): Promise<UserDto> {
         return this._adminService.GetUserDetails(userId);
     }
 
@@ -150,13 +143,10 @@ export default class AdminController {
         description: 'Get Driver Tips',
         response: {},
     })
-    async getDriverTips(
-        @Param('userId') userId: string,
-        @Query() data: SlotRequest,
-    ): Promise<any> {
+    async getDriverTips(@Param('userId') userId: string, @Query() data: SlotRequest): Promise<any> {
         return this._adminService.GetDriverTips(userId, data);
     }
-    
+
     @Get({
         path: '/tips/all',
         description: 'Get All Tips',
@@ -165,5 +155,4 @@ export default class AdminController {
     async getAllTips(@Query() data: PaginatedRequest): Promise<AllTipsResponseDTO> {
         return this._adminService.GetAllTips(data);
     }
-
 }

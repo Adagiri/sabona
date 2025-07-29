@@ -1,18 +1,8 @@
 // This is your Prisma schema file.
 // Learn more about Prisma: https://pris.ly/d/prisma-schema
 
-// Key Features:
-// Original Models: Your original User, Order, Token, Device, and Media models are preserved.
-// Bridge Tables: RiderOrder and VendorOrder tables efficiently manage many-to-many relationships between riders, vendors, and orders.
-// Feedback: A new Feedback model for users to leave reviews for completed orders.
-// Notifications: A Notification model that tracks in-app, push, or email notifications with NotificationType and NotificationStatus enums.
-// Order Status History: The OrderStatusHistory table logs each status change with timestamps.
-// This is your Prisma schema file.
-// Learn more about Prisma: https://pris.ly/d/prisma-schema
-
 generator client {
-  provider = "prisma-client-js"
-  // output   = "../node_modules/.prisma/client"
+  provider      = "prisma-client-js"
   binaryTargets = ["rhel-openssl-1.0.x", "native"]
 }
 
@@ -33,6 +23,12 @@ enum UserType {
 enum UserStatus {
   ACTIVE
   INACTIVE
+}
+
+enum VendorStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 // DeviceType enum to identify the platform used by the user
@@ -65,7 +61,7 @@ enum OrderStatus {
   COMPLETED // When the entire process is completed
 }
 
-// NotificationType enum to define the different types of notificationsnotification
+// NotificationType enum to define the different types of notifications
 enum NotificationType {
   ORDER_PLACED
   ORDER_ACCEPTED
@@ -123,149 +119,6 @@ enum PaymentType {
   CARD
 }
 
-// User model to store user-related information
-model User {
-  id               String     @id @default(uuid()) // Now using UUID for user ID
-  email            String? // Optional email field
-  firstName        String? // Optional first name
-  lastName         String? // Optional last name
-  password         String? // Optional password field
-  phone            String?     @unique // Unique phone number for each user
-  type             UserType   @default(USER) // Defines if user is USER, VENDOR, RIDER, etc.
-  status           UserStatus @default(ACTIVE) // Active or inactive status
-  profilePictureId Int? // Optional relation to user's profile picture
-  createdAt        DateTime   @default(now()) @db.Timestamptz()
-  updatedAt        DateTime   @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt        DateTime?  @db.Timestamptz() // Optional deleted at timestamp
-  profilePicture   Media?     @relation(fields: [profilePictureId], references: [id])
-
-  level LEVEL? @default(BASIC) // User level
-
-  addresses UserAddress[] // A user can have multiple addresses
-
-  devices      Device[] // Relation to devices used by the user
-  tokens       Token[] // Authentication tokens used by the user
-  medias       Media[]        @relation("MediaOwner") // Media files uploaded by the user
-  settings     UserSettings? // Relation to user settings
-  DeviceToken  DeviceToken[]
-  Order        Order[]
-  RiderOrder   RiderOrder[]
-  VendorOrder  VendorOrder[]
-  Notification Notification[]
-  Pickup       Pickup[]
-  Delivery     Delivery[]
-  laundry      Laundry[]      @relation("VendorLaundry")
-
-  feedbacks Feedback[]
-  couponUsage  CouponUsage[]
-
-  reward Reward[]
-
-  givenTips    Tip[] @relation("GivenTips") // Tips the user has given
-  receivedTips Tip[] @relation("ReceivedTips") // Tips the user has received
-}
-
-model UserAddress {
-  id        String    @id @default(uuid()) // UUID for address ID
-  userId    String // Foreign key to the User model
-  user      User      @relation(fields: [userId], references: [id])
-  address   String // The actual address (e.g., street, city, etc.)
-  lat       Float // Latitude of the address
-  long      Float // Longitude of the address
-  label     String? // Optional label (e.g., "Home", "Work")
-  isDefault Boolean   @default(false) // Whether this is the default address
-  createdAt DateTime  @default(now()) @db.Timestamptz()
-  updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt DateTime? @db.Timestamptz()
-}
-
-// UserSettings model for storing user-specific settings (e.g., location)
-model UserSettings {
-  id                    Int       @id @default(autoincrement()) // Using Int for settings ID
-  lat                   Float?
-  long                  Float?
-  userId                String    @unique // Changed to String to match User's UUID
-  user                  User      @relation(fields: [userId], references: [id])
-  isOnboardingCompleted Boolean   @default(false) // Flag to track onboarding completion
-  state                 String?
-  city                  String?
-  postalCode            String?
-  createdAt             DateTime  @default(now()) @db.Timestamptz()
-  updatedAt             DateTime  @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt             DateTime? @db.Timestamptz()
-}
-
-// DeviceToken model to store device tokens for push notifications
-model DeviceToken {
-  id        Int       @id @default(autoincrement()) // Using Int for device token ID
-  userId    String // Changed to String to match User's UUID
-  user      User      @relation(fields: [userId], references: [id])
-  token     String
-  deviceId  String
-  createdAt DateTime  @default(now()) @db.Timestamptz()
-  deletedAt DateTime? @db.Timestamptz() // Optional deletion timestamp
-}
-
-// Device model to store devices used by users (for web, iOS, Android)
-model Device {
-  id        Int        @id @default(autoincrement()) // Using Int for device ID
-  uuid      String     @default(uuid()) // Unique identifier for each device
-  userAgent String? // Optional user agent string
-  type      DeviceType @default(ANDROID) // Default device type is Android
-  userId    String // Changed to String to match User's UUID
-  user      User       @relation(fields: [userId], references: [id])
-  createdAt DateTime   @default(now()) @db.Timestamptz()
-  updatedAt DateTime   @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt DateTime?  @db.Timestamptz() // Optional deletion timestamp
-}
-
-// Token model to manage tokens for authentication (e.g., password reset)
-model Token {
-  id        Int         @id @default(autoincrement()) // Using Int for token ID
-  uuid      String      @default(uuid())
-  code      String // Token code (e.g., OTP)
-  reason    TokenReason // Reason for the token (password reset, etc.)
-  userId    String?
-  createdAt DateTime    @default(now()) @db.Timestamptz()
-  updatedAt DateTime    @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt DateTime?   @db.Timestamptz()
-  user      User?       @relation(fields: [userId], references: [id])
-}
-
-// Media model to store media files uploaded by users
-model Media {
-  id        Int         @id @default(autoincrement()) // Using Int for media ID
-  name      String // Media name
-  extension String // File extension (e.g., jpg, png)
-  type      MediaType // Media type (image, video, etc.)
-  access    MediaAccess // Access level (public/private)
-  size      Float?
-  location  String? // Optional location URL
-  path      String // Path to the file
-  thumbPath String? // Optional thumbnail path
-  status    MediaStatus @default(UPLOADING) // Upload status
-  meta      Json?       @db.JsonB
-  userId    String?
-  createdAt DateTime    @default(now()) @db.Timestamptz()
-  updatedAt DateTime    @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt DateTime?   @db.Timestamptz()
-  user      User?       @relation("MediaOwner", fields: [userId], references: [id])
-  users     User[] // Users related to this media (for example, profile pictures)
-}
-
-model Reward {
-  id        String    @id @default(uuid()) // UUID for reward ID
-  userId    String    @unique // Foreign key to the User model
-  user      User      @relation(fields: [userId], references: [id])
-  points    Int       @default(0) // Reward points earned by the user
-  createdAt DateTime  @default(now()) @db.Timestamptz()
-  updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt DateTime? @db.Timestamptz()
-}
-
-// Order model to represent a user's order
-// UserAddress model to store multiple addresses for each user
-
 // Enum to track the status of the pickup process
 enum PickupStatus {
   PENDING // Pickup request available, no rider assigned
@@ -299,74 +152,273 @@ enum DeliveryType {
   EXPRESS
 }
 
-// Pickup model to track the pickup of the order from the user to the vendor
+enum PaymentTransactionType {
+  ORDER
+  TIP
+}
+
+enum CouponType {
+  PERCENTAGE
+  FIXED
+}
+
+enum TipType {
+  RIDER_PICKUP
+  RIDER_DELIVERY
+}
+
+// User model to store user-related information
+model User {
+  id               String     @id @default(uuid())
+  email            String?
+  firstName        String?
+  lastName         String?
+  password         String?
+  phone            String?    @unique
+  type             UserType   @default(USER)
+  status           UserStatus @default(ACTIVE)
+  profilePictureId Int?
+  createdAt        DateTime   @default(now()) @db.Timestamptz()
+  updatedAt        DateTime   @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt        DateTime?  @db.Timestamptz()
+  profilePicture   Media?     @relation(fields: [profilePictureId], references: [id])
+
+  level LEVEL? @default(BASIC)
+
+  addresses    UserAddress[]
+  devices      Device[]
+  tokens       Token[]
+  medias       Media[]        @relation("UserMediaOwner")
+  settings     UserSettings?
+  DeviceToken  DeviceToken[]
+  Order        Order[]
+  RiderOrder   RiderOrder[]
+  Notification Notification[]
+  Pickup       Pickup[]
+  Delivery     Delivery[]
+
+  feedbacks   Feedback[]
+  couponUsage CouponUsage[]
+  reward      Reward[]
+
+  givenTips    Tip[] @relation("GivenTips")
+  receivedTips Tip[] @relation("ReceivedTips")
+}
+
+model Vendor {
+  id        String       @id @default(uuid())
+  phone     String       
+  status    VendorStatus @default(PENDING)
+  createdAt DateTime     @default(now()) @db.Timestamptz()
+  updatedAt DateTime     @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime?    @db.Timestamptz()
+  address   String?
+  type      UserType     @default(VENDOR)
+
+  // FIELDS FOR ONBOARDING
+  laundryName         String // Name provided during signup
+  contactPhone        String? // Phone number that riders and customers can call
+  latitude            Float // Pinned location latitude
+  longitude           Float // Pinned location longitude
+  rejectionReason     String? // Admin's reason for rejection
+  isDocumentsUploaded Boolean @default(false) // Verification flag
+
+  mainVendorId String? // Points to main vendor if branch
+  mainVendor   Vendor?  @relation("VendorBranches", fields: [mainVendorId], references: [id])
+  branches     Vendor[] @relation("VendorBranches") // All branches under this main vendor
+
+  // Relations
+  devices       Device[]
+  tokens        Token[]
+  medias        Media[]        @relation("VendorMediaOwner")
+  settings      UserSettings?  @relation(fields: [userSettingsId], references: [id])
+  deviceTokens  DeviceToken[]
+  orders        Order[]
+    vendorOrders  VendorOrder[]
+  riderOrders   RiderOrder[]
+  notifications Notification[]
+  pickups       Pickup[]
+  deliveries    Delivery[]
+  laundries     Laundry[]      @relation("VendorLaundry")
+  feedbacks     Feedback[]
+  couponUsage   CouponUsage[]
+  rewards       Reward[]
+  givenTips     Tip[]          @relation("VendorGivenTips")
+  receivedTips  Tip[]          @relation("VendorReceivedTips")
+
+  userSettingsId Int?
+}
+
+model UserAddress {
+  id        String    @id @default(uuid())
+  userId    String?
+  user      User?     @relation(fields: [userId], references: [id])
+  address   String
+  lat       Float
+  long      Float
+  label     String?
+  isDefault Boolean   @default(false)
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime? @db.Timestamptz()
+}
+
+model UserSettings {
+  id                    Int       @id @default(autoincrement())
+  lat                   Float?
+  long                  Float?
+  userId                String?   @unique
+  user                  User?     @relation(fields: [userId], references: [id])
+  isOnboardingCompleted Boolean   @default(false)
+  state                 String?
+  city                  String?
+  postalCode            String?
+  createdAt             DateTime  @default(now()) @db.Timestamptz()
+  updatedAt             DateTime  @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt             DateTime? @db.Timestamptz()
+  vendors               Vendor[]
+}
+
+model DeviceToken {
+  id        Int       @id @default(autoincrement())
+  userId    String?
+  user      User?     @relation(fields: [userId], references: [id])
+  vendorId  String?
+  vendor    Vendor?   @relation(fields: [vendorId], references: [id])
+  token     String
+  deviceId  String
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  deletedAt DateTime? @db.Timestamptz()
+}
+
+model Device {
+  id        Int        @id @default(autoincrement())
+  uuid      String     @default(uuid())
+  userAgent String?
+  type      DeviceType @default(ANDROID)
+  userId    String?
+  user      User?      @relation(fields: [userId], references: [id])
+  vendorId  String?
+  vendor    Vendor?    @relation(fields: [vendorId], references: [id])
+  createdAt DateTime   @default(now()) @db.Timestamptz()
+  updatedAt DateTime   @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime?  @db.Timestamptz()
+}
+
+model Token {
+  id        Int         @id @default(autoincrement())
+  uuid      String      @default(uuid())
+  code      String
+  reason    TokenReason
+  userId    String?
+  user      User?       @relation(fields: [userId], references: [id])
+  vendorId  String?
+  vendor    Vendor?     @relation(fields: [vendorId], references: [id])
+  createdAt DateTime    @default(now()) @db.Timestamptz()
+  updatedAt DateTime    @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime?   @db.Timestamptz()
+}
+
+model Media {
+  id        Int         @id @default(autoincrement())
+  name      String
+  extension String
+  type      MediaType
+  access    MediaAccess
+  size      Float?
+  location  String?
+  path      String
+  thumbPath String?
+  status    MediaStatus @default(UPLOADING)
+  meta      Json?       @db.JsonB
+  userId    String?
+  user      User?       @relation("UserMediaOwner", fields: [userId], references: [id])
+  vendorId  String?
+  vendor    Vendor?     @relation("VendorMediaOwner", fields: [vendorId], references: [id])
+  createdAt DateTime    @default(now()) @db.Timestamptz()
+  updatedAt DateTime    @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime?   @db.Timestamptz()
+
+  // Profile picture relation
+  users User[]
+}
+
+model Reward {
+  id        String    @id @default(uuid())
+  userId    String?   @unique
+  user      User?     @relation(fields: [userId], references: [id])
+  vendorId  String?
+  vendor    Vendor?   @relation(fields: [vendorId], references: [id])
+  points    Int       @default(0)
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime? @db.Timestamptz()
+}
+
 model Pickup {
-  id      String  @id @default(uuid()) // UUID for pickup ID
-  orderId String  @unique // The related order
-  order   Order   @relation(fields: [orderId], references: [id])
-  riderId String? // The rider responsible for the pickup (optional initially)
-  rider   User?   @relation(fields: [riderId], references: [id])
+  id       String  @id @default(uuid())
+  orderId  String  @unique
+  order    Order   @relation(fields: [orderId], references: [id])
+  riderId  String?
+  rider    User?   @relation(fields: [riderId], references: [id])
+  vendorId String?
+  vendor   Vendor? @relation(fields: [vendorId], references: [id])
 
-  // Store the snapshot of the pickup address
-  pickupAddress String // The address for pickup
-  pickupLat     Float // Latitude for pickup location
-  pickupLong    Float // Longitude for pickup location
+  pickupAddress String
+  pickupLat     Float
+  pickupLong    Float
+  pickupTime    String?
+  pickupDate    String?
 
-  //Store the pickup address and time 
-  pickupTime String? // Time for pickup
-  pickupDate String? // Date for pickup
-
-  status    PickupStatus @default(PENDING) // Status of the pickup process
+  status    PickupStatus @default(PENDING)
   createdAt DateTime     @default(now()) @db.Timestamptz()
   updatedAt DateTime     @default(now()) @updatedAt @db.Timestamptz()
   deletedAt DateTime?    @db.Timestamptz()
 }
 
-// Delivery model to track the delivery of the order from the vendor back to the user
 model Delivery {
-  id      String  @id @default(uuid()) // UUID for delivery ID
-  orderId String  @unique // The related order
-  order   Order   @relation(fields: [orderId], references: [id])
-  riderId String? // The rider responsible for the delivery (optional initially)
-  rider   User?   @relation(fields: [riderId], references: [id])
+  id       String  @id @default(uuid())
+  orderId  String  @unique
+  order    Order   @relation(fields: [orderId], references: [id])
+  riderId  String?
+  rider    User?   @relation(fields: [riderId], references: [id])
+  vendorId String?
+  vendor   Vendor? @relation(fields: [vendorId], references: [id])
 
-  // Store the snapshot of the delivery address
-  deliveryAddress String // The address for delivery
-  deliveryLat     Float // Latitude for delivery location
-  deliveryLong    Float // Longitude for delivery location
+  deliveryAddress String
+  deliveryLat     Float
+  deliveryLong    Float
+  deliveryTime    String?
+  deliveryDate    String?
 
-  //Store the address and time for delivery
-  deliveryTime String? // Time for delivery
-  deliveryDate String? // Date for delivery
-
-  status    DeliveryStatus @default(PENDING) // Status of the delivery process
+  status    DeliveryStatus @default(PENDING)
   createdAt DateTime       @default(now()) @db.Timestamptz()
   updatedAt DateTime       @default(now()) @updatedAt @db.Timestamptz()
   deletedAt DateTime?      @db.Timestamptz()
 }
 
 model Laundry {
-  id             String           @id @default(uuid())
-  name           String // Name of the laundry
-  address        String // Address of the laundry
-  vendor         User?            @relation("VendorLaundry", fields: [vendorId], references: [id])
-  vendorId       String?
-  createdAt      DateTime         @default(now()) @db.Timestamptz()
-  updatedAt      DateTime         @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt      DateTime?        @db.Timestamptz()
-  Order          Order[]
-  laundryService LaundryService[]
+  id        String    @id @default(uuid())
+  name      String
+  address   String
+  vendorId  String?
+  vendor    Vendor?   @relation("VendorLaundry", fields: [vendorId], references: [id])
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime? @db.Timestamptz()
 
-  feedbacks Feedback[]
+  orders         Order[]
+  laundryService LaundryService[]
+  feedbacks      Feedback[]
 }
 
 model LaundryService {
   id                  String                @id @default(uuid())
-  laundryId           String // Foreign key to Laundry model
+  laundryId           String
   laundry             Laundry               @relation(fields: [laundryId], references: [id])
-  name                String // Name of the service (e.g., "Wash & Fold")
-  description         String? // Optional description of the service
-  laundryServiceItems LaundryServiceItem[] // Relation to LaundryServiceItem model
+  name                String
+  description         String?
+  laundryServiceItems LaundryServiceItem[]
   createdAt           DateTime              @default(now()) @db.Timestamptz()
   updatedAt           DateTime              @default(now()) @updatedAt @db.Timestamptz()
   deletedAt           DateTime?             @db.Timestamptz()
@@ -375,17 +427,16 @@ model LaundryService {
 
 model LaundryServiceItem {
   id                      String                    @id @default(uuid())
-  laundryServiceId        String // Foreign key to LaundryService model
+  laundryServiceId        String
   laundryService          LaundryService            @relation(fields: [laundryServiceId], references: [id])
-  name                    String // Name of the item (e.g., "T-shirt")
-  price                   Float // Price of the item
+  name                    String
+  price                   Float
   createdAt               DateTime                  @default(now()) @db.Timestamptz()
   updatedAt               DateTime                  @default(now()) @updatedAt @db.Timestamptz()
   deletedAt               DateTime?                 @db.Timestamptz()
   OrderLaundryServiceItem OrderLaundryServiceItem[]
 }
 
-// Represents the association between orders and laundry services
 model OrderLaundryService {
   id               String                    @id @default(uuid())
   orderId          String
@@ -393,227 +444,215 @@ model OrderLaundryService {
   laundryServiceId String
   laundryService   LaundryService            @relation(fields: [laundryServiceId], references: [id])
   items            OrderLaundryServiceItem[]
-
-  createdAt DateTime @default(now()) @db.Timestamptz()
-  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
+  createdAt        DateTime                  @default(now()) @db.Timestamptz()
+  updatedAt        DateTime                  @default(now()) @updatedAt @db.Timestamptz()
 }
 
-// Represents the association between an order service and service items
 model OrderLaundryServiceItem {
   id                    String              @id @default(uuid())
   orderLaundryServiceId String
   orderLaundryService   OrderLaundryService @relation(fields: [orderLaundryServiceId], references: [id])
   laundryServiceItemId  String
   laundryServiceItem    LaundryServiceItem  @relation(fields: [laundryServiceItemId], references: [id])
-  quantity              Int // Quantity of each item ordered
-
-  createdAt DateTime @default(now()) @db.Timestamptz()
-  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
+  quantity              Int
+  createdAt             DateTime            @default(now()) @db.Timestamptz()
+  updatedAt             DateTime            @default(now()) @updatedAt @db.Timestamptz()
 }
 
-// Update the Order model to include pickup and delivery addresses
-// Order model to represent a user's order
 model Order {
-  id          String                @id @default(uuid()) // UUID for order ID
-  orderNumber Int?                  @default(autoincrement()) // Auto-incrementing order number
-  userId      String // User who placed the order
-  user        User                  @relation(fields: [userId], references: [id])
-  laundryId   String // Foreign key to the Laundry model
-  laundry     Laundry               @relation(fields: [laundryId], references: [id])
-  status      OrderStatus           @default(PENDING) // High-level status of the order
-  baseAmount   Float? // Base amount before discounts
-  discountAmount Float?              // Amount discounted due to the coupon
-  totalAmount Float // Total amount for the order
-  couponId         String?               // Nullable coupon ID field
-  coupon           Coupon?               @relation(fields: [couponId], references: [id])
-  services    OrderLaundryService[]
-  payment     Payment? // Payment details for the order
-  paymentType PaymentType? // Payment type for the order
-  paid        Boolean?
+  id             String                @id @default(uuid())
+  orderNumber    Int?                  @default(autoincrement())
+  userId         String
+  user           User                  @relation(fields: [userId], references: [id])
+  laundryId      String
+  laundry        Laundry               @relation(fields: [laundryId], references: [id])
+  vendorId       String?
+  vendor         Vendor?               @relation(fields: [vendorId], references: [id])
+  status         OrderStatus           @default(PENDING)
+  baseAmount     Float?
+  discountAmount Float?
+  totalAmount    Float
+  couponId       String?
+  coupon         Coupon?               @relation(fields: [couponId], references: [id])
+  services       OrderLaundryService[]
+  payment        Payment?
+  paymentType    PaymentType?
+  paid           Boolean?
 
-  tip Tip[] // Tip details for the order
+  tip Tip[]
 
-  riderOrders   RiderOrder[] // Existing relation with riders for order management
-  vendorOrders  VendorOrder? // Existing relation with vendors for order management
-  Notification  Notification[] // Notifications related to the order
-  feedbacks     Feedback[] // Multiple feedbacks related to the order
-  statusHistory OrderStatusHistory[] // History of order status changes
-  pickup        Pickup? // Relation to the pickup tracking
-  delivery      Delivery? // Relation to the delivery tracking
-  deliveryType  DeliveryType         @default(NORMAL) // Type of delivery (normal/express)
-  detergentType DetergentType? // Type of detergent used
-  colorType     ColorType? // Type of color (light/dark/mixed)
-  notes         String? // Additional notes for the order
+  riderOrders   RiderOrder[]
+  vendorOrders  VendorOrder?
+  Notification  Notification[]
+  feedbacks     Feedback[]
+  statusHistory OrderStatusHistory[]
+  pickup        Pickup?
+  delivery      Delivery?
+  deliveryType  DeliveryType         @default(NORMAL)
+  detergentType DetergentType?
+  colorType     ColorType?
+  notes         String?
   createdAt     DateTime             @default(now()) @db.Timestamptz()
   updatedAt     DateTime             @default(now()) @updatedAt @db.Timestamptz()
   deletedAt     DateTime?            @db.Timestamptz()
 }
 
-// RiderOrder model to manage assignments between riders and orders
 model RiderOrder {
-  id         String          @id @default(uuid()) // Now using UUID for rider-order relation ID
+  id         String          @id @default(uuid())
   riderId    String
   rider      User            @relation(fields: [riderId], references: [id])
   orderId    String
   order      Order           @relation(fields: [orderId], references: [id])
-  assignedAt DateTime        @default(now()) @db.Timestamptz() // When the rider was assigned
+  vendorId   String?
+  vendor     Vendor?         @relation(fields: [vendorId], references: [id])
+  assignedAt DateTime        @default(now()) @db.Timestamptz()
   deletedAt  DateTime?       @db.Timestamptz()
-  type       RiderOrderType? // Optional field to specify the type of assignment
+  type       RiderOrderType?
   feedbacks  Feedback[]
 
-  @@index([riderId, orderId]) // Optional: Index for efficient querying on riderId and orderId
+  @@index([riderId, orderId])
 }
 
-// VendorOrder model to manage assignments between vendors and orders
 model VendorOrder {
-  id         String     @id @default(uuid()) // Now using UUID for vendor-order relation ID
-  vendorId   String // Vendor assigned to the order
-  vendor     User       @relation(fields: [vendorId], references: [id])
-  orderId    String     @unique // Using UUID for orderId field
+  id         String     @id @default(uuid())
+  vendorId   String
+  vendor     Vendor     @relation(fields: [vendorId], references: [id]) 
+  orderId    String     @unique
   order      Order      @relation(fields: [orderId], references: [id])
-  acceptedAt DateTime   @default(now()) @db.Timestamptz() // When the vendor accepted the order
+  acceptedAt DateTime   @default(now()) @db.Timestamptz()
   deletedAt  DateTime?  @db.Timestamptz()
-  feedbacks  Feedback[] // Feedback related to the order
+  feedbacks  Feedback[]
 }
-
-// OrderStatusHistory model to track all status changes for an order
 model OrderStatusHistory {
-  id        String      @id @default(uuid()) // Now using UUID for status history ID
-  orderId   String // Using UUID for orderId field
+  id        String      @id @default(uuid())
+  orderId   String
   order     Order       @relation(fields: [orderId], references: [id])
-  status    OrderStatus // The status change
-  timestamp DateTime    @default(now()) @db.Timestamptz() // When the status was updated
+  status    OrderStatus
+  timestamp DateTime    @default(now()) @db.Timestamptz()
 }
 
-// Feedback model to store user feedback on completed orders
 model Feedback {
-  id            String       @id @default(uuid()) // Now using UUID for feedback ID
+  id            String       @id @default(uuid())
   orderId       String
   order         Order        @relation(fields: [orderId], references: [id])
-  userId        String // ID of the rider or vendor who provided the service
+  userId        String
   user          User         @relation(fields: [userId], references: [id])
-  type          FeedbackType // Type of feedback (RIDER_PICKUP, RIDER_DELIVERY, VENDOR)
-  rating        Int // Numerical rating, for example, 1-5 stars
-  comments      String? // Optional text feedback from the user
-  createdAt     DateTime     @default(now()) @db.Timestamptz() // Timestamp for feedback creation
+  vendorId      String?
+  vendor        Vendor?      @relation(fields: [vendorId], references: [id])
+  type          FeedbackType
+  rating        Int
+  comments      String?
+  createdAt     DateTime     @default(now()) @db.Timestamptz()
+  deletedAt     DateTime?    @db.Timestamptz()
   VendorOrder   VendorOrder? @relation(fields: [vendorOrderId], references: [id])
   vendorOrderId String?
   RiderOrder    RiderOrder?  @relation(fields: [riderOrderId], references: [id])
   laundryId     String?
-  Laundry      Laundry?     @relation(fields: [laundryId], references: [id])
+  Laundry       Laundry?     @relation(fields: [laundryId], references: [id])
   riderOrderId  String?
-  deletedAt     DateTime?    @db.Timestamptz()
 }
 
-// Notification model to track in-app, push, and email notifications
 model Notification {
-  id        String             @id @default(uuid()) // Now using UUID for notification ID
-  userId    String // User receiving the notification
-  user      User               @relation(fields: [userId], references: [id])
-  type      NotificationType // Type of notification (order accepted, feedback, etc.)
-  status    NotificationStatus @default(UNREAD) // Status of the notification (read/unread)
-  message   String // Custom message for the notification
+  id        String             @id @default(uuid())
+  userId    String?
+  user      User?              @relation(fields: [userId], references: [id])
+  vendorId  String?
+  vendor    Vendor?            @relation(fields: [vendorId], references: [id])
+  type      NotificationType
+  status    NotificationStatus @default(UNREAD)
+  message   String
   orderId   String?
   order     Order?             @relation(fields: [orderId], references: [id])
-  createdAt DateTime           @default(now()) @db.Timestamptz() // Timestamp for notification creation
-  data      Json?              @db.JsonB // Additional data for the notification
+  createdAt DateTime           @default(now()) @db.Timestamptz()
+  data      Json?              @db.JsonB
   deletedAt DateTime?          @db.Timestamptz()
 }
 
-enum PaymentTransactionType {
-  ORDER
-  TIP
-}
 model Payment {
-  id                   String   @id @default(uuid()) // UUID for payment ID
-  orderId              String?   @unique
-  order                Order?  @relation(fields: [orderId], references: [id])
+  id      String  @id @default(uuid())
+  orderId String? @unique
+  order   Order?  @relation(fields: [orderId], references: [id])
 
-  tipTransactionId String? @unique // Foreign key to TipTransaction
+  tipTransactionId String?         @unique
   tipTransaction   TipTransaction? @relation(fields: [tipTransactionId], references: [id])
 
-  paymentType PaymentTransactionType?  @default(ORDER)// Type of payment (e.g., Order payment , Tip payment)
+  paymentType PaymentTransactionType? @default(ORDER)
 
-  transactionRef String // PayTabs transaction reference
-  amount     Float    // Total transaction amount
-  type      String   // Type of transaction (e.g., Sale, Refund)
-  status        String   // Payment Status 
-  paymentMethod        String   // Payment Method (e.g., Visa, MasterCard)
+  transactionRef String
+  amount         Float
+  type           String
+  status         String
+  paymentMethod  String
 
-  createdAt            DateTime @default(now()) @db.Timestamptz() // Timestamp of creation
-  updatedAt            DateTime @default(now()) @updatedAt @db.Timestamptz() // Timestamp of last update
-}
-
-enum CouponType {
-  PERCENTAGE
-  FIXED
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
 }
 
 model Coupon {
-  id          String   @id @default(uuid())
-  code        String   @unique
-  name      String
-  discount     Float
-  type         CouponType
-  maxDiscount Float?      // For percentage-based discounts
-  minOrderAmount Float?      // Minimum order amount required to apply this coupon
-  expiryDate  DateTime
-  startDate  DateTime?
-  isActive    Boolean  @default(true)
-  usageLimit  Int?     // Maximum allowed uses for this coupon
-  singleUse   Boolean  @default(true) // True for single-use per user
-  orders            Order[]   
-  couponUsage  CouponUsage[]  // Relation to track usage by individual users
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  id             String        @id @default(uuid())
+  code           String        @unique
+  name           String
+  discount       Float
+  type           CouponType
+  maxDiscount    Float?
+  minOrderAmount Float?
+  expiryDate     DateTime
+  startDate      DateTime?
+  isActive       Boolean       @default(true)
+  usageLimit     Int?
+  singleUse      Boolean       @default(true)
+  orders         Order[]
+  couponUsage    CouponUsage[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
 }
 
 model CouponUsage {
-  id        String   @id @default(uuid())
-  userId    String   // User ID who used the coupon
-  user      User     @relation(fields: [userId], references: [id]) // Relation to the User table
-  couponId  String   // Coupon ID
-  coupon    Coupon   @relation(fields: [couponId], references: [id]) // Relation to the Coupon table
-  createdAt DateTime @default(now())
+  id        String    @id @default(uuid())
+  userId    String?
+  user      User?     @relation(fields: [userId], references: [id])
+  vendorId  String?
+  vendor    Vendor?   @relation(fields: [vendorId], references: [id])
+  couponId  String
+  coupon    Coupon    @relation(fields: [couponId], references: [id])
+  createdAt DateTime  @default(now())
   deletedAt DateTime?
 }
 
-enum TipType {
-  RIDER_PICKUP
-  RIDER_DELIVERY
-}
-
 model Tip {
-  id      String @id @default(uuid()) // Unique tip ID
-  orderId String // The order associated with this tip
+  id      String @id @default(uuid())
+  orderId String
   order   Order  @relation(fields: [orderId], references: [id])
 
-  userId String // The customer who gave the tip
+  userId String
   user   User   @relation(fields: [userId], references: [id], name: "GivenTips")
 
-  riderId String? // The rider who received the tip
+  riderId String?
   rider   User?   @relation(fields: [riderId], references: [id], name: "ReceivedTips")
 
-  transactionId String? // Foreign key to TipTransaction
+  vendorGiverId String?
+  vendorGiver   Vendor? @relation(fields: [vendorGiverId], references: [id], name: "VendorGivenTips")
+
+  vendorReceiverId String?
+  vendorReceiver   Vendor? @relation(fields: [vendorReceiverId], references: [id], name: "VendorReceivedTips")
+
+  transactionId String?
   transaction   TipTransaction? @relation(fields: [transactionId], references: [id])
 
-  amount    Float // Tip amount
-  type      TipType // Type of tip (PICKUP_RIDER, DROPOFF_RIDER)
-  paid      Boolean   @default(false) // Whether the tip was successfully paid
-  // tipPayment    TipPayment? // Payment details for the tip
+  amount    Float
+  type      TipType
+  paid      Boolean   @default(false)
   createdAt DateTime  @default(now()) @db.Timestamptz()
   deletedAt DateTime? @db.Timestamptz()
 }
 
 model TipTransaction {
-  id        String      @id @default(uuid()) // Unique transaction ID
-  // transactionRef String   @unique
-  // transactionId  String   @unique             // Unique transaction reference (PayTabs)
-  amount    Float // Total amount for all tips in this transaction
-  tips      Tip[] // Connects to multiple tips
+  id     String @id @default(uuid())
+  amount Float
+  tips   Tip[]
 
-  payment  Payment?
+  payment Payment?
 
   createdAt DateTime @default(now()) @db.Timestamptz()
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()

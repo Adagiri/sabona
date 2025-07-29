@@ -145,7 +145,6 @@ export default class UserService {
             select: { id: true },
         });
 
-        
         if (existingUser) {
             throw new BadRequestException('This phone number is already registered');
         }
@@ -235,27 +234,7 @@ export default class UserService {
                         points: true,
                     },
                 },
-                laundry: {
-                    select: {
-                        laundryService: {
-                            select: {
-                                id: true,
-                                name: true,
-                                description: true,
-                                laundryServiceItems: {
-                                    select: {
-                                        id: true,
-                                        name: true,
-                                        price: true,
-                                    },
-                                },
-                            },
-                        },
-                        address: true,
-                        name: true,
-                        id: true,
-                    },
-                },
+            
             },
         });
         return currentUser;
@@ -304,14 +283,14 @@ export default class UserService {
     }
 
     async SendVerificationCode(data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
-        // const user = await this._dbService.user.findUnique({
-        //     where: { phone: data.phone },
-        // })
-        // if (user) {
-        //     throw new BadRequestException(
-        //         "Phone number is already registered"
-        //     );
-        // }
+        const user = await this._dbService.user.findUnique({
+            where: { phone: data.phone },
+        })
+        if (user) {
+            throw new BadRequestException(
+                "Phone number is already registered"
+            );
+        }
         if (AppConfig.APP.ENV === APP_ENV.TEST) {
             return {
                 message: 'OTP sent successfully',
@@ -337,7 +316,7 @@ export default class UserService {
                 const token = await this.Login(data);
                 return { token };
             } else {
-                console.log(data)
+                console.log(data);
                 const token = await this.Signup(data);
                 return { token };
             }
@@ -390,9 +369,6 @@ export default class UserService {
                 phone: data.phone,
             },
         });
-
-        console.log("data: ", data)
-        console.log('doesUserExist: ', doesUserExist);
 
         if (!doesUserExist) {
             throw new BadRequestException('User not registered');
