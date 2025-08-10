@@ -111,9 +111,9 @@ export default class VendorOnboardingService {
     }
 
     // ADMIN: APPROVE VENDOR
-    async approveVendor(data: AdminApproveVendorRequestDTO): Promise<AdminActionResponseDTO> {
+    async approveVendor(vendorId: string, data: AdminApproveVendorRequestDTO): Promise<AdminActionResponseDTO> {
         const vendor = await this._dbService.vendor.findUnique({
-            where: { id: data.vendorId },
+            where: { id: vendorId },
         });
 
         if (!vendor) {
@@ -208,9 +208,12 @@ export default class VendorOnboardingService {
     }
 
     // ADMIN: UPLOAD VENDOR DOCUMENTS
-    async uploadVendorDocuments(data: AdminUploadVendorDocumentsRequestDTO): Promise<AdminActionResponseDTO> {
+    async uploadVendorDocuments(
+        vendorId: string,
+        data: AdminUploadVendorDocumentsRequestDTO,
+    ): Promise<AdminActionResponseDTO> {
         const vendor = await this._dbService.vendor.findUnique({
-            where: { id: data.vendorId },
+            where: { id: vendorId },
         });
 
         if (!vendor) {

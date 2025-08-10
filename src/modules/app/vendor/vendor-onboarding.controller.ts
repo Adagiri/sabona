@@ -27,7 +27,6 @@ export default class VendorOnboardingController {
     constructor(private _vendorOnboardingService: VendorOnboardingService) {}
 
     // VENDOR ENDPOINTS
-
     @Post({
         path: '/signup',
         description: 'Vendor signup with laundry details',
@@ -47,7 +46,6 @@ export default class VendorOnboardingController {
     }
 
     // ADMIN ENDPOINTS
-
     @Authorized(UserType.ADMIN)
     @Get({
         path: '/admin/pending',
@@ -58,7 +56,7 @@ export default class VendorOnboardingController {
         return this._vendorOnboardingService.getPendingVendors();
     }
 
-    @Authorized(UserType.ADMIN) // Add admin role check here
+    @Authorized(UserType.ADMIN)
     @Get({
         path: '/admin/main-vendors/search',
         description: 'Search existing main vendors by laundry name for branch linking',
@@ -68,7 +66,7 @@ export default class VendorOnboardingController {
         return this._vendorOnboardingService.searchMainVendors(data);
     }
 
-    @Authorized(UserType.ADMIN) // Add admin role check here
+    @Authorized(UserType.ADMIN)
     @Post({
         path: '/admin/:vendorId/approve',
         description: 'Approve vendor signup and create new laundry (optionally link to main vendor)',
@@ -76,15 +74,15 @@ export default class VendorOnboardingController {
     })
     async approveVendor(
         @Param('vendorId') vendorId: string,
-        @Body() data: Omit<AdminApproveVendorRequestDTO, 'vendorId'>,
+        @Body() data: AdminApproveVendorRequestDTO,
     ): Promise<AdminActionResponseDTO> {
-        return this._vendorOnboardingService.approveVendor({
+        return this._vendorOnboardingService.approveVendor(
             vendorId,
-            ...data,
-        });
+            data,
+        );
     }
 
-    @Authorized(UserType.ADMIN) // Add admin role check here
+    @Authorized(UserType.ADMIN)
     @Post({
         path: '/admin/:vendorId/reject',
         description: 'Reject vendor signup with reason',
@@ -100,7 +98,7 @@ export default class VendorOnboardingController {
         });
     }
 
-    @Authorized(UserType.ADMIN) // Add admin role check here
+    @Authorized(UserType.ADMIN)
     @Post({
         path: '/admin/:vendorId/documents',
         description: 'Upload VAT and business certificate documents for approved vendor',
@@ -108,12 +106,9 @@ export default class VendorOnboardingController {
     })
     async uploadVendorDocuments(
         @Param('vendorId') vendorId: string,
-        @Body() data: Omit<AdminUploadVendorDocumentsRequestDTO, 'vendorId'>,
+        @Body() data: AdminUploadVendorDocumentsRequestDTO,
     ): Promise<AdminActionResponseDTO> {
-        return this._vendorOnboardingService.uploadVendorDocuments({
-            vendorId,
-            ...data,
-        });
+        return this._vendorOnboardingService.uploadVendorDocuments(vendorId, data);
     }
 
     @Authorized(UserType.ADMIN)
@@ -126,7 +121,7 @@ export default class VendorOnboardingController {
         return this._vendorOnboardingService.getVendorDocuments(vendorId);
     }
 
-    @Authorized(UserType.ADMIN) // Add admin role check here
+    @Authorized(UserType.ADMIN)
     @Get({
         path: '/admin/:mainVendorId/branches',
         description: 'Get all branches of a main vendor',

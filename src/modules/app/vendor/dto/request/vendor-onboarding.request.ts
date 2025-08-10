@@ -25,19 +25,14 @@ export class VendorSignupRequestDTO {
 
 export class AdminApproveVendorRequestDTO {
     @ApiProperty()
-    @IsNotEmpty()
+    @IsOptional()
     @IsString()
-    vendorId: string;
+    mainVendorId?: string;
 
     @ApiProperty()
     @IsOptional()
     @IsString()
-    mainVendorId?: string; // ID of existing main vendor to link this vendor as a branch
-
-    @ApiProperty()
-    @IsOptional()
-    @IsString()
-    address: string; // Confirmed address in string format
+    address: string;
 
     @ApiProperty()
     @IsOptional()
@@ -61,17 +56,12 @@ export class AdminUploadVendorDocumentsRequestDTO {
     @ApiProperty()
     @IsNotEmpty()
     @IsString()
-    vendorId: string;
+    vatNumberDocId: string;
 
     @ApiProperty()
     @IsNotEmpty()
     @IsString()
-    vatNumberDocId: string; // Media ID for VAT document
-
-    @ApiProperty()
-    @IsNotEmpty()
-    @IsString()
-    businessCertDocId: string; // Media ID for business certificate
+    businessCertDocId: string;
 }
 
 export class AdminSearchMainVendorsRequestDTO {
