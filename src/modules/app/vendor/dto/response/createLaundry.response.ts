@@ -1,55 +1,72 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+class IconMedia {
+    @ApiProperty()
+    id: number;
+
+    @ApiProperty()
+    name: string;
+
+    @ApiProperty()
+    path: string;
+
+    @ApiProperty()
+    extension: string;
+}
+
 class LaundryServiceDTO {
-  @ApiProperty()
-  id: string;
+    @ApiProperty()
+    id: string;
 
-  @ApiProperty()
-  laundryId: string;
+    @ApiProperty()
+    laundryId: string;
 
-  @ApiProperty()
-  name: string;
+    @ApiProperty()
+    name: string;
 
-  @ApiProperty()
-  description: string;
+    @ApiProperty()
+    description: string;
 
-  @ApiProperty()
-  createdAt: Date;
+    @ApiProperty({ type: IconMedia, required: false })
+    icon?: IconMedia;
 
-  @ApiProperty()
-  updatedAt: Date;
+    @ApiProperty()
+    createdAt: Date;
 
-  @ApiProperty({ nullable: true })
-  deletedAt: Date | null;
+    @ApiProperty()
+    updatedAt: Date;
+
+    @ApiProperty({ nullable: true })
+    deletedAt: Date | null;
 }
 
 class LaundryDataDTO {
-  @ApiProperty()
-  id: string;
+    @ApiProperty()
+    id: string;
 
-  @ApiProperty()
-  name: string;
+    @ApiProperty()
+    name: string;
 
-  @ApiProperty()
-  address: string;
+    @ApiProperty()
+    address: string;
 
-  @ApiProperty()
-  vendorId: string;
+    @ApiProperty()
+    vendorId: string;
 
-  @ApiProperty()
-  createdAt: Date;
+    @ApiProperty()
+    createdAt: Date;
 
-  @ApiProperty()
-  updatedAt: Date;
+    @ApiProperty()
+    updatedAt: Date;
 
-  @ApiProperty({ nullable: true })
-  deletedAt: Date | null;
+    @ApiProperty({ nullable: true })
+    deletedAt: Date | null;
 
-  @ApiProperty({ type: [LaundryServiceDTO] })
-  laundryService: LaundryServiceDTO[];
+    @ApiProperty({ type: [LaundryServiceDTO] })
+    laundryService: LaundryServiceDTO[];
 }
 
 export class CreateLaundryReponseDTO {
-  @ApiProperty({ description: 'The data payload of the response', type: LaundryDataDTO })
-  data: LaundryDataDTO;
+    @ApiProperty({ description: 'The data payload of the response', type: LaundryDataDTO })
+    data: LaundryDataDTO;
 }

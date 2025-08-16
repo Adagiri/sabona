@@ -1,6 +1,6 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { Type } from "class-transformer";
-import { IsArray, IsNumber,  IsString, ValidateNested } from "class-validator";
+import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsArray, IsNumber, IsString, IsOptional, ValidateNested } from 'class-validator';
 
 export class CreateLaundryServiceItemRequestDTO {
     @ApiProperty()
@@ -10,6 +10,11 @@ export class CreateLaundryServiceItemRequestDTO {
     @ApiProperty()
     @IsNumber()
     price: number;
+
+    @ApiProperty({ description: 'Category ID for this item', required: false })
+    @IsString()
+    @IsOptional()
+    categoryId?: string;
 }
 
 export class CreateLaundryServiceItemsArrayDTO {
@@ -18,5 +23,4 @@ export class CreateLaundryServiceItemsArrayDTO {
     @ValidateNested({ each: true })
     @Type(() => CreateLaundryServiceItemRequestDTO)
     items: CreateLaundryServiceItemRequestDTO[];
-  }
-
+}

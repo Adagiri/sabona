@@ -25,7 +25,7 @@ export default class MediaService {
     ) {}
 
     private _allowedMediaExtensions = {
-        [MediaType.IMAGE]: ['png', 'jpg', 'bmp', 'jpeg', 'gif'],
+        [MediaType.IMAGE]: ['png', 'jpg', 'bmp', 'jpeg', 'gif', 'svg'], 
         [MediaType.VIDEO]: ['mov', 'wav', 'mp4', 'avi', 'flv', 'wav', 'mov'],
         [MediaType.DOCUMENT]: ['pdf', 'doc', 'docx', 'xls', 'xlsx'],
         [MediaType.ARCHIVE]: ['zip', 'gzip'],
@@ -46,7 +46,7 @@ export default class MediaService {
 
     async UploadAdminInitiate(data: UploadInitiateAdminMediaRequestDTO): Promise<UploadInitiateMediaResponseDTO> {
         const extension = this._getMediaExtension(data.name);
-console.log(extension)
+        console.log(extension);
         if (!this._allowedMediaExtensions[data.type].includes(extension)) {
             throw new BadRequestException('media.not_supported');
         }

@@ -40,3 +40,6 @@ export const DELIVERY_CHARGES = {
 };
 
 export const SERVICE_CHARGES = 7;
+
+// Add platform fee configuration
+export const PLATFORM_FEE_PERCENTAGE = 10; 

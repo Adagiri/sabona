@@ -5,18 +5,24 @@ import GetOrderRequestsResponseDTO from './dto/response/getOrderRequests.respons
 import { Body, Param } from '@nestjs/common';
 import UpdateStatusRequestDTO from './dto/request/updateStatus.request';
 import UpdateStatusResponseDTO from './dto/response/updateStatus.response';
-import CreateLaundryRequestDTO, { LaundryServiceDTO } from './dto/request/createLaundry.request';
+import  { LaundryServiceDTO } from './dto/request/createLaundry.request';
 import EditLaundryRequestDTO from './dto/request/editLaundry.request';
 import EditLaundryServiceRequestDTO from './dto/request/laundryServiceEdit.request';
 import { CreateLaundryServiceItemsArrayDTO } from './dto/request/createLaundryServiceItem.request';
 import { EditLaundryServiceItemRequestDTO } from './dto/request/editlaundryServiceItem.request';
-import { CreateLaundryReponseDTO } from './dto/response/createLaundry.response';
 import { GetAllLaundriesResponseDTO } from './dto/response/getAllLaundry.response';
 import { GetLaundryByIdResponseDTO } from './dto/response/getLaundryById.response';
 import LaundryMessageResponseDTO from './dto/response/laundryMessage';
 import LaundryServiceMessageResponseDTO from './dto/response/laundryServiceMessage.response';
 import GetOrderRequestDTO from './dto/request/getOrder.request';
 import CancelOrderRequestDTO from './dto/request/cancelOrder.request';
+import { CreateLaundryItemCategoryRequestDTO } from './dto/request/createLaundryItemCategory.request';
+import { EditLaundryItemCategoryRequestDTO } from './dto/request/editLaundryItemCategory.request';
+import {
+    LaundryItemCategoryResponseDTO,
+    GetAllLaundryItemCategoriesResponseDTO,
+    LaundryItemCategoryMessageResponseDTO,
+} from './dto/response/laundryItemCategory.response';
 
 @ApiController({
     path: '/vendor',
@@ -105,18 +111,18 @@ export default class VendorController {
         return await this._vendorService.getLastCompletedOrder(user);
     }
 
-    @Authorized()
-    @Post({
-        path: '/laundry/create',
-        description: 'Add laundry',
-        response: CreateLaundryReponseDTO,
-    })
-    async addLaundry(
-        @Body() data: CreateLaundryRequestDTO,
-        @CurrentUser() user: User,
-    ): Promise<CreateLaundryReponseDTO> {
-        return await this._vendorService.addLaundry(data, user);
-    }
+    // @Authorized()
+    // @Post({
+    //     path: '/laundry/create',
+    //     description: 'Add laundry',
+    //     response: CreateLaundryReponseDTO,
+    // })
+    // async addLaundry(
+    //     @Body() data: CreateLaundryRequestDTO,
+    //     @CurrentUser() user: User,
+    // ): Promise<CreateLaundryReponseDTO> {
+    //     return await this._vendorService.addLaundry(data, user);
+    // }
 
     @Get({
         path: '/laundry/all',
@@ -266,5 +272,57 @@ export default class VendorController {
         @CurrentUser() user: User,
     ): Promise<any> {
         return await this._vendorService.deleteLaundryServiceItem(laundryId, serviceId, itemId, user);
+    }
+
+    @Post({
+        path: '/category/create',
+        description: 'Create laundry item category',
+        response: LaundryItemCategoryResponseDTO,
+    })
+    async createLaundryItemCategory(
+        @Body() data: CreateLaundryItemCategoryRequestDTO,
+    ): Promise<LaundryItemCategoryResponseDTO> {
+        return await this._vendorService.createLaundryItemCategory(data);
+    }
+
+    @Get({
+        path: '/categories',
+        description: 'Get all laundry item categories',
+        response: GetAllLaundryItemCategoriesResponseDTO,
+    })
+    async getAllLaundryItemCategories(): Promise<GetAllLaundryItemCategoriesResponseDTO> {
+        return await this._vendorService.getAllLaundryItemCategories();
+    }
+
+    @Get({
+        path: '/category/:categoryId',
+        description: 'Get laundry item category by id',
+        response: LaundryItemCategoryResponseDTO,
+    })
+    async getLaundryItemCategoryById(@Param('categoryId') categoryId: string): Promise<LaundryItemCategoryResponseDTO> {
+        return await this._vendorService.getLaundryItemCategoryById(categoryId);
+    }
+
+    @Patch({
+        path: '/category/:categoryId/edit',
+        description: 'Edit laundry item category',
+        response: LaundryItemCategoryMessageResponseDTO,
+    })
+    async editLaundryItemCategory(
+        @Param('categoryId') categoryId: string,
+        @Body() data: EditLaundryItemCategoryRequestDTO,
+    ): Promise<LaundryItemCategoryMessageResponseDTO> {
+        return await this._vendorService.editLaundryItemCategory(categoryId, data);
+    }
+
+    @Delete({
+        path: '/category/:categoryId/delete',
+        description: 'Delete laundry item category',
+        response: LaundryItemCategoryMessageResponseDTO,
+    })
+    async deleteLaundryItemCategory(
+        @Param('categoryId') categoryId: string,
+    ): Promise<LaundryItemCategoryMessageResponseDTO> {
+        return await this._vendorService.deleteLaundryItemCategory(categoryId);
     }
 }

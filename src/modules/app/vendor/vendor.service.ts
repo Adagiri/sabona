@@ -1,15 +1,14 @@
-import { OrderStatus, Prisma, User, UserType } from '@prisma/client';
+import { OrderStatus,  User, UserType } from '@prisma/client';
 import DatabaseService from 'src/database/database.service';
 import UpdateStatusRequestDTO from './dto/request/updateStatus.request';
 import GetOrderRequestsResponseDTO from './dto/response/getOrderRequests.response';
 import UpdateStatusResponseDTO from './dto/response/updateStatus.response';
-import CreateLaundryRequestDTO, { LaundryServiceDTO } from './dto/request/createLaundry.request';
+import  { LaundryServiceDTO } from './dto/request/createLaundry.request';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
 import { Injectable } from '@nestjs/common';
 import EditLaundryRequestDTO from './dto/request/editLaundry.request';
 import { CreateLaundryServiceItemsArrayDTO } from './dto/request/createLaundryServiceItem.request';
 import { EditLaundryServiceItemRequestDTO } from './dto/request/editlaundryServiceItem.request';
-import { CreateLaundryReponseDTO } from './dto/response/createLaundry.response';
 import { GetAllLaundriesResponseDTO } from './dto/response/getAllLaundry.response';
 import { GetLaundryByIdResponseDTO } from './dto/response/getLaundryById.response';
 import LaundryMessageResponseDTO from './dto/response/laundryMessage';
@@ -18,6 +17,10 @@ import GetOrderRequestDTO from './dto/request/getOrder.request';
 import CancelOrderRequestDTO from './dto/request/cancelOrder.request';
 import { extractTokens } from 'src/helpers/util.helper';
 import NotificationService from '../notification/notification.service';
+import { EditLaundryItemCategoryRequestDTO } from './dto/request/editLaundryItemCategory.request';
+import { GetAllLaundryItemCategoriesResponseDTO, LaundryItemCategoryMessageResponseDTO, LaundryItemCategoryResponseDTO } from './dto/response/laundryItemCategory.response';
+import { CreateLaundryItemCategoryRequestDTO } from './dto/request/createLaundryItemCategory.request';
+import EditLaundryServiceRequestDTO from './dto/request/laundryServiceEdit.request';
 @Injectable()
 export default class VendorService {
     constructor(
@@ -394,80 +397,82 @@ export default class VendorService {
         }
     }
 
-    async addLaundry(data: CreateLaundryRequestDTO, user: User): Promise<CreateLaundryReponseDTO> {
-        const laundry = await this._dbService.laundry.findFirst({
-            where: {
-                vendorId: user.id,
-                deletedAt: null,
-            },
-        });
+    // async addLaundry(data: CreateLaundryRequestDTO, user: User): Promise<CreateLaundryReponseDTO> {
+    //     // Validate service icons if provided
+    //     if (data.services) {
+    //         for (const service of data.services) {
+    //             if (service.iconId) {
+    //                 const icon = await this._dbService.media.findFirst({
+    //                     where: {
+    //                         id: service.iconId,
+    //                         deletedAt: null,
+    //                         extension: 'svg',
+    //                     },
+    //                 });
 
-        if (laundry) {
-            throw new BadRequestException('Laundry already exist');
-        }
+    //                 if (!icon) {
+    //                     throw new BadRequestException(`SVG icon ${service.iconId} not found or invalid format`);
+    //                 }
+    //             }
+    //         }
+    //     }
 
-        const newLaundry = await this._dbService.laundry.create({
-            data: {
-                name: data.name,
-                address: data.address,
-                vendorId: user.id,
-                ...(data.services &&
-                    data.services.length > 0 && {
-                        laundryService: {
-                            create: data.services.map((service) => ({
-                                name: service.name,
-                                description: service.description,
-                            })),
-                        },
-                    }),
-            } as Prisma.LaundryUncheckedCreateInput,
-            include: {
-                laundryService: true,
-            },
-        });
+    //     const laundry = await this._dbService.laundry.create({
+    //         data: {
+    //             name: data.name,
+    //             address: data.address,
+    //             vendorId: user.id,
+    //             laundryService: data.services
+    //                 ? {
+    //                       create: data.services.map((service) => ({
+    //                           name: service.name,
+    //                           description: service.description,
+    //                           iconId: service.iconId,
+    //                       })),
+    //                   }
+    //                 : undefined,
+    //         },
+    //         include: {
+    //             laundryService: {
+    //                 include: {
+    //                     icon: {
+    //                         select: {
+    //                             id: true,
+    //                             name: true,
+    //                             path: true,
+    //                             extension: true,
+    //                         },
+    //                     },
+    //                 },
+    //             },
+    //         },
+    //     });
 
-        if (!newLaundry) {
-            throw new BadRequestException('Failed to add laundry');
-        }
-
-        return { data: newLaundry };
-    }
-
+    //     return { data: laundry };
+    // }
     async getAllLaundries(): Promise<GetAllLaundriesResponseDTO> {
         const laundries = await this._dbService.laundry.findMany({
-            select: {
-                id: true,
-                name: true,
-                address: true,
-                feedbacks: {
-                    select: {
-                        rating: true,
-                        comments: true,
+            where: {
+                deletedAt: null,
+            },
+            include: {
+                laundryService: {
+                    where: {
+                        deletedAt: null,
                     },
-                },
-                vendor: {
-                    select: {
-                        addresses: {
+                    include: {
+                        icon: {
                             select: {
-                                lat: true,
-                                long: true,
+                                id: true,
+                                name: true,
+                                path: true,
+                                extension: true,
                             },
                         },
                     },
                 },
-                laundryService: {
-                    select: {
-                        id: true,
-                        name: true,
-                        description: true,
-                    },
-                },
             },
         });
-
-        if (!laundries) {
-            throw new BadRequestException('Error fetching laundries');
-        }
 
         return { data: laundries };
     }
@@ -478,10 +483,7 @@ export default class VendorService {
                 id: laundryId,
                 // vendorId: user.id,
             },
-            select: {
-                id: true,
-                name: true,
-                address: true,
+            include: {
                 laundryService: {
                     where: {
                         deletedAt: null,
@@ -490,10 +492,12 @@ export default class VendorService {
                         id: true,
                         name: true,
                         description: true,
-                        laundryServiceItems: {
+                        icon: {
                             select: {
+                                id: true,
                                 name: true,
-                                price: true,
+                                path: true,
+                                extension: true,
                             },
                         },
                     },
@@ -577,11 +581,37 @@ export default class VendorService {
             throw new BadRequestException('Laundry does not exist');
         }
 
+        // Validate icon exists if provided
+        if (data.iconId) {
+            const icon = await this._dbService.media.findFirst({
+                where: {
+                    id: data.iconId,
+                    deletedAt: null,
+                    extension: 'svg',
+                },
+            });
+
+            if (!icon) {
+                throw new BadRequestException('SVG icon not found or invalid format');
+            }
+        }
+
         const service = await this._dbService.laundryService.create({
             data: {
                 laundryId: laundryId,
                 name: data.name,
                 description: data.description,
+                iconId: data.iconId,
+            },
+            include: {
+                icon: {
+                    select: {
+                        id: true,
+                        name: true,
+                        path: true,
+                        extension: true,
+                    },
+                },
             },
         });
 
@@ -591,7 +621,7 @@ export default class VendorService {
     async editLaundryService(
         laundryId: string,
         serviceId: string,
-        data: LaundryServiceDTO,
+        data: EditLaundryServiceRequestDTO,
         user: User,
     ): Promise<LaundryServiceMessageResponseDTO> {
         const laundry = await this._dbService.laundry.findFirst({
@@ -616,19 +646,31 @@ export default class VendorService {
             throw new BadRequestException('Service does not exist');
         }
 
-        const updatedService = await this._dbService.laundryService.update({
+        // Validate icon exists if provided
+        if (data.iconId) {
+            const icon = await this._dbService.media.findFirst({
+                where: {
+                    id: data.iconId,
+                    deletedAt: null,
+                    extension: 'svg',
+                },
+            });
+
+            if (!icon) {
+                throw new BadRequestException('SVG icon not found or invalid format');
+            }
+        }
+
+        await this._dbService.laundryService.update({
             where: {
                 id: serviceId,
             },
             data: {
-                name: data.name,
-                description: data.description,
+                ...(data.name && { name: data.name }),
+                ...(data.description !== undefined && { description: data.description }),
+                ...(data.iconId !== undefined && { iconId: data.iconId }),
             },
         });
-
-        if (!updatedService) {
-            throw new BadRequestException('Failed to update service');
-        }
 
         return { message: 'Service Updated Successfully' };
     }
@@ -697,9 +739,26 @@ export default class VendorService {
             throw new BadRequestException('Service does not exist');
         }
 
+        // Validate categories if provided
+        for (const item of data.items) {
+            if (item.categoryId) {
+                const category = await this._dbService.laundryItemCategory.findFirst({
+                    where: {
+                        id: item.categoryId,
+                        deletedAt: null,
+                    },
+                });
+
+                if (!category) {
+                    throw new BadRequestException(`Category ${item.categoryId} does not exist`);
+                }
+            }
+        }
+
         const items = data.items.map((item) => ({
             name: item.name,
             price: item.price,
+            categoryId: item.categoryId,
             laundryServiceId: serviceId,
         }));
 
@@ -714,11 +773,11 @@ export default class VendorService {
         return { data: { message: 'Items Added Successfully' } };
     }
 
+    // Update getAllLaundryServiceItems method
     async getAllLaundryServiceItems(laundryId: string, serviceId: string): Promise<any> {
         const laundry = await this._dbService.laundry.findFirst({
             where: {
                 id: laundryId,
-                // vendorId: user.id,
             },
         });
 
@@ -746,12 +805,26 @@ export default class VendorService {
                 id: true,
                 name: true,
                 price: true,
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                        icon: {
+                            select: {
+                                id: true,
+                                path: true,
+                                name: true,
+                            },
+                        },
+                    },
+                },
             },
         });
 
         return { data: items };
     }
 
+    // Update editLaundryServiceItem method
     async editLaundryServiceItem(
         laundryId: string,
         serviceId: string,
@@ -785,6 +858,7 @@ export default class VendorService {
             where: {
                 id: itemId,
                 laundryServiceId: serviceId,
+                deletedAt: null,
             },
         });
 
@@ -792,14 +866,36 @@ export default class VendorService {
             throw new BadRequestException('Item does not exist');
         }
 
+        // Validate category if provided
+        if (data.categoryId) {
+            const category = await this._dbService.laundryItemCategory.findFirst({
+                where: {
+                    id: data.categoryId,
+                    deletedAt: null,
+                },
+            });
+
+            if (!category) {
+                throw new BadRequestException('Category does not exist');
+            }
+        }
+
+        const updateData: any = {};
+        if (data.name !== undefined) {
+            updateData.name = data.name;
+        }
+        if (data.price !== undefined) {
+            updateData.price = data.price;
+        }
+        if (data.categoryId !== undefined) {
+            updateData.categoryId = data.categoryId;
+        }
+
         const updatedItem = await this._dbService.laundryServiceItem.update({
             where: {
                 id: itemId,
             },
-            data: {
-                name: data.name,
-                price: data.price,
-            },
+            data: updateData,
         });
 
         if (!updatedItem) {
@@ -962,5 +1058,172 @@ export default class VendorService {
         });
 
         return { data: orders };
+    }
+
+    async createLaundryItemCategory(
+        data: CreateLaundryItemCategoryRequestDTO,
+    ): Promise<LaundryItemCategoryResponseDTO> {
+        // Validate icon exists if provided
+        if (data.iconId) {
+            const icon = await this._dbService.media.findFirst({
+                where: {
+                    id: data.iconId,
+                    deletedAt: null,
+                    extension: 'svg',
+                },
+            });
+
+            if (!icon) {
+                throw new BadRequestException('SVG icon not found or invalid format');
+            }
+        }
+
+        const category = await this._dbService.laundryItemCategory.create({
+            data: {
+                name: data.name,
+                description: data.description,
+                iconId: data.iconId,
+            },
+            include: {
+                icon: {
+                    select: {
+                        id: true,
+                        name: true,
+                        path: true,
+                        extension: true,
+                    },
+                },
+            },
+        });
+
+        return category;
+    }
+
+    async getAllLaundryItemCategories(): Promise<GetAllLaundryItemCategoriesResponseDTO> {
+        const categories = await this._dbService.laundryItemCategory.findMany({
+            where: {
+                deletedAt: null,
+            },
+            include: {
+                icon: {
+                    select: {
+                        id: true,
+                        name: true,
+                        path: true,
+                        extension: true,
+                    },
+                },
+            },
+            orderBy: {
+                createdAt: 'desc',
+            },
+        });
+
+        return { data: categories };
+    }
+
+    async getLaundryItemCategoryById(categoryId: string): Promise<LaundryItemCategoryResponseDTO> {
+        const category = await this._dbService.laundryItemCategory.findFirst({
+            where: {
+                id: categoryId,
+                deletedAt: null,
+            },
+            include: {
+                icon: {
+                    select: {
+                        id: true,
+                        name: true,
+                        path: true,
+                        extension: true,
+                    },
+                },
+            },
+        });
+
+        if (!category) {
+            throw new BadRequestException('Category does not exist');
+        }
+
+        return category;
+    }
+
+    async editLaundryItemCategory(
+        categoryId: string,
+        data: EditLaundryItemCategoryRequestDTO,
+    ): Promise<LaundryItemCategoryMessageResponseDTO> {
+        const category = await this._dbService.laundryItemCategory.findFirst({
+            where: {
+                id: categoryId,
+                deletedAt: null,
+            },
+        });
+
+        if (!category) {
+            throw new BadRequestException('Category does not exist');
+        }
+
+        // Validate icon exists if provided
+        if (data.iconId) {
+            const icon = await this._dbService.media.findFirst({
+                where: {
+                    id: data.iconId,
+                    deletedAt: null,
+                    extension: 'svg',
+                },
+            });
+
+            if (!icon) {
+                throw new BadRequestException('SVG icon not found or invalid format');
+            }
+        }
+
+        await this._dbService.laundryItemCategory.update({
+            where: {
+                id: categoryId,
+            },
+            data: {
+                ...(data.name && { name: data.name }),
+                ...(data.description !== undefined && { description: data.description }),
+                ...(data.iconId !== undefined && { iconId: data.iconId }),
+            },
+        });
+
+        return { message: 'Category Updated Successfully' };
+    }
+
+    async deleteLaundryItemCategory(categoryId: string): Promise<LaundryItemCategoryMessageResponseDTO> {
+        const category = await this._dbService.laundryItemCategory.findFirst({
+            where: {
+                id: categoryId,
+                deletedAt: null,
+            },
+        });
+
+        if (!category) {
+            throw new BadRequestException('Category does not exist');
+        }
+
+        // Check if any items are using this category
+        const itemsUsingCategory = await this._dbService.laundryServiceItem.findFirst({
+            where: {
+                categoryId: categoryId,
+                deletedAt: null,
+            },
+        });
+
+        if (itemsUsingCategory) {
+            throw new BadRequestException('Cannot delete category - items are still using it');
+        }
+
+        await this._dbService.laundryItemCategory.update({
+            where: {
+                id: categoryId,
+            },
+            data: {
+                deletedAt: new Date(),
+            },
+        });
+
+        return { message: 'Category Deleted Successfully' };
     }
 }

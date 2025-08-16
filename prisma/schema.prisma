@@ -258,23 +258,25 @@ model Token {
 
 // Media model to store media files uploaded by users
 model Media {
-  id        Int         @id @default(autoincrement()) // Using Int for media ID
-  name      String // Media name
-  extension String // File extension (e.g., jpg, png)
-  type      MediaType // Media type (image, video, etc.)
-  access    MediaAccess // Access level (public/private)
-  size      Float?
-  location  String? // Optional location URL
-  path      String // Path to the file
-  thumbPath String? // Optional thumbnail path
-  status    MediaStatus @default(UPLOADING) // Upload status
-  meta      Json?       @db.JsonB
-  userId    String?
-  createdAt DateTime    @default(now()) @db.Timestamptz()
-  updatedAt DateTime    @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt DateTime?   @db.Timestamptz()
-  user      User?       @relation("MediaOwner", fields: [userId], references: [id])
-  users     User[] // Users related to this media (for example, profile pictures)
+  id                    Int                   @id @default(autoincrement()) // Using Int for media ID
+  name                  String // Media name
+  extension             String // File extension (e.g., jpg, png)
+  type                  MediaType // Media type (image, video, etc.)
+  access                MediaAccess // Access level (public/private)
+  size                  Float?
+  location              String? // Optional location URL
+  path                  String // Path to the file
+  thumbPath             String? // Optional thumbnail path
+  status                MediaStatus           @default(UPLOADING) // Upload status
+  meta                  Json?                 @db.JsonB
+  userId                String?
+  createdAt             DateTime              @default(now()) @db.Timestamptz()
+  updatedAt             DateTime              @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt             DateTime?             @db.Timestamptz()
+  user                  User?                 @relation("MediaOwner", fields: [userId], references: [id])
+  users                 User[] // Users related to this media (for example, profile pictures)
+  laundryItemCategories LaundryItemCategory[]
+  laundryServices       LaundryService[]      @relation("LaundryServiceIcons") 
 }
 
 model Reward {
@@ -372,7 +374,7 @@ model Delivery {
 model Laundry {
   id             String           @id @default(uuid())
   name           String // Name of the laundry
-  address        String // Address of the laundry
+  address        String? // Address of the laundry
   lat            Float // Latitude of the laundry address
   long           Float // Longitude of the laundry address 
   vendor         User             @relation("VendorLaundry", fields: [vendorId], references: [id])
@@ -392,19 +394,35 @@ model LaundryService {
   laundry             Laundry               @relation(fields: [laundryId], references: [id])
   name                String // Name of the service (e.g., "Wash & Fold")
   description         String? // Optional description of the service
-  laundryServiceItems LaundryServiceItem[] // Relation to LaundryServiceItem model
+  iconId              Int? // Reference to Media for SVG icon
+  icon                Media? @relation("LaundryServiceIcons", fields: [iconId], references: [id])
+  laundryServiceItems LaundryServiceItem[]  // Relation to LaundryServiceItem model
   createdAt           DateTime              @default(now()) @db.Timestamptz()
   updatedAt           DateTime              @default(now()) @updatedAt @db.Timestamptz()
   deletedAt           DateTime?             @db.Timestamptz()
   OrderLaundryService OrderLaundryService[]
 }
 
+model LaundryItemCategory {
+  id                  String               @id @default(uuid())
+  name                String               @unique
+  description         String?
+  iconId              Int? // Reference to Media for SVG icon
+  icon                Media?               @relation(fields: [iconId], references: [id])
+  laundryServiceItems LaundryServiceItem[] // Relation to LaundryServiceItem
+  createdAt           DateTime             @default(now()) @db.Timestamptz()
+  updatedAt           DateTime             @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt           DateTime?            @db.Timestamptz()
+}
+
 model LaundryServiceItem {
   id                      String                    @id @default(uuid())
   laundryServiceId        String // Foreign key to LaundryService model
   laundryService          LaundryService            @relation(fields: [laundryServiceId], references: [id])
+  categoryId              String? // Foreign key to LaundryItemCategory
+  category                LaundryItemCategory?      @relation(fields: [categoryId], references: [id])
   name                    String // Name of the item (e.g., "T-shirt")
-  price                   Float // Price of the item
+  price                   Float // Price of the item (keep existing field)
   createdAt               DateTime                  @default(now()) @db.Timestamptz()
   updatedAt               DateTime                  @default(now()) @updatedAt @db.Timestamptz()
   deletedAt               DateTime?                 @db.Timestamptz()
