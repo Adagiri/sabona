@@ -13,16 +13,16 @@ import {
     UploadInitiateAdminMediaRequestDTO,
     UploadInitiateMediaRequestDTO,
 } from './dto/request/upload.request';
-import {
-    UploadFinalizeMediaResponseDTO,
-    UploadInitiateMediaResponseDTO,
-} from './dto/response/upload.response';
+import { UploadFinalizeMediaResponseDTO, UploadInitiateMediaResponseDTO } from './dto/response/upload.response';
 import S3Service from './s3.service';
 import { DeleteMediaResponseDto } from './dto/response/deleteMedia.response';
 
 @Injectable()
 export default class MediaService {
-    constructor(private _dbService: DatabaseService, private _s3Service: S3Service) { }
+    constructor(
+        private _dbService: DatabaseService,
+        private _s3Service: S3Service,
+    ) {}
 
     private _allowedMediaExtensions = {
         [MediaType.IMAGE]: ['png', 'jpg', 'bmp', 'jpeg', 'gif'],
@@ -44,11 +44,9 @@ export default class MediaService {
         return fileName.slice(((fileName.lastIndexOf('.') - 1) >>> 0) + 2).toLowerCase();
     }
 
-    async UploadAdminInitiate(
-        data: UploadInitiateAdminMediaRequestDTO
-    ): Promise<UploadInitiateMediaResponseDTO> {
+    async UploadAdminInitiate(data: UploadInitiateAdminMediaRequestDTO): Promise<UploadInitiateMediaResponseDTO> {
         const extension = this._getMediaExtension(data.name);
-
+console.log(extension)
         if (!this._allowedMediaExtensions[data.type].includes(extension)) {
             throw new BadRequestException('media.not_supported');
         }
@@ -89,22 +87,16 @@ export default class MediaService {
         };
     }
 
-    async UploadAdminFinalize(
-        data: UploadFinalizeAdminMediaRequestDTO
-    ): Promise<UploadFinalizeMediaResponseDTO> {
+    async UploadAdminFinalize(data: UploadFinalizeAdminMediaRequestDTO): Promise<UploadFinalizeMediaResponseDTO> {
         const media = await this._dbService.media.findFirst({
             where: { id: data.id },
         });
-
 
         if (!media) {
             throw new NotFoundException('media.not_found');
         }
 
-        if (
-            media.access === MediaAccess.PRIVATE &&
-            (!data || data?.userId !== media.userId)
-        ) {
+        if (media.access === MediaAccess.PRIVATE && (!data || data?.userId !== media.userId)) {
             throw new ForbiddenException('media.not_allowed');
         }
 
@@ -113,24 +105,22 @@ export default class MediaService {
             throw new NotFoundException('media.not_found');
         }
 
-        const sizeAllowed =
-            s3Object.contentLength <= this._allowedMediaSize[media.type];
+        const sizeAllowed = s3Object.contentLength <= this._allowedMediaSize[media.type];
         if (!sizeAllowed) {
             await this._dbService.media.update({
                 where: { id: media.id },
                 data: { status: MediaStatus.STALE },
             });
-            
+
             await this._s3Service.UpdateObjectStaleTag(media.location);
             throw new BadRequestException('media.too_large');
         }
 
         if (media.access === MediaAccess.PUBLIC) {
-            try{
+            try {
                 await this._s3Service.UpdateObjectAccess(media.location, 'public-read');
-            }
-            catch(e){
-                console.log("SADASDASD",e);
+            } catch (e) {
+                console.log('SADASDASD', e);
             }
         }
 
@@ -150,10 +140,7 @@ export default class MediaService {
         return media;
     }
 
-    async UploadInitiate(
-        data: UploadInitiateMediaRequestDTO,
-        user?: User,
-    ): Promise<UploadInitiateMediaResponseDTO> {
+    async UploadInitiate(data: UploadInitiateMediaRequestDTO, user?: User): Promise<UploadInitiateMediaResponseDTO> {
         const extension = this._getMediaExtension(data.name);
         if (!this._allowedMediaExtensions[data.type].includes(extension)) {
             throw new BadRequestException('media.not_supported');
@@ -195,10 +182,7 @@ export default class MediaService {
         };
     }
 
-    async UploadFinalize(
-        data: UploadFinalizeMediaRequestDTO,
-        user?: User,
-    ): Promise<UploadFinalizeMediaResponseDTO> {
+    async UploadFinalize(data: UploadFinalizeMediaRequestDTO, user?: User): Promise<UploadFinalizeMediaResponseDTO> {
         const media = await this._dbService.media.findFirst({
             where: { id: data.id },
         });
@@ -246,23 +230,18 @@ export default class MediaService {
     }
 
     async GetSignedUrl(location: string): Promise<DeleteMediaResponseDto> {
-      
-        try{
+        try {
             const url = await this._s3Service.GetSignedUrl(location);
             return {
-                message : url
+                message: url,
             };
-        }
-        catch(e){
-            console.log(e)
+        } catch (e) {
+            console.log(e);
             throw new NotFoundException('media.not_found');
         }
-
-
     }
 
     async DeleteMedia(mediaId: number): Promise<DeleteMediaResponseDto> {
-
         const mediaid = Number(mediaId);
 
         const media = await this._dbService.media.findFirst({

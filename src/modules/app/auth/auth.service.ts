@@ -2,12 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { v4 as uuid } from 'uuid';
 import RedisService from '../../../core/cache/redis.service';
 import DatabaseService from '../../../database/database.service';
-import { User, Vendor } from '@prisma/client';
+import { User } from '@prisma/client';
 import AppConfig from '../../../configs/app.config';
 
 export class AuthModel {
     id: string;
-    user: User | Vendor | null;
+    user: User | null;
 
     constructor(id: string, user?: User) {
         this.id = id;
@@ -41,12 +41,6 @@ export default class AuthService {
         Auth.user = await this._databaseService.user.findFirst({
             where: { id: Auth.id },
         });
-console.log(Auth.user)
-        if (!Auth.user) {
-            Auth.user = await this._databaseService.vendor.findFirst({
-                where: { id: Auth.id },
-            });
-        }
 
         return Auth;
     }

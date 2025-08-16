@@ -33,6 +33,8 @@ import { isUserExistResponseDTO } from './dto/response/isUserExist.response';
 import FirebaseService from 'src/modules/firebase/firebase.service';
 import { SocialVerificationRequestDTO } from './dto/request/socialVerification.request';
 import IsUserWithEmailExistRequestDTO from './dto/request/isUserWithEmailExist.request';
+import { VendorSignupRequestDTO } from './dto/request/vendorSignup.request';
+import { VendorSignupResponseDTO } from './dto/response/vendorSignup.response';
 
 @Injectable()
 export default class UserService {
@@ -44,6 +46,74 @@ export default class UserService {
         private _smsService: SMSService,
         private _firebaseService: FirebaseService,
     ) {}
+
+    async VendorSignup(data: VendorSignupRequestDTO): Promise<VendorSignupResponseDTO> {
+        // Check if phone number already exists
+        const existingVendor = await this._dbService.user.findFirst({
+            where: { phone: data.phone, status: UserStatus.ACTIVE },
+        });
+
+        if (existingVendor) {
+            throw new BadRequestException('Phone number already registered');
+        }
+
+         const user = await this._dbService.user.create({
+             data: {
+                 phone: data.phone,
+                 type: UserType.VENDOR,
+                 status: UserStatus.INACTIVE,
+                 settings: {
+                     create: {
+                         lat: data.latitude || 0,
+                         long: data.longitude || 0,
+                         laundryName: data.laundryName || null,
+                     },
+                 },
+             },
+             select: { id: true, phone: true },
+         });
+
+         if (data?.referrerId && user) {
+             const reward = await this._dbService.reward.findFirst({
+                 where: {
+                     userId: data.referrerId,
+                 },
+             });
+
+             if (reward) {
+                 await this._dbService.reward.update({
+                     data: {
+                         userId: data.referrerId,
+                         points: reward?.points + 5,
+                         createdAt: new Date(),
+                         updatedAt: new Date(),
+                     },
+                     where: {
+                         userId: data.referrerId,
+                     },
+                 });
+             } else {
+                 await this._dbService.reward.create({
+                     data: {
+                         userId: data.referrerId,
+                         points: 5,
+                         createdAt: new Date(),
+                         updatedAt: new Date(),
+                     },
+                 });
+             }
+         }
+
+         if (!user) {
+             throw new BadRequestException('auth.error_creating_user');
+         }
+
+        return {
+            id: user.id,
+            phone: user.phone,
+            message: 'Signup successful. Your account is pending admin approval.',
+        };
+    }
 
     async Login(data: LoginRequestDTO): Promise<string> {
         const user = await this._dbService.user.findFirst({
@@ -158,6 +228,7 @@ export default class UserService {
                     create: {
                         lat: data.latitude || 0,
                         long: data.longitude || 0,
+                        laundryName: data.laundryName || null,
                     },
                 },
                 password: data.password,
@@ -234,7 +305,6 @@ export default class UserService {
                         points: true,
                     },
                 },
-            
             },
         });
         return currentUser;
@@ -285,11 +355,9 @@ export default class UserService {
     async SendVerificationCode(data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
         const user = await this._dbService.user.findUnique({
             where: { phone: data.phone },
-        })
+        });
         if (user) {
-            throw new BadRequestException(
-                "Phone number is already registered"
-            );
+            throw new BadRequestException('Phone number is already registered');
         }
         if (AppConfig.APP.ENV === APP_ENV.TEST) {
             return {

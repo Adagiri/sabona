@@ -1,45 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { VendorStatus } from '@prisma/client';
-
-export class VendorSignupResponseDTO {
-    @ApiProperty()
-    id: string;
-
-    @ApiProperty()
-    phone: string;
-
-    @ApiProperty()
-    laundryName: string;
-
-    @ApiProperty()
-    status: VendorStatus;
-
-    @ApiProperty()
-    message: string;
-}
-
-export class PendingVendorResponseDTO {
-    @ApiProperty()
-    id: string;
-
-    @ApiProperty()
-    phone: string;
-
-    @ApiProperty()
-    laundryName: string;
-
-    @ApiProperty()
-    latitude: number;
-
-    @ApiProperty()
-    longitude: number;
-
-    @ApiProperty()
-    status: VendorStatus;
-
-    @ApiProperty()
-    createdAt: Date;
-}
 
 export class MainVendorSearchResultDTO {
     @ApiProperty()
@@ -58,21 +17,7 @@ export class MainVendorSearchResultDTO {
     createdAt: Date;
 }
 
-export class AdminActionResponseDTO {
-    @ApiProperty()
-    success: boolean;
-
-    @ApiProperty()
-    message: string;
-
-    @ApiProperty()
-    vendorId: string;
-
-    @ApiProperty()
-    laundryId?: string; // Returned when laundry is created
-}
-
-export class VendorDocumentsResponseDTO {
+export class ApplicationDocumentsResponseDTO {
     @ApiProperty({ required: false })
     vatNumberDoc?: {
         id: number;
@@ -131,8 +76,8 @@ export class VendorBranchesResponseDTO {
     mainVendor: MainVendorInfoDTO;
 
     @ApiProperty({ type: [VendorBranchInfoDTO] })
-    branches: VendorBranchInfoDTO[];
+    subVendors: VendorBranchInfoDTO[];
 
     @ApiProperty()
-    totalBranches: number;
+    totalSubVendors: number;
 }

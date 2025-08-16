@@ -12,7 +12,7 @@ export class SignupRequestDTO {
     @Matches(/^(?:00|\\+)[0-9\\s.\\/-]{6,20}$/, {
         message: 'phone must start with 00 followed by the country code',
     })
-    phone: string
+    phone: string;
 
     @ApiProperty({ enum: UserType })
     @IsString()
@@ -26,6 +26,10 @@ export class SignupRequestDTO {
     @ApiProperty()
     @IsOptional()
     latitude: number;
+
+    @ApiPropertyOptional()
+    @IsOptional()
+    laundryName: string;
 
     @ApiPropertyOptional()
     @IsOptional()

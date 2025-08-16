@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
 import { AllOrderListDto } from './dto/response/allorderlist.response.dto';
 import FindUsersRequestDTO from '../user/dto/request/find.request';
@@ -12,7 +12,12 @@ import {
     GetSlotFilterOptions,
 } from 'src/helpers/util.helper';
 import FindOrderRequestDTO from './dto/request/find.request';
-import FindApplicationRequestDTO from './dto/request/application.request';
+import FindApplicationRequestDTO, {
+    AdminSearchMainVendorsRequestDTO,
+    ApproveApplicationRequestDTO,
+    RejectApplicationRequestDTO,
+    UploadApplicationDocumentsRequestDTO,
+} from './dto/request/application.request';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
 import ApplicationApproveMessageResponseDTO from './dto/response/approve.response.dto';
 import NotificationService from '../notification/notification.service';
@@ -25,6 +30,11 @@ import S3Service from '../media/s3.service';
 import { UserDto } from './dto/response/userdetails.response';
 import { SlotRequest } from '../customer/dto/request/slotRequest';
 import { AllTipsResponseDTO } from './dto/response/allTips.response';
+import {
+    ApplicationRejectMessageResponseDTO,
+    UploadApplicationDocumentsResponseDTO,
+} from './dto/response/application.response';
+import { MainVendorSearchResultDTO } from './dto/response/vendor.response';
 
 @Injectable()
 export default class AdminService {
@@ -223,24 +233,141 @@ export default class AdminService {
         return { data: applications, count };
     }
 
-    async ApproveApplication(userId: string): Promise<ApplicationApproveMessageResponseDTO> {
+    // ADMIN: SEARCH EXISTING MAIN VENDORS BY LAUNDRY NAME
+    async searchMainVendors(data: AdminSearchMainVendorsRequestDTO): Promise<MainVendorSearchResultDTO[]> {
+        const mainVendors = await this._dbService.user.findMany({
+            where: {
+                type: UserType.VENDOR,
+                status: UserStatus.ACTIVE,
+                deletedAt: null,
+                settings: {
+                    laundryName: {
+                        contains: data.laundryName,
+                        mode: 'insensitive',
+                    },
+                },
+                vendorRelationAsBranch: null, // User is not a branch of another vendor
+            },
+            include: {
+                settings: {
+                    select: {
+                        laundryName: true,
+                    },
+                },
+                vendorRelationAsMain: true, // Get all branch relations
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        return mainVendors.map((vendor) => ({
+            id: vendor.id,
+            phone: vendor.phone,
+            laundryName: vendor.settings?.laundryName || null,
+            branchCount: vendor.vendorRelationAsMain.length,
+            createdAt: vendor.createdAt,
+        }));
+    }
+
+    async ApproveApplication(
+        userId: string,
+        data: ApproveApplicationRequestDTO,
+    ): Promise<ApplicationApproveMessageResponseDTO> {
         const user = await this._dbService.user.findUnique({
             where: { id: userId },
+            include: {
+                settings: {
+                    select: {
+                        isOnboardingCompleted: true,
+                        laundryName: true,
+                        long: true,
+                        lat: true,
+                    },
+                },
+            },
         });
 
         if (!user) {
             throw new BadRequestException('User not found');
         }
 
-        if (user.status !== UserStatus.INACTIVE) {
+        if (user.status === UserStatus.ACTIVE) {
             throw new BadRequestException('Application is already approved');
         }
 
-        await this._dbService.user.update({
-            where: { id: userId },
-            data: { status: UserStatus.ACTIVE },
+        if (user.status === UserStatus.REJECTED) {
+            throw new BadRequestException('Application was already rejected');
+        }
+
+        // Validate main vendor if provided
+        if (data.mainVendorId) {
+            const mainVendor = await this._dbService.user.findUnique({
+                where: { id: data.mainVendorId },
+            });
+
+            if (!mainVendor) {
+                throw new NotFoundException('Main vendor not found');
+            }
+
+            const isBranch = await this._dbService.vendorRelation.findUnique({
+                where: { branchId: data.mainVendorId },
+            });
+
+            if (isBranch) {
+                throw new BadRequestException('Specified vendor is not a main vendor');
+            }
+
+            if (mainVendor.status !== UserStatus.ACTIVE) {
+                throw new BadRequestException('Main vendor must be approved');
+            }
+        }
+
+        await this._dbService.$transaction(async (tx) => {
+            await tx.user.update({
+                where: { id: userId },
+                data: {
+                    status: UserStatus.ACTIVE,
+                },
+            });
+
+            await tx.userSettings.update({
+                where: { userId: userId },
+
+                data: {
+                    isOnboardingCompleted: true,
+                    contactPhone: data.contactPhone,
+                },
+            });
+
+            if (data.mainVendorId) {
+                await tx.vendorRelation.upsert({
+                    where: { branchId: userId },
+                    update: { mainVendorId: data.mainVendorId },
+                    create: {
+                        branchId: userId,
+                        mainVendorId: data.mainVendorId,
+                    },
+                });
+            } else {
+                // Remove vendor relation if exists
+                await tx.vendorRelation.deleteMany({
+                    where: { branchId: userId },
+                });
+            }
+
+            if (user.type === UserType.VENDOR) {
+                await tx.laundry.create({
+                    data: {
+                        name: user.settings?.laundryName || 'Default Laundry Name',
+                        long: user.settings?.long || 0,
+                        lat: user.settings?.lat || 0,
+                        address: data.address,
+                        vendorId: user.id,
+                    },
+                });
+            }
         });
 
+        // Send notifications (outside transaction for performance)
         const deviceTokens = await this._dbService.deviceToken.findMany({
             where: {
                 userId: userId,
@@ -253,7 +380,7 @@ export default class AdminService {
 
         const userTokens = extractTokens(deviceTokens);
 
-        const data = {
+        const notificationPayload = {
             tokens: userTokens,
             title: 'Application Approved',
             body: 'Your application has been approved successfully',
@@ -266,7 +393,7 @@ export default class AdminService {
 
         if (userTokens?.length) {
             try {
-                const res = await this._notificationService.SendNotificationToMultipleTokens(data);
+                const res = await this._notificationService.SendNotificationToMultipleTokens(notificationPayload);
                 console.log(
                     'RESS',
                     res?.responses?.map((e) => {
@@ -277,10 +404,45 @@ export default class AdminService {
                 console.log('error', error);
             }
         } else {
-            console.log('NO TOKENS TO SEND NOTIFICAITON');
+            console.log('NO TOKENS TO SEND NOTIFICATION');
         }
 
         return { message: 'Application approved successfully' };
+    }
+
+    async RejectApplication(
+        userId: string,
+        data: RejectApplicationRequestDTO,
+    ): Promise<ApplicationRejectMessageResponseDTO> {
+        const vendor = await this._dbService.user.findUnique({
+            where: { id: userId },
+            include: {
+                settings: true,
+            },
+        });
+
+        if (!vendor) {
+            throw new NotFoundException('Vendor not found');
+        }
+
+        if (vendor.status !== UserStatus.INACTIVE) {
+            throw new BadRequestException('Vendor is not in pending status');
+        }
+
+        await this._dbService.$transaction([
+            this._dbService.user.update({
+                where: { id: vendor.id },
+                data: { status: UserStatus.REJECTED },
+            }),
+            this._dbService.userSettings.update({
+                where: { userId: vendor.id },
+                data: { rejectionReason: data.rejectionReason },
+            }),
+        ]);
+
+        return {
+            message: 'Vendor rejected successfully',
+        };
     }
 
     async GetCustomersLocation(): Promise<AllUserLocationsResponseDTO> {
@@ -595,5 +757,163 @@ export default class AdminService {
         }
 
         return { data: paginatedTips, count: tips.length };
+    }
+
+    async getSubVendorsForMainVendor(mainVendorId: string) {
+        const mainVendor = await this._dbService.user.findUnique({
+            where: { id: mainVendorId },
+            include: {
+                settings: { select: { laundryName: true } },
+            },
+        });
+
+        if (!mainVendor) {
+            throw new NotFoundException('Main vendor not found');
+        }
+
+        const isBranch = await this._dbService.vendorRelation.findFirst({
+            where: { branchId: mainVendorId },
+        });
+
+        console.log(mainVendorId);
+        if (isBranch) {
+            throw new BadRequestException('Specified vendor is not a main vendor');
+        }
+
+        const branches = await this._dbService.vendorRelation.findMany({
+            where: { mainVendorId },
+            include: {
+                branch: {
+                    include: {
+                        settings: { select: { laundryName: true } },
+                    },
+                },
+            },
+        });
+
+        const subVendors = branches.map((relation) => ({
+            id: relation.branch.id,
+            phone: relation.branch.phone,
+            laundryName: relation.branch.settings?.laundryName || null,
+            status: relation.branch.status,
+            createdAt: relation.branch.createdAt,
+        }));
+
+        return {
+            mainVendor: {
+                id: mainVendor.id,
+                phone: mainVendor.phone,
+                laundryName: mainVendor.settings?.laundryName,
+                status: mainVendor.status,
+            },
+            subVendors,
+            totalSubVendors: subVendors.length,
+        };
+    }
+
+    async getApplicationDocuments(userId: string) {
+        const documents = await this._dbService.media.findMany({
+            where: {
+                userId,
+                meta: {
+                    path: ['uploadedFor'],
+                    equals: 'application-verification',
+                },
+            },
+        });
+
+        function hasDocType(meta: any): meta is { docType: string } {
+            return meta && typeof meta === 'object' && typeof meta.docType === 'string';
+        }
+
+        return {
+            vatNumberDoc: documents.find((doc) => hasDocType(doc.meta) && doc.meta.docType === 'VAT_NUMBER_DOC'),
+            businessCertDoc: documents.find((doc) => hasDocType(doc.meta) && doc.meta.docType === 'BUSINESS_CERT_DOC'),
+        };
+    }
+
+    async uploadApplicationDocuments(
+        userId: string,
+        data: UploadApplicationDocumentsRequestDTO,
+    ): Promise<UploadApplicationDocumentsResponseDTO> {
+        const vendor = await this._dbService.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!vendor) {
+            throw new NotFoundException('Vendor not found');
+        }
+
+        if (vendor.status !== UserStatus.ACTIVE) {
+            throw new BadRequestException('Vendor must be approved before uploading documents');
+        }
+
+        // Verify both documents exist
+        const [vatDoc, businessDoc] = await Promise.all([
+            this._dbService.media.findUnique({
+                where: { id: parseInt(data.vatNumberDocId) },
+            }),
+            this._dbService.media.findUnique({
+                where: { id: parseInt(data.businessCertDocId) },
+            }),
+        ]);
+
+        if (!vatDoc || !businessDoc) {
+            throw new NotFoundException('One or both documents not found');
+        }
+
+        // Prepare metadata
+        const vatDocMeta = {
+            ...((vatDoc.meta as object) || {}),
+            docType: 'VAT_NUMBER_DOC',
+            uploadedFor: 'application-verification',
+            uploadedBy: 'admin',
+        };
+
+        const businessDocMeta = {
+            ...((businessDoc.meta as object) || {}),
+            docType: 'BUSINESS_CERT_DOC',
+            uploadedFor: 'application-verification',
+            uploadedBy: 'admin',
+        };
+
+        // Execute all updates in a transaction
+        await this._dbService.$transaction(async (tx) => {
+            // 1. Update VAT document
+            await tx.media.update({
+                where: { id: vatDoc.id },
+                data: {
+                    userId: vendor.id,
+                    meta: vatDocMeta,
+                },
+            });
+
+            // 2. Update Business document
+            await tx.media.update({
+                where: { id: businessDoc.id },
+                data: {
+                    userId: vendor.id,
+                    meta: businessDocMeta,
+                },
+            });
+
+            // 3. Update or create user settings
+            await tx.userSettings.upsert({
+                where: { userId: vendor.id },
+                create: {
+                    userId: vendor.id,
+                    isDocumentsUploaded: true,
+                },
+                update: {
+                    isDocumentsUploaded: true,
+                },
+            });
+        });
+
+        return {
+            success: true,
+            message: 'Vendor documents uploaded successfully',
+            vendorId: vendor.id,
+        };
     }
 }

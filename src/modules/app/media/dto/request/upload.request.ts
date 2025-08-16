@@ -26,7 +26,7 @@ export class UploadInitiateAdminMediaRequestDTO {
     @Length(1, 255)
     name: string;
 
-    @ApiProperty()
+    @ApiProperty({ description: 'Size in KB' })
     @IsNumber()
     size: number;
 
@@ -41,7 +41,7 @@ export class UploadInitiateAdminMediaRequestDTO {
 
     @ApiProperty()
     @IsString()
-    userId : string;
+    userId: string;
 }
 
 export class UploadFinalizeMediaRequestDTO {

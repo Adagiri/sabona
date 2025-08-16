@@ -34,6 +34,11 @@ export class VerifyOtpRequestDTO {
     password: string;
 
     @ApiProperty()
+    @IsString()
+    @IsOptional()
+    laundryName: string;
+
+    @ApiProperty()
     @IsOptional()
     @IsString()
     referrerId: string;

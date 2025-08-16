@@ -1,4 +1,4 @@
-import { OrderStatus, User, UserType } from '@prisma/client';
+import { OrderStatus, Prisma, User, UserType } from '@prisma/client';
 import DatabaseService from 'src/database/database.service';
 import UpdateStatusRequestDTO from './dto/request/updateStatus.request';
 import GetOrderRequestsResponseDTO from './dto/response/getOrderRequests.response';
@@ -18,68 +18,12 @@ import GetOrderRequestDTO from './dto/request/getOrder.request';
 import CancelOrderRequestDTO from './dto/request/cancelOrder.request';
 import { extractTokens } from 'src/helpers/util.helper';
 import NotificationService from '../notification/notification.service';
-import { VerifyOtpRequestDTO } from './dto/request/verifyOtp.request';
-import AppConfig from 'src/configs/app.config';
-import { APP_ENV, OTP_CODE_FOR_TEST } from 'src/constants';
-import SMSService from 'src/modules/sms/sms.service';
-import AuthService from '../auth/auth.service';
-import SendVerificationCodeRequestDTO from './dto/request/send_verification_code.request';
-import { SendVerificationCodeResponseDTO } from './dto/response/send_verification_code.response';
 @Injectable()
 export default class VendorService {
     constructor(
         private _dbService: DatabaseService,
         private _notificationService: NotificationService,
-        private _smsService: SMSService,
-        private _authService: AuthService,
     ) {}
-
-    async SendVerificationCode(data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
-        const user = await this._dbService.user.findUnique({
-            where: { phone: data.phone },
-        });
-        if (!user) {
-            throw new BadRequestException('Phone number is not registered');
-        }
-
-        if (AppConfig.APP.ENV === APP_ENV.TEST) {
-            return {
-                message: 'OTP sent successfully',
-            };
-        } else {
-            const otp = await this._smsService.sendVerificationCode(data.phone);
-            if (!otp) {
-                throw new BadRequestException('Error while sending verification code, Please try again!!!');
-            }
-
-            return {
-                message: 'OTP sent successfully',
-            };
-        }
-    }
-
-    async VerifyCode(data: VerifyOtpRequestDTO): Promise<string> {
-        const existingUser = await this._dbService.vendor.findFirst({
-            where: { phone: data.phone },
-            select: { id: true },
-        });
-
-        if (!existingUser) {
-            throw new BadRequestException('Phone number not registered');
-        }
-
-        if (AppConfig.APP.ENV !== APP_ENV.PROD && data.otp !== OTP_CODE_FOR_TEST) {
-            throw new BadRequestException('You have entered the wrong otp');
-        } else {
-            const otp = await this._smsService.verifyPhoneNumber(data.phone, data.otp);
-            if (!otp) {
-                throw new BadRequestException('Error while sending verification code, Please try again!!!');
-            }
-        }
-
-        const token = await this._authService.CreateSession(existingUser.id);
-        return token;
-    }
 
     async getOrderRequests(user: User, param: GetOrderRequestDTO): Promise<GetOrderRequestsResponseDTO> {
         const orderRequests = await this._dbService.order.findMany({
@@ -476,7 +420,7 @@ export default class VendorService {
                             })),
                         },
                     }),
-            },
+            } as Prisma.LaundryUncheckedCreateInput,
             include: {
                 laundryService: true,
             },
@@ -503,10 +447,12 @@ export default class VendorService {
                 },
                 vendor: {
                     select: {
-                        contactPhone: true,
-                        address: true,
-                        latitude: true,
-                        longitude: true,
+                        addresses: {
+                            select: {
+                                lat: true,
+                                long: true,
+                            },
+                        },
                     },
                 },
                 laundryService: {
@@ -526,7 +472,7 @@ export default class VendorService {
         return { data: laundries };
     }
 
-    async getLaundryById(laundryId: string,): Promise<GetLaundryByIdResponseDTO> {
+    async getLaundryById(laundryId: string): Promise<GetLaundryByIdResponseDTO> {
         const laundry = await this._dbService.laundry.findFirst({
             where: {
                 id: laundryId,

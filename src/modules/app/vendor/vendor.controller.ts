@@ -17,10 +17,6 @@ import LaundryMessageResponseDTO from './dto/response/laundryMessage';
 import LaundryServiceMessageResponseDTO from './dto/response/laundryServiceMessage.response';
 import GetOrderRequestDTO from './dto/request/getOrder.request';
 import CancelOrderRequestDTO from './dto/request/cancelOrder.request';
-import VerifyOtpResponseDTO from './dto/response/verifyOtpCode';
-import { VerifyOtpRequestDTO } from './dto/request/verifyOtp.request';
-import { SendVerificationCodeResponseDTO } from './dto/response/send_verification_code.response';
-import SendVerificationCodeRequestDTO from './dto/request/send_verification_code.request';
 
 @ApiController({
     path: '/vendor',
@@ -29,24 +25,6 @@ import SendVerificationCodeRequestDTO from './dto/request/send_verification_code
 })
 export default class VendorController {
     constructor(private _vendorService: VendorService) {}
-
-    @Post({
-        path: 'sendVerificationCode',
-        description: 'send otp code',
-        response: SendVerificationCodeResponseDTO,
-    })
-    SendVerificationCode(@Body() data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
-        return this._vendorService.SendVerificationCode(data);
-    }
-
-    @Post({
-        path: 'verifyCode',
-        description: 'send otp code',
-        response: VerifyOtpResponseDTO,
-    })
-    VerifyCode(@Body() data: VerifyOtpRequestDTO): Promise<string> {
-        return this._vendorService.VerifyCode(data);
-    }
 
     @Authorized()
     @Get({

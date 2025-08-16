@@ -6,7 +6,7 @@ import { AllOrderListDto } from './dto/response/allorderlist.response.dto';
 import FindUsersResponseDTO from '../user/dto/response/find.response';
 import FindUsersRequestDTO from '../user/dto/request/find.request';
 import FindOrderRequestDTO from './dto/request/find.request';
-import FindApplicationRequestDTO from './dto/request/application.request';
+import FindApplicationRequestDTO, { AdminSearchMainVendorsRequestDTO, UploadApplicationDocumentsRequestDTO } from './dto/request/application.request';
 import ApplicationApproveMessageResponseDTO from './dto/response/approve.response.dto';
 import GetOrderByIdRequestDTO from '../order/dto/request/getOrderById.request';
 import GetOrderByIdResponseDTO from '../order/dto/response/getOrderById.response';
@@ -21,6 +21,12 @@ import { CouponUsagePaginatedResponseDTO } from './dto/response/couponUsage.resp
 import { UserDto } from './dto/response/userdetails.response';
 import { SlotRequest } from '../customer/dto/request/slotRequest';
 import { AllTipsResponseDTO } from './dto/response/allTips.response';
+import { ApproveApplicationRequestDTO, RejectApplicationRequestDTO } from './dto/request/application.request';
+import {
+    ApplicationRejectMessageResponseDTO,
+    UploadApplicationDocumentsResponseDTO,
+} from './dto/response/application.response';
+import { ApplicationDocumentsResponseDTO, MainVendorSearchResultDTO, VendorBranchesResponseDTO } from './dto/response/vendor.response';
 
 @ApiController({
     path: '/admin',
@@ -76,6 +82,49 @@ export default class AdminController {
         return this._adminService.GetAllApplications(data);
     }
 
+    @Authorized(UserType.ADMIN)
+    @Post({
+        path: '/application/documents/:userId',
+        description: 'Upload VAT and business certificate documents for approved vendor',
+        response: UploadApplicationDocumentsResponseDTO,
+    })
+    async uploadApplicationDocuments(
+        @Param('userId') userId: string,
+        @Body() data: UploadApplicationDocumentsRequestDTO,
+    ): Promise<UploadApplicationDocumentsResponseDTO> {
+        return this._adminService.uploadApplicationDocuments(userId, data);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/application/documents/:userId',
+        description: 'Get application documents',
+        response: ApplicationDocumentsResponseDTO,
+    })
+    async getApplicationDocuments(@Param('userId') userId: string): Promise<ApplicationDocumentsResponseDTO> {
+        return this._adminService.getApplicationDocuments(userId);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/main-vendors/search',
+        description: 'Search existing main vendors by laundry name for branch linking',
+        response: [MainVendorSearchResultDTO],
+    })
+    async searchMainVendors(@Query() data: AdminSearchMainVendorsRequestDTO): Promise<MainVendorSearchResultDTO[]> {
+        return this._adminService.searchMainVendors(data);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: 'mainVendor/:mainVendorId/branches',
+        description: 'Get all branches of a main vendor',
+        response: VendorBranchesResponseDTO,
+    })
+    async getSubVendorsForMainVendor(@Param('mainVendorId') mainVendorId: string): Promise<VendorBranchesResponseDTO> {
+        return this._adminService.getSubVendorsForMainVendor(mainVendorId);
+    }
+
     // Approve Applications
     @Authorized(UserType.ADMIN)
     @Post({
@@ -83,8 +132,24 @@ export default class AdminController {
         description: 'Approve Applications',
         response: ApplicationApproveMessageResponseDTO,
     })
-    async approveApplication(@Param('userId') userId: string): Promise<ApplicationApproveMessageResponseDTO> {
-        return await this._adminService.ApproveApplication(userId);
+    async approveApplication(
+        @Param('userId') userId: string,
+        @Body() data: ApproveApplicationRequestDTO,
+    ): Promise<ApplicationApproveMessageResponseDTO> {
+        return await this._adminService.ApproveApplication(userId, data);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Post({
+        path: '/application/reject/:userId',
+        description: 'Reject vendor signup with reason',
+        response: ApplicationRejectMessageResponseDTO,
+    })
+    async rejectApplication(
+        @Param('userId') userId: string,
+        @Body() data: RejectApplicationRequestDTO,
+    ): Promise<ApplicationRejectMessageResponseDTO> {
+        return this._adminService.RejectApplication(userId, data);
     }
 
     @Authorized(UserType.ADMIN)
