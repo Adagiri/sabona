@@ -13,11 +13,33 @@ import { SocialVerificationRequestDTO } from './dto/request/socialVerification.r
 import IsUserWithEmailExistRequestDTO from './dto/request/isUserWithEmailExist.request';
 import { VendorSignupRequestDTO } from './dto/request/vendorSignup.request';
 import { VendorSignupResponseDTO } from './dto/response/vendorSignup.response';
+import { VendorLoginSendCodeRequestDTO } from './dto/request/vendorLoginSendCode.request';
+import { VendorLoginVerifyCodeRequestDTO } from './dto/request/vendorLoginVerifyCode.request';
+import { VendorLoginSendCodeResponseDTO } from './dto/response/vendorLoginSendCode.response';
+import { VendorLoginVerifyCodeResponseDTO } from './dto/response/vendorLoginVerifyCode.response';
 
 @ApiController({ version: '1', tag: 'auth', path: '/auth' })
 export default class AuthController {
     constructor(private _userService: UserService) {}
 
+    @Post({
+        path: '/vendor/login/send-code',
+        description: 'Send OTP code to vendor phone for login',
+        response: VendorLoginSendCodeResponseDTO,
+    })
+    vendorLoginSendCode(@Body() data: VendorLoginSendCodeRequestDTO): Promise<VendorLoginSendCodeResponseDTO> {
+        return this._userService.vendorLoginSendCode(data);
+    }
+
+    @Post({
+        path: '/vendor/login/verify-code',
+        description: 'Verify OTP code and login vendor',
+        response: VendorLoginVerifyCodeResponseDTO,
+    })
+    vendorLoginVerifyCode(@Body() data: VendorLoginVerifyCodeRequestDTO): Promise<VendorLoginVerifyCodeResponseDTO> {
+        return this._userService.vendorLoginVerifyCode(data);
+    }
+    
     @Post({
         path: '/login',
         description: 'Login to the application',

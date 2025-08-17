@@ -35,6 +35,10 @@ import { SocialVerificationRequestDTO } from './dto/request/socialVerification.r
 import IsUserWithEmailExistRequestDTO from './dto/request/isUserWithEmailExist.request';
 import { VendorSignupRequestDTO } from './dto/request/vendorSignup.request';
 import { VendorSignupResponseDTO } from './dto/response/vendorSignup.response';
+import { VendorLoginSendCodeRequestDTO } from './dto/request/vendorLoginSendCode.request';
+import { VendorLoginVerifyCodeRequestDTO } from './dto/request/vendorLoginVerifyCode.request';
+import { VendorLoginSendCodeResponseDTO } from './dto/response/vendorLoginSendCode.response';
+import { VendorLoginVerifyCodeResponseDTO } from './dto/response/vendorLoginVerifyCode.response';
 
 @Injectable()
 export default class UserService {
@@ -57,61 +61,148 @@ export default class UserService {
             throw new BadRequestException('Phone number already registered');
         }
 
-         const user = await this._dbService.user.create({
-             data: {
-                 phone: data.phone,
-                 type: UserType.VENDOR,
-                 status: UserStatus.INACTIVE,
-                 settings: {
-                     create: {
-                         lat: data.latitude || 0,
-                         long: data.longitude || 0,
-                         laundryName: data.laundryName || null,
-                     },
-                 },
-             },
-             select: { id: true, phone: true },
-         });
+        const user = await this._dbService.user.create({
+            data: {
+                phone: data.phone,
+                type: UserType.VENDOR,
+                status: UserStatus.INACTIVE,
+                settings: {
+                    create: {
+                        lat: data.latitude || 0,
+                        long: data.longitude || 0,
+                        laundryName: data.laundryName || null,
+                    },
+                },
+            },
+            select: { id: true, phone: true },
+        });
 
-         if (data?.referrerId && user) {
-             const reward = await this._dbService.reward.findFirst({
-                 where: {
-                     userId: data.referrerId,
-                 },
-             });
+        if (data?.referrerId && user) {
+            const reward = await this._dbService.reward.findFirst({
+                where: {
+                    userId: data.referrerId,
+                },
+            });
 
-             if (reward) {
-                 await this._dbService.reward.update({
-                     data: {
-                         userId: data.referrerId,
-                         points: reward?.points + 5,
-                         createdAt: new Date(),
-                         updatedAt: new Date(),
-                     },
-                     where: {
-                         userId: data.referrerId,
-                     },
-                 });
-             } else {
-                 await this._dbService.reward.create({
-                     data: {
-                         userId: data.referrerId,
-                         points: 5,
-                         createdAt: new Date(),
-                         updatedAt: new Date(),
-                     },
-                 });
-             }
-         }
+            if (reward) {
+                await this._dbService.reward.update({
+                    data: {
+                        userId: data.referrerId,
+                        points: reward?.points + 5,
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                    },
+                    where: {
+                        userId: data.referrerId,
+                    },
+                });
+            } else {
+                await this._dbService.reward.create({
+                    data: {
+                        userId: data.referrerId,
+                        points: 5,
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                    },
+                });
+            }
+        }
 
-         if (!user) {
-             throw new BadRequestException('auth.error_creating_user');
-         }
+        if (!user) {
+            throw new BadRequestException('auth.error_creating_user');
+        }
 
         return {
             id: user.id,
             phone: user.phone,
             message: 'Signup successful. Your account is pending admin approval.',
+        };
+    }
+
+    async vendorLoginSendCode(data: VendorLoginSendCodeRequestDTO): Promise<VendorLoginSendCodeResponseDTO> {
+        // Check if vendor exists with this phone number
+        const vendor = await this._dbService.user.findFirst({
+            where: {
+                phone: data.phone,
+                type: UserType.VENDOR,
+                status: UserStatus.ACTIVE, // Only allow active vendors to login
+            },
+        });
+
+        if (!vendor) {
+            throw new BadRequestException('No active vendor account found with this phone number');
+        }
+
+        // Send OTP code
+        if (AppConfig.APP.ENV === APP_ENV.TEST) {
+            return {
+                message: 'OTP sent successfully (Test mode: use 123456)',
+            };
+        } else {
+            try {
+                const otp = await this._smsService.sendVerificationCode(data.phone);
+                if (!otp) {
+                    throw new BadRequestException('Failed to send verification code. Please try again.');
+                }
+                return {
+                    message: 'OTP sent successfully',
+                };
+            } catch (error) {
+                console.error('Error sending OTP:', error);
+                throw new BadRequestException('Failed to send verification code. Please try again.');
+            }
+        }
+    }
+
+    async vendorLoginVerifyCode(data: VendorLoginVerifyCodeRequestDTO): Promise<VendorLoginVerifyCodeResponseDTO> {
+        // Find vendor with phone number
+        const vendor = await this._dbService.user.findFirst({
+            where: {
+                phone: data.phone,
+                type: UserType.VENDOR,
+                status: UserStatus.ACTIVE,
+            },
+            select: {
+                id: true,
+                phone: true,
+                type: true,
+                status: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+            },
+        });
+
+        if (!vendor) {
+            throw new BadRequestException('No active vendor account found with this phone number');
+        }
+
+        // Verify OTP
+        let isValidOtp = false;
+
+        if (AppConfig.APP.ENV === APP_ENV.TEST && data.otp === OTP_CODE_FOR_TEST) {
+            isValidOtp = true;
+        } else if (AppConfig.APP.ENV !== APP_ENV.TEST) {
+            try {
+                const verification = await this._smsService.verifyPhoneNumber(data.phone, data.otp);
+                if (verification && verification.status === 'approved') {
+                    isValidOtp = true;
+                }
+            } catch (error) {
+                console.error('OTP verification error:', error);
+                throw new BadRequestException('Invalid or expired OTP code');
+            }
+        }
+
+        if (!isValidOtp) {
+            throw new BadRequestException('Invalid or expired OTP code');
+        }
+
+        const token = await this._authService.CreateSession(vendor.id);
+
+        return {
+            token,
+            user: vendor,
         };
     }
 

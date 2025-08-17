@@ -1,5 +1,5 @@
-import { UserType } from '@prisma/client';
-import { ApiController, Authorized, Get, Post } from '../../../core/decorators';
+import { User, UserType } from '@prisma/client';
+import { ApiController, Authorized, CurrentUser, Delete, Get, Patch, Post } from '../../../core/decorators';
 import { Body, Param, Query } from '@nestjs/common';
 import AdminService from './admin.service';
 import { AllOrderListDto } from './dto/response/allorderlist.response.dto';
@@ -28,6 +28,25 @@ import {
 } from './dto/response/application.response';
 import { ApplicationDocumentsResponseDTO, MainVendorSearchResultDTO, VendorBranchesResponseDTO } from './dto/response/vendor.response';
 
+import VendorService from '../vendor/vendor.service';
+import { LaundryServiceDTO } from '../vendor/dto/request/createLaundry.request';
+import EditLaundryRequestDTO from '../vendor/dto/request/editLaundry.request';
+import EditLaundryServiceRequestDTO from '../vendor/dto/request/laundryServiceEdit.request';
+import { CreateLaundryServiceItemsArrayDTO } from '../vendor/dto/request/createLaundryServiceItem.request';
+import { EditLaundryServiceItemRequestDTO } from '../vendor/dto/request/editlaundryServiceItem.request';
+import { GetAllLaundriesResponseDTO } from '../vendor/dto/response/getAllLaundry.response';
+import { GetLaundryByIdResponseDTO } from '../vendor/dto/response/getLaundryById.response';
+import LaundryMessageResponseDTO from '../vendor/dto/response/laundryMessage';
+import LaundryServiceMessageResponseDTO from '../vendor/dto/response/laundryServiceMessage.response';
+import { CreateLaundryItemCategoryRequestDTO } from '../vendor/dto/request/createLaundryItemCategory.request';
+import { EditLaundryItemCategoryRequestDTO } from '../vendor/dto/request/editLaundryItemCategory.request';
+import {
+    LaundryItemCategoryResponseDTO,
+    GetAllLaundryItemCategoriesResponseDTO,
+    LaundryItemCategoryMessageResponseDTO,
+} from '../vendor/dto/response/laundryItemCategory.response';
+
+
 @ApiController({
     path: '/admin',
     tag: 'admin',
@@ -37,6 +56,7 @@ export default class AdminController {
     constructor(
         private _adminService: AdminService,
         private _orderService: OrderService,
+        private _vendorService: VendorService,
     ) {}
 
     // Get All orders
@@ -112,7 +132,7 @@ export default class AdminController {
         response: [MainVendorSearchResultDTO],
     })
     async searchMainVendors(@Query() data: AdminSearchMainVendorsRequestDTO): Promise<MainVendorSearchResultDTO[]> {
-        console.log(data)
+        console.log(data);
         return this._adminService.searchMainVendors(data);
     }
 
@@ -220,5 +240,228 @@ export default class AdminController {
     })
     async getAllTips(@Query() data: PaginatedRequest): Promise<AllTipsResponseDTO> {
         return this._adminService.GetAllTips(data);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/laundries',
+        description: 'Get all laundries',
+        response: GetAllLaundriesResponseDTO,
+    })
+    async getAllLaundries(): Promise<GetAllLaundriesResponseDTO> {
+        return await this._vendorService.getAllLaundries();
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/laundry/:laundryId',
+        description: 'Get laundry by id',
+        response: GetLaundryByIdResponseDTO,
+    })
+    async getLaundryById(@Param('laundryId') laundryId: string): Promise<GetLaundryByIdResponseDTO> {
+        return await this._vendorService.getLaundryById(laundryId);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/laundry/:laundryId/edit',
+        description: 'Edit laundry',
+        response: LaundryMessageResponseDTO,
+    })
+    async editLaundry(
+        @Param('laundryId') laundryId: string,
+        @Body() data: EditLaundryRequestDTO,
+        @CurrentUser() user: User,
+    ): Promise<LaundryMessageResponseDTO> {
+        return await this._vendorService.editLaundry(laundryId, data, user);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Delete({
+        path: '/laundry/:laundryId/delete',
+        description: 'Delete laundry',
+        response: LaundryMessageResponseDTO,
+    })
+    async deleteLaundry(
+        @Param('laundryId') laundryId: string,
+        @CurrentUser() user: User,
+    ): Promise<LaundryMessageResponseDTO> {
+        return await this._vendorService.deleteLaundry(laundryId, user);
+    }
+
+    // Laundry Service Management
+
+    @Authorized(UserType.ADMIN)
+    @Post({
+        path: '/laundry/:laundryId/service/create',
+        description: 'Add laundry service',
+        response: {},
+    })
+    async addLaundryService(
+        @Param('laundryId') laundryId: string,
+        @Body() data: LaundryServiceDTO,
+        @CurrentUser() user: User,
+    ): Promise<any> {
+        return await this._vendorService.addLaundryService(laundryId, data, user);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/laundry/:laundryId/services',
+        description: 'Get all services for a laundry',
+        response: {},
+    })
+    async getLaundryServices(@Param('laundryId') laundryId: string): Promise<any> {
+        // You'll need to add this method to vendor service
+        return await this._vendorService.getLaundryServices(laundryId);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/laundry/:laundryId/service/:serviceId/edit',
+        description: 'Edit laundry service',
+        response: LaundryServiceMessageResponseDTO,
+    })
+    async editLaundryService(
+        @Param('laundryId') laundryId: string,
+        @Param('serviceId') serviceId: string,
+        @Body() data: EditLaundryServiceRequestDTO,
+        @CurrentUser() user: User,
+    ): Promise<LaundryServiceMessageResponseDTO> {
+        return await this._vendorService.editLaundryService(laundryId, serviceId, data, user);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Delete({
+        path: '/laundry/:laundryId/service/:serviceId/delete',
+        description: 'Delete laundry service',
+        response: LaundryServiceMessageResponseDTO,
+    })
+    async deleteLaundryService(
+        @Param('laundryId') laundryId: string,
+        @Param('serviceId') serviceId: string,
+        @CurrentUser() user: User,
+    ): Promise<LaundryServiceMessageResponseDTO> {
+        return await this._vendorService.deleteLaundryService(laundryId, serviceId, user);
+    }
+
+    // Laundry Service Item Management
+
+    @Authorized(UserType.ADMIN)
+    @Post({
+        path: '/laundry/:laundryId/service/:serviceId/item',
+        description: 'Add laundry service item',
+        response: {},
+    })
+    async addLaundryServiceItem(
+        @Param('laundryId') laundryId: string,
+        @Param('serviceId') serviceId: string,
+        @Body() data: CreateLaundryServiceItemsArrayDTO,
+        @CurrentUser() user: User,
+    ): Promise<any> {
+        return await this._vendorService.addLaundryServiceItem(laundryId, serviceId, data, user);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/laundry/:laundryId/service/:serviceId/items',
+        description: 'Get all laundry service items',
+        response: {},
+    })
+    async getAllLaundryServiceItems(
+        @Param('laundryId') laundryId: string,
+        @Param('serviceId') serviceId: string,
+    ): Promise<any> {
+        return await this._vendorService.getAllLaundryServiceItems(laundryId, serviceId);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/laundry/:laundryId/service/:serviceId/item/:itemId/edit',
+        description: 'Edit laundry service item',
+        response: {},
+    })
+    async editLaundryServiceItem(
+        @Param('laundryId') laundryId: string,
+        @Param('serviceId') serviceId: string,
+        @Param('itemId') itemId: string,
+        @Body() data: EditLaundryServiceItemRequestDTO,
+        @CurrentUser() user: User,
+    ): Promise<any> {
+        return await this._vendorService.editLaundryServiceItem(laundryId, serviceId, itemId, data, user);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Delete({
+        path: '/laundry/:laundryId/service/:serviceId/item/:itemId/delete',
+        description: 'Delete laundry service item',
+        response: {},
+    })
+    async deleteLaundryServiceItem(
+        @Param('laundryId') laundryId: string,
+        @Param('serviceId') serviceId: string,
+        @Param('itemId') itemId: string,
+        @CurrentUser() user: User,
+    ): Promise<any> {
+        return await this._vendorService.deleteLaundryServiceItem(laundryId, serviceId, itemId, user);
+    }
+
+    // Laundry Item Category Management
+
+    @Authorized(UserType.ADMIN)
+    @Post({
+        path: '/category/create',
+        description: 'Create laundry item category',
+        response: LaundryItemCategoryResponseDTO,
+    })
+    async createLaundryItemCategory(
+        @Body() data: CreateLaundryItemCategoryRequestDTO,
+    ): Promise<LaundryItemCategoryResponseDTO> {
+        return await this._vendorService.createLaundryItemCategory(data);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/categories',
+        description: 'Get all laundry item categories',
+        response: GetAllLaundryItemCategoriesResponseDTO,
+    })
+    async getAllLaundryItemCategories(): Promise<GetAllLaundryItemCategoriesResponseDTO> {
+        return await this._vendorService.getAllLaundryItemCategories();
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/category/:categoryId',
+        description: 'Get laundry item category by id',
+        response: LaundryItemCategoryResponseDTO,
+    })
+    async getLaundryItemCategoryById(@Param('categoryId') categoryId: string): Promise<LaundryItemCategoryResponseDTO> {
+        return await this._vendorService.getLaundryItemCategoryById(categoryId);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/category/:categoryId/edit',
+        description: 'Edit laundry item category',
+        response: LaundryItemCategoryMessageResponseDTO,
+    })
+    async editLaundryItemCategory(
+        @Param('categoryId') categoryId: string,
+        @Body() data: EditLaundryItemCategoryRequestDTO,
+    ): Promise<LaundryItemCategoryMessageResponseDTO> {
+        return await this._vendorService.editLaundryItemCategory(categoryId, data);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Delete({
+        path: '/category/:categoryId/delete',
+        description: 'Delete laundry item category',
+        response: LaundryItemCategoryMessageResponseDTO,
+    })
+    async deleteLaundryItemCategory(
+        @Param('categoryId') categoryId: string,
+    ): Promise<LaundryItemCategoryMessageResponseDTO> {
+        return await this._vendorService.deleteLaundryItemCategory(categoryId);
     }
 }

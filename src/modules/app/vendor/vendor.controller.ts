@@ -1,11 +1,11 @@
 import { ApiController, Authorized, CurrentUser, Delete, Get, Patch, Post } from 'src/core/decorators';
 import VendorService from './vendor.service';
-import { User } from '@prisma/client';
+import { User, UserType } from '@prisma/client';
 import GetOrderRequestsResponseDTO from './dto/response/getOrderRequests.response';
 import { Body, Param } from '@nestjs/common';
 import UpdateStatusRequestDTO from './dto/request/updateStatus.request';
 import UpdateStatusResponseDTO from './dto/response/updateStatus.response';
-import  { LaundryServiceDTO } from './dto/request/createLaundry.request';
+import { LaundryServiceDTO } from './dto/request/createLaundry.request';
 import EditLaundryRequestDTO from './dto/request/editLaundry.request';
 import EditLaundryServiceRequestDTO from './dto/request/laundryServiceEdit.request';
 import { CreateLaundryServiceItemsArrayDTO } from './dto/request/createLaundryServiceItem.request';
@@ -111,21 +111,8 @@ export default class VendorController {
         return await this._vendorService.getLastCompletedOrder(user);
     }
 
-    // @Authorized()
-    // @Post({
-    //     path: '/laundry/create',
-    //     description: 'Add laundry',
-    //     response: CreateLaundryReponseDTO,
-    // })
-    // async addLaundry(
-    //     @Body() data: CreateLaundryRequestDTO,
-    //     @CurrentUser() user: User,
-    // ): Promise<CreateLaundryReponseDTO> {
-    //     return await this._vendorService.addLaundry(data, user);
-    // }
-
     @Get({
-        path: '/laundry/all',
+        path: '/laundries',
         description: 'Get all laundries',
         response: GetAllLaundriesResponseDTO,
     })
@@ -138,14 +125,11 @@ export default class VendorController {
         description: 'Get laundry by id',
         response: GetLaundryByIdResponseDTO,
     })
-    async getLaundryById(
-        @Param('laundryId') laundryId: string,
-        // @CurrentUser() user: User,
-    ): Promise<GetLaundryByIdResponseDTO> {
+    async getLaundryById(@Param('laundryId') laundryId: string): Promise<GetLaundryByIdResponseDTO> {
         return await this._vendorService.getLaundryById(laundryId);
     }
 
-    @Authorized()
+    @Authorized(UserType.ADMIN)
     @Patch({
         path: '/laundry/:laundryId/edit',
         description: 'Edit laundry',
@@ -159,7 +143,7 @@ export default class VendorController {
         return await this._vendorService.editLaundry(laundryId, data, user);
     }
 
-    @Authorized()
+    @Authorized(UserType.ADMIN)
     @Delete({
         path: '/laundry/:laundryId/delete',
         description: 'Delete laundry',
@@ -172,7 +156,7 @@ export default class VendorController {
         return await this._vendorService.deleteLaundry(laundryId, user);
     }
 
-    @Authorized()
+    @Authorized(UserType.ADMIN)
     @Post({
         path: '/laundry/:laundryId/service/create',
         description: 'Add laundry service',
@@ -186,7 +170,7 @@ export default class VendorController {
         return await this._vendorService.addLaundryService(laundryId, data, user);
     }
 
-    @Authorized()
+    @Authorized(UserType.ADMIN)
     @Patch({
         path: '/laundry/:laundryId/service/:serviceId/edit',
         description: 'Edit laundry service',
@@ -201,7 +185,7 @@ export default class VendorController {
         return await this._vendorService.editLaundryService(laundryId, serviceId, data, user);
     }
 
-    @Authorized()
+    @Authorized(UserType.ADMIN)
     @Delete({
         path: '/laundry/:laundryId/service/:serviceId/delete',
         description: 'Delete laundry service',
@@ -215,7 +199,7 @@ export default class VendorController {
         return await this._vendorService.deleteLaundryService(laundryId, serviceId, user);
     }
 
-    @Authorized()
+    @Authorized(UserType.ADMIN)
     @Post({
         path: '/laundry/:laundryId/service/:serviceId/item',
         description: 'Add laundry service item',
@@ -238,12 +222,11 @@ export default class VendorController {
     async getAllLaundryServiceItems(
         @Param('laundryId') laundryId: string,
         @Param('serviceId') serviceId: string,
-        // @CurrentUser() user: User,
     ): Promise<any> {
         return await this._vendorService.getAllLaundryServiceItems(laundryId, serviceId);
     }
 
-    @Authorized()
+    @Authorized(UserType.ADMIN)
     @Patch({
         path: '/laundry/:laundryId/service/:serviceId/item/:itemId/edit',
         description: 'Edit laundry service item',
@@ -259,7 +242,7 @@ export default class VendorController {
         return await this._vendorService.editLaundryServiceItem(laundryId, serviceId, itemId, data, user);
     }
 
-    @Authorized()
+    @Authorized(UserType.ADMIN)
     @Delete({
         path: '/laundry/:laundryId/service/:serviceId/item/:itemId/delete',
         description: 'Delete laundry service item',
@@ -274,6 +257,7 @@ export default class VendorController {
         return await this._vendorService.deleteLaundryServiceItem(laundryId, serviceId, itemId, user);
     }
 
+    @Authorized(UserType.ADMIN)
     @Post({
         path: '/category/create',
         description: 'Create laundry item category',
@@ -303,6 +287,7 @@ export default class VendorController {
         return await this._vendorService.getLaundryItemCategoryById(categoryId);
     }
 
+    @Authorized(UserType.ADMIN)
     @Patch({
         path: '/category/:categoryId/edit',
         description: 'Edit laundry item category',
@@ -315,6 +300,7 @@ export default class VendorController {
         return await this._vendorService.editLaundryItemCategory(categoryId, data);
     }
 
+    @Authorized(UserType.ADMIN)
     @Delete({
         path: '/category/:categoryId/delete',
         description: 'Delete laundry item category',

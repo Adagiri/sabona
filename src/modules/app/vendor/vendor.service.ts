@@ -26,6 +26,7 @@ export default class VendorService {
     constructor(
         private _dbService: DatabaseService,
         private _notificationService: NotificationService,
+        
     ) {}
 
     async getOrderRequests(user: User, param: GetOrderRequestDTO): Promise<GetOrderRequestsResponseDTO> {
@@ -1225,5 +1226,58 @@ export default class VendorService {
         });
 
         return { message: 'Category Deleted Successfully' };
+    }
+
+    async getLaundryServices(laundryId: string): Promise<any> {
+        try {
+            const laundry = await this._dbService.laundry.findUnique({
+                where: { id: laundryId, deletedAt: null },
+                include: {
+                    vendor: {
+                        select: {
+                            id: true,
+                            firstName: true,
+                            lastName: true,
+                            email: true,
+                        },
+                    },
+                },
+            });
+
+            if (!laundry) {
+                throw new BadRequestException('Laundry not found');
+            }
+
+            const services = await this._dbService.laundryService.findMany({
+                where: {
+                    laundryId: laundryId,
+                    deletedAt: null,
+                },
+                include: {
+                    _count: {
+                        select: {
+                            laundryServiceItems: {
+                                where: { deletedAt: null },
+                            },
+                        },
+                    },
+                },
+                orderBy: { createdAt: 'desc' },
+            });
+
+            return {
+                success: true,
+                message: 'Laundry services retrieved successfully',
+                data: services,
+                laundry: {
+                    id: laundry.id,
+                    name: laundry.name,
+                    address: laundry.address,
+                    vendor: laundry.vendor,
+                },
+            };
+        } catch (error) {
+            throw error;
+        }
     }
 }
