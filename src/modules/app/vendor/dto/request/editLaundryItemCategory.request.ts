@@ -1,13 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsInt } from 'class-validator';
+import { IsString, IsOptional, IsInt } from 'class-validator';
 
-export default class EditLaundryServiceRequestDTO {
-    @ApiProperty({ required: false })
+export class EditLaundryItemCategoryRequestDTO {
+    @ApiProperty({ description: 'Category name', required: false })
     @IsString()
     @IsOptional()
     name?: string;
 
-    @ApiProperty({ required: false })
+    @ApiProperty({ description: 'Category description', required: false })
     @IsString()
     @IsOptional()
     description?: string;

@@ -1,4 +1,4 @@
-import { Body, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { Body, Param, Query } from '@nestjs/common';
 import { User, UserType } from '@prisma/client';
 import { ApiController, Authorized, CurrentUser, Get, Patch, Post } from '../../../core/decorators';
 import FindUsersRequestDTO from './dto/request/find.request';

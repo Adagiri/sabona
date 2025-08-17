@@ -11,7 +11,7 @@
 // Learn more about Prisma: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   // output   = "../node_modules/.prisma/client"
   binaryTargets = ["rhel-openssl-1.0.x", "native"]
 }
@@ -33,6 +33,7 @@ enum UserType {
 enum UserStatus {
   ACTIVE
   INACTIVE
+  REJECTED
 }
 
 // DeviceType enum to identify the platform used by the user
@@ -130,7 +131,7 @@ model User {
   firstName        String? // Optional first name
   lastName         String? // Optional last name
   password         String? // Optional password field
-  phone            String?     @unique // Unique phone number for each user
+  phone            String?    @unique // Unique phone number for each user
   type             UserType   @default(USER) // Defines if user is USER, VENDOR, RIDER, etc.
   status           UserStatus @default(ACTIVE) // Active or inactive status
   profilePictureId Int? // Optional relation to user's profile picture
@@ -156,13 +157,29 @@ model User {
   Delivery     Delivery[]
   laundry      Laundry[]      @relation("VendorLaundry")
 
-  feedbacks Feedback[]
-  couponUsage  CouponUsage[]
+  feedbacks   Feedback[]
+  couponUsage CouponUsage[]
 
   reward Reward[]
 
   givenTips    Tip[] @relation("GivenTips") // Tips the user has given
   receivedTips Tip[] @relation("ReceivedTips") // Tips the user has received
+
+  vendorRelationAsMain   VendorRelation[] @relation("MainVendor")
+  vendorRelationAsBranch VendorRelation?  @relation("BranchVendor")
+}
+
+model VendorRelation {
+  id           String    @id @default(uuid())
+  mainVendorId String
+  mainVendor   User      @relation("MainVendor", fields: [mainVendorId], references: [id])
+  branchId     String    @unique // Each branch can only have one main vendor
+  branch       User      @relation("BranchVendor", fields: [branchId], references: [id])
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime? @db.Timestamptz() // Optional deleted at timestamp
+
+  @@unique([mainVendorId, branchId])
+  @@index([mainVendorId])
 }
 
 model UserAddress {
@@ -181,18 +198,25 @@ model UserAddress {
 
 // UserSettings model for storing user-specific settings (e.g., location)
 model UserSettings {
-  id                    Int       @id @default(autoincrement()) // Using Int for settings ID
+  id                    Int     @id @default(autoincrement()) // Using Int for settings ID
   lat                   Float?
   long                  Float?
-  userId                String    @unique // Changed to String to match User's UUID
-  user                  User      @relation(fields: [userId], references: [id])
-  isOnboardingCompleted Boolean   @default(false) // Flag to track onboarding completion
-  state                 String?
-  city                  String?
-  postalCode            String?
-  createdAt             DateTime  @default(now()) @db.Timestamptz()
-  updatedAt             DateTime  @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt             DateTime? @db.Timestamptz()
+  userId                String  @unique // Changed to String to match User's UUID
+  user                  User    @relation(fields: [userId], references: [id])
+  isOnboardingCompleted Boolean @default(false) // Flag to track onboarding completion
+
+  // FIELDS FOR ONBOARDING
+  laundryName         String? // Laundry Name provided during Vendor signup
+  contactPhone        String? // Phone number that riders and customers can call
+  rejectionReason     String? // Admin's reason for rejection
+  isDocumentsUploaded Boolean @default(false) // Verification flag
+
+  state      String?
+  city       String?
+  postalCode String?
+  createdAt  DateTime  @default(now()) @db.Timestamptz()
+  updatedAt  DateTime  @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt  DateTime? @db.Timestamptz()
 }
 
 // DeviceToken model to store device tokens for push notifications
@@ -234,23 +258,25 @@ model Token {
 
 // Media model to store media files uploaded by users
 model Media {
-  id        Int         @id @default(autoincrement()) // Using Int for media ID
-  name      String // Media name
-  extension String // File extension (e.g., jpg, png)
-  type      MediaType // Media type (image, video, etc.)
-  access    MediaAccess // Access level (public/private)
-  size      Float?
-  location  String? // Optional location URL
-  path      String // Path to the file
-  thumbPath String? // Optional thumbnail path
-  status    MediaStatus @default(UPLOADING) // Upload status
-  meta      Json?       @db.JsonB
-  userId    String?
-  createdAt DateTime    @default(now()) @db.Timestamptz()
-  updatedAt DateTime    @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt DateTime?   @db.Timestamptz()
-  user      User?       @relation("MediaOwner", fields: [userId], references: [id])
-  users     User[] // Users related to this media (for example, profile pictures)
+  id                    Int                   @id @default(autoincrement()) // Using Int for media ID
+  name                  String // Media name
+  extension             String // File extension (e.g., jpg, png)
+  type                  MediaType // Media type (image, video, etc.)
+  access                MediaAccess // Access level (public/private)
+  size                  Float?
+  location              String? // Optional location URL
+  path                  String // Path to the file
+  thumbPath             String? // Optional thumbnail path
+  status                MediaStatus           @default(UPLOADING) // Upload status
+  meta                  Json?                 @db.JsonB
+  userId                String?
+  createdAt             DateTime              @default(now()) @db.Timestamptz()
+  updatedAt             DateTime              @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt             DateTime?             @db.Timestamptz()
+  user                  User?                 @relation("MediaOwner", fields: [userId], references: [id])
+  users                 User[] // Users related to this media (for example, profile pictures)
+  laundryItemCategories LaundryItemCategory[]
+  laundryServices       LaundryService[]      @relation("LaundryServiceIcons") 
 }
 
 model Reward {
@@ -348,9 +374,11 @@ model Delivery {
 model Laundry {
   id             String           @id @default(uuid())
   name           String // Name of the laundry
-  address        String // Address of the laundry
-  vendor         User?            @relation("VendorLaundry", fields: [vendorId], references: [id])
-  vendorId       String?
+  address        String? // Address of the laundry
+  lat            Float // Latitude of the laundry address
+  long           Float // Longitude of the laundry address 
+  vendor         User             @relation("VendorLaundry", fields: [vendorId], references: [id])
+  vendorId       String
   createdAt      DateTime         @default(now()) @db.Timestamptz()
   updatedAt      DateTime         @default(now()) @updatedAt @db.Timestamptz()
   deletedAt      DateTime?        @db.Timestamptz()
@@ -366,19 +394,35 @@ model LaundryService {
   laundry             Laundry               @relation(fields: [laundryId], references: [id])
   name                String // Name of the service (e.g., "Wash & Fold")
   description         String? // Optional description of the service
-  laundryServiceItems LaundryServiceItem[] // Relation to LaundryServiceItem model
+  iconId              Int? // Reference to Media for SVG icon
+  icon                Media? @relation("LaundryServiceIcons", fields: [iconId], references: [id])
+  laundryServiceItems LaundryServiceItem[]  // Relation to LaundryServiceItem model
   createdAt           DateTime              @default(now()) @db.Timestamptz()
   updatedAt           DateTime              @default(now()) @updatedAt @db.Timestamptz()
   deletedAt           DateTime?             @db.Timestamptz()
   OrderLaundryService OrderLaundryService[]
 }
 
+model LaundryItemCategory {
+  id                  String               @id @default(uuid())
+  name                String               @unique
+  description         String?
+  iconId              Int? // Reference to Media for SVG icon
+  icon                Media?               @relation(fields: [iconId], references: [id])
+  laundryServiceItems LaundryServiceItem[] // Relation to LaundryServiceItem
+  createdAt           DateTime             @default(now()) @db.Timestamptz()
+  updatedAt           DateTime             @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt           DateTime?            @db.Timestamptz()
+}
+
 model LaundryServiceItem {
   id                      String                    @id @default(uuid())
   laundryServiceId        String // Foreign key to LaundryService model
   laundryService          LaundryService            @relation(fields: [laundryServiceId], references: [id])
+  categoryId              String? // Foreign key to LaundryItemCategory
+  category                LaundryItemCategory?      @relation(fields: [categoryId], references: [id])
   name                    String // Name of the item (e.g., "T-shirt")
-  price                   Float // Price of the item
+  price                   Float // Price of the item (keep existing field)
   createdAt               DateTime                  @default(now()) @db.Timestamptz()
   updatedAt               DateTime                  @default(now()) @updatedAt @db.Timestamptz()
   deletedAt               DateTime?                 @db.Timestamptz()
@@ -414,22 +458,22 @@ model OrderLaundryServiceItem {
 // Update the Order model to include pickup and delivery addresses
 // Order model to represent a user's order
 model Order {
-  id          String                @id @default(uuid()) // UUID for order ID
-  orderNumber Int?                  @default(autoincrement()) // Auto-incrementing order number
-  userId      String // User who placed the order
-  user        User                  @relation(fields: [userId], references: [id])
-  laundryId   String // Foreign key to the Laundry model
-  laundry     Laundry               @relation(fields: [laundryId], references: [id])
-  status      OrderStatus           @default(PENDING) // High-level status of the order
-  baseAmount   Float? // Base amount before discounts
-  discountAmount Float?              // Amount discounted due to the coupon
-  totalAmount Float // Total amount for the order
-  couponId         String?               // Nullable coupon ID field
-  coupon           Coupon?               @relation(fields: [couponId], references: [id])
-  services    OrderLaundryService[]
-  payment     Payment? // Payment details for the order
-  paymentType PaymentType? // Payment type for the order
-  paid        Boolean?
+  id             String                @id @default(uuid()) // UUID for order ID
+  orderNumber    Int?                  @default(autoincrement()) // Auto-incrementing order number
+  userId         String // User who placed the order
+  user           User                  @relation(fields: [userId], references: [id])
+  laundryId      String // Foreign key to the Laundry model
+  laundry        Laundry               @relation(fields: [laundryId], references: [id])
+  status         OrderStatus           @default(PENDING) // High-level status of the order
+  baseAmount     Float? // Base amount before discounts
+  discountAmount Float? // Amount discounted due to the coupon
+  totalAmount    Float // Total amount for the order
+  couponId       String? // Nullable coupon ID field
+  coupon         Coupon?               @relation(fields: [couponId], references: [id])
+  services       OrderLaundryService[]
+  payment        Payment? // Payment details for the order
+  paymentType    PaymentType? // Payment type for the order
+  paid           Boolean?
 
   tip Tip[] // Tip details for the order
 
@@ -500,7 +544,7 @@ model Feedback {
   vendorOrderId String?
   RiderOrder    RiderOrder?  @relation(fields: [riderOrderId], references: [id])
   laundryId     String?
-  Laundry      Laundry?     @relation(fields: [laundryId], references: [id])
+  Laundry       Laundry?     @relation(fields: [laundryId], references: [id])
   riderOrderId  String?
   deletedAt     DateTime?    @db.Timestamptz()
 }
@@ -524,24 +568,25 @@ enum PaymentTransactionType {
   ORDER
   TIP
 }
-model Payment {
-  id                   String   @id @default(uuid()) // UUID for payment ID
-  orderId              String?   @unique
-  order                Order?  @relation(fields: [orderId], references: [id])
 
-  tipTransactionId String? @unique // Foreign key to TipTransaction
+model Payment {
+  id      String  @id @default(uuid()) // UUID for payment ID
+  orderId String? @unique
+  order   Order?  @relation(fields: [orderId], references: [id])
+
+  tipTransactionId String?         @unique // Foreign key to TipTransaction
   tipTransaction   TipTransaction? @relation(fields: [tipTransactionId], references: [id])
 
-  paymentType PaymentTransactionType?  @default(ORDER)// Type of payment (e.g., Order payment , Tip payment)
+  paymentType PaymentTransactionType? @default(ORDER) // Type of payment (e.g., Order payment , Tip payment)
 
   transactionRef String // PayTabs transaction reference
-  amount     Float    // Total transaction amount
-  type      String   // Type of transaction (e.g., Sale, Refund)
-  status        String   // Payment Status 
-  paymentMethod        String   // Payment Method (e.g., Visa, MasterCard)
+  amount         Float // Total transaction amount
+  type           String // Type of transaction (e.g., Sale, Refund)
+  status         String // Payment Status 
+  paymentMethod  String // Payment Method (e.g., Visa, MasterCard)
 
-  createdAt            DateTime @default(now()) @db.Timestamptz() // Timestamp of creation
-  updatedAt            DateTime @default(now()) @updatedAt @db.Timestamptz() // Timestamp of last update
+  createdAt DateTime @default(now()) @db.Timestamptz() // Timestamp of creation
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz() // Timestamp of last update
 }
 
 enum CouponType {
@@ -550,32 +595,32 @@ enum CouponType {
 }
 
 model Coupon {
-  id          String   @id @default(uuid())
-  code        String   @unique
-  name      String
-  discount     Float
-  type         CouponType
-  maxDiscount Float?      // For percentage-based discounts
-  minOrderAmount Float?      // Minimum order amount required to apply this coupon
-  expiryDate  DateTime
-  startDate  DateTime?
-  isActive    Boolean  @default(true)
-  usageLimit  Int?     // Maximum allowed uses for this coupon
-  singleUse   Boolean  @default(true) // True for single-use per user
-  orders            Order[]   
-  couponUsage  CouponUsage[]  // Relation to track usage by individual users
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  id             String        @id @default(uuid())
+  code           String        @unique
+  name           String
+  discount       Float
+  type           CouponType
+  maxDiscount    Float? // For percentage-based discounts
+  minOrderAmount Float? // Minimum order amount required to apply this coupon
+  expiryDate     DateTime
+  startDate      DateTime?
+  isActive       Boolean       @default(true)
+  usageLimit     Int? // Maximum allowed uses for this coupon
+  singleUse      Boolean       @default(true) // True for single-use per user
+  orders         Order[]
+  couponUsage    CouponUsage[] // Relation to track usage by individual users
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
 }
 
 model CouponUsage {
-  id        String   @id @default(uuid())
-  userId    String   // User ID who used the coupon
-  user      User     @relation(fields: [userId], references: [id]) // Relation to the User table
-  couponId  String   // Coupon ID
-  coupon    Coupon   @relation(fields: [couponId], references: [id]) // Relation to the Coupon table
-  createdAt DateTime @default(now())
+  id        String    @id @default(uuid())
+  userId    String // User ID who used the coupon
+  user      User      @relation(fields: [userId], references: [id]) // Relation to the User table
+  couponId  String // Coupon ID
+  coupon    Coupon    @relation(fields: [couponId], references: [id]) // Relation to the Coupon table
+  createdAt DateTime  @default(now())
   deletedAt DateTime?
 }
 
@@ -607,13 +652,13 @@ model Tip {
 }
 
 model TipTransaction {
-  id        String      @id @default(uuid()) // Unique transaction ID
+  id     String @id @default(uuid()) // Unique transaction ID
   // transactionRef String   @unique
   // transactionId  String   @unique             // Unique transaction reference (PayTabs)
-  amount    Float // Total amount for all tips in this transaction
-  tips      Tip[] // Connects to multiple tips
+  amount Float // Total amount for all tips in this transaction
+  tips   Tip[] // Connects to multiple tips
 
-  payment  Payment?
+  payment Payment?
 
   createdAt DateTime @default(now()) @db.Timestamptz()
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()

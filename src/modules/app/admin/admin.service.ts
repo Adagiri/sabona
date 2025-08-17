@@ -1,14 +1,23 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
-import { OrderListDto } from '../customer/dto/response/orderlist.response.dto';
 import { AllOrderListDto } from './dto/response/allorderlist.response.dto';
-import { AllUserListDto } from './dto/response/allCustomerList.response.dto';
 import FindUsersRequestDTO from '../user/dto/request/find.request';
 import FindUsersResponseDTO from '../user/dto/response/find.response';
 import { CouponType, Prisma, UserStatus, UserType } from '@prisma/client';
-import { DateFilter, extractTokens, GetDateFilterOptions, GetOrderOptions, GetPaginationOptions, GetSlotFilterOptions, SlotFilter } from 'src/helpers/util.helper';
+import {
+    extractTokens,
+    GetDateFilterOptions,
+    GetOrderOptions,
+    GetPaginationOptions,
+    GetSlotFilterOptions,
+} from 'src/helpers/util.helper';
 import FindOrderRequestDTO from './dto/request/find.request';
-import FindApplicationRequestDTO from './dto/request/application.request';
+import FindApplicationRequestDTO, {
+    AdminSearchMainVendorsRequestDTO,
+    ApproveApplicationRequestDTO,
+    RejectApplicationRequestDTO,
+    UploadApplicationDocumentsRequestDTO,
+} from './dto/request/application.request';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
 import ApplicationApproveMessageResponseDTO from './dto/response/approve.response.dto';
 import NotificationService from '../notification/notification.service';
@@ -21,17 +30,23 @@ import S3Service from '../media/s3.service';
 import { UserDto } from './dto/response/userdetails.response';
 import { SlotRequest } from '../customer/dto/request/slotRequest';
 import { AllTipsResponseDTO } from './dto/response/allTips.response';
+import {
+    ApplicationRejectMessageResponseDTO,
+    UploadApplicationDocumentsResponseDTO,
+} from './dto/response/application.response';
+import { MainVendorSearchResultDTO } from './dto/response/vendor.response';
+import MediaService from '../media/media.service';
 
 @Injectable()
 export default class AdminService {
     constructor(
         private _dbService: DatabaseService,
         private _notificationService: NotificationService,
-        private _s3service: S3Service
-    ) { }
+        private _s3service: S3Service,
+        private _mediaService: MediaService,
+    ) {}
 
     async GetAllOrders(data: FindOrderRequestDTO): Promise<AllOrderListDto> {
-
         const where: Prisma.OrderWhereInput = {
             ...(!!data.type && { status: data.type }), // Only include 'status' condition if it exists
         };
@@ -51,14 +66,14 @@ export default class AdminService {
                         firstName: true,
                         lastName: true,
                         phone: true,
-                    }
+                    },
                 },
                 totalAmount: true,
                 coupon: {
                     select: {
                         code: true,
                         id: true,
-                    }
+                    },
                 },
                 riderOrders: {
                     select: {
@@ -67,9 +82,9 @@ export default class AdminService {
                                 firstName: true,
                                 lastName: true,
                                 phone: true,
-                            }
-                        }
-                    }
+                            },
+                        },
+                    },
                 },
                 services: {
                     select: {
@@ -86,8 +101,8 @@ export default class AdminService {
                         vendor: {
                             select: {
                                 phone: true,
-                            }
-                        }
+                            },
+                        },
                     },
                 },
                 delivery: {
@@ -97,9 +112,9 @@ export default class AdminService {
                                 firstName: true,
                                 lastName: true,
                                 phone: true,
-                            }
-                        }
-                    }
+                            },
+                        },
+                    },
                 },
                 pickup: {
                     select: {
@@ -108,13 +123,13 @@ export default class AdminService {
                                 firstName: true,
                                 lastName: true,
                                 phone: true,
-                            }
+                            },
                         },
                         pickupLat: true,
                         pickupLong: true,
                         pickupAddress: true,
-                    }
-                }
+                    },
+                },
             },
             ...pagination,
             orderBy: order,
@@ -127,10 +142,7 @@ export default class AdminService {
         // Calculate totalQuantity for each order
         const ordersWithTotalQuantity = orders.map((order) => {
             const totalQuantity = order.services.reduce((orderTotal, service) => {
-                const serviceTotal = service.items.reduce(
-                    (itemTotal, item) => itemTotal + item.quantity,
-                    0,
-                );
+                const serviceTotal = service.items.reduce((itemTotal, item) => itemTotal + item.quantity, 0);
                 return orderTotal + serviceTotal;
             }, 0);
 
@@ -151,7 +163,7 @@ export default class AdminService {
     async Find(data: FindUsersRequestDTO): Promise<FindUsersResponseDTO> {
         const where: Prisma.UserWhereInput = {
             ...(!!data.type && { type: data.type }),
-            ...GetDateFilterOptions(data.dateFilter)
+            ...GetDateFilterOptions(data.dateFilter),
         };
         const pagination = GetPaginationOptions(data);
         const order = GetOrderOptions(data);
@@ -170,14 +182,14 @@ export default class AdminService {
                 level: UserType.USER === data.type ? true : false,
                 medias: {
                     where: {
-                        deletedAt: null
+                        deletedAt: null,
                     },
                     select: {
                         id: true,
                         location: true,
-                        status: true
-                    }
-                }
+                        status: true,
+                    },
+                },
             },
             where,
             ...pagination,
@@ -194,7 +206,7 @@ export default class AdminService {
     async GetAllApplications(data: FindApplicationRequestDTO): Promise<FindUsersResponseDTO> {
         const where: Prisma.UserWhereInput = {
             ...(!!data.type && { type: data.type }),
-            ...({ status: UserStatus.INACTIVE }),
+            ...{ status: UserStatus.INACTIVE },
         };
         const pagination = GetPaginationOptions(data);
         const order = GetOrderOptions(data);
@@ -223,40 +235,164 @@ export default class AdminService {
         return { data: applications, count };
     }
 
-    async ApproveApplication(userId: string): Promise<ApplicationApproveMessageResponseDTO> {
+    async searchMainVendors(data: AdminSearchMainVendorsRequestDTO): Promise<MainVendorSearchResultDTO[]> {
+        const limit = Math.min(data.limit || 50, 100); // Cap at 100 results max
 
+        const mainVendors = await this._dbService.user.findMany({
+            where: {
+                type: UserType.VENDOR,
+                status: UserStatus.ACTIVE,
+                deletedAt: null,
+                settings: {
+                    laundryName: {
+                        contains: data.laundryName,
+                        mode: 'insensitive',
+                    },
+                },
+                vendorRelationAsBranch: null, // User is not a branch of another vendor
+            },
+            include: {
+                settings: {
+                    select: {
+                        laundryName: true,
+                    },
+                },
+                vendorRelationAsMain: true, // Get all branch relations
+            },
+            orderBy: [
+                // Prioritize exact matches
+                {
+                    settings: {
+                        laundryName: 'asc',
+                    },
+                },
+                { createdAt: 'desc' },
+            ],
+            take: limit, // Limit results
+        });
+
+        return mainVendors.map((vendor) => ({
+            id: vendor.id,
+            phone: vendor.phone,
+            laundryName: vendor.settings?.laundryName || null,
+            branchCount: vendor.vendorRelationAsMain.length,
+            createdAt: vendor.createdAt,
+        }));
+    }
+
+    async ApproveApplication(
+        userId: string,
+        data: ApproveApplicationRequestDTO,
+    ): Promise<ApplicationApproveMessageResponseDTO> {
         const user = await this._dbService.user.findUnique({
             where: { id: userId },
+            include: {
+                settings: {
+                    select: {
+                        isOnboardingCompleted: true,
+                        laundryName: true,
+                        long: true,
+                        lat: true,
+                    },
+                },
+            },
         });
 
         if (!user) {
             throw new BadRequestException('User not found');
         }
 
-        if (user.status !== UserStatus.INACTIVE) {
+        if (user.status === UserStatus.ACTIVE) {
             throw new BadRequestException('Application is already approved');
         }
 
+        if (user.status === UserStatus.REJECTED) {
+            throw new BadRequestException('Application was already rejected');
+        }
 
-        await this._dbService.user.update({
-            where: { id: userId },
-            data: { status: UserStatus.ACTIVE },
+        // Validate main vendor if provided
+        if (data.mainVendorId) {
+            const mainVendor = await this._dbService.user.findUnique({
+                where: { id: data.mainVendorId },
+            });
+
+            if (!mainVendor) {
+                throw new NotFoundException('Main vendor not found');
+            }
+
+            const isBranch = await this._dbService.vendorRelation.findUnique({
+                where: { branchId: data.mainVendorId },
+            });
+
+            if (isBranch) {
+                throw new BadRequestException('Specified vendor is not a main vendor');
+            }
+
+            if (mainVendor.status !== UserStatus.ACTIVE) {
+                throw new BadRequestException('Main vendor must be approved');
+            }
+        }
+
+        await this._dbService.$transaction(async (tx) => {
+            await tx.user.update({
+                where: { id: userId },
+                data: {
+                    status: UserStatus.ACTIVE,
+                },
+            });
+
+            await tx.userSettings.update({
+                where: { userId: userId },
+
+                data: {
+                    isOnboardingCompleted: true,
+                    contactPhone: data.contactPhone,
+                },
+            });
+
+            if (data.mainVendorId) {
+                await tx.vendorRelation.upsert({
+                    where: { branchId: userId },
+                    update: { mainVendorId: data.mainVendorId },
+                    create: {
+                        branchId: userId,
+                        mainVendorId: data.mainVendorId,
+                    },
+                });
+            } else {
+                // Remove vendor relation if exists
+                await tx.vendorRelation.deleteMany({
+                    where: { branchId: userId },
+                });
+            }
+
+            if (user.type === UserType.VENDOR) {
+                await tx.laundry.create({
+                    data: {
+                        name: user.settings?.laundryName || 'Default Laundry Name',
+                        long: user.settings?.long || 0,
+                        lat: user.settings?.lat || 0,
+                        address: data.address,
+                        vendorId: user.id,
+                    },
+                });
+            }
         });
 
+        // Send notifications (outside transaction for performance)
         const deviceTokens = await this._dbService.deviceToken.findMany({
             where: {
                 userId: userId,
-                deletedAt: null
+                deletedAt: null,
             },
             select: {
                 token: true,
-
-            }
+            },
         });
 
         const userTokens = extractTokens(deviceTokens);
 
-        const data = {
+        const notificationPayload = {
             tokens: userTokens,
             title: 'Application Approved',
             body: 'Your application has been approved successfully',
@@ -265,25 +401,60 @@ export default class AdminService {
                 key: 'FETCH_USER_DETAILS',
                 route: '',
             },
-
         };
 
         if (userTokens?.length) {
             try {
-                const res = await this._notificationService.SendNotificationToMultipleTokens(data);
-                console.log("RESS", res?.responses?.map((e) => {
-                    console.log('ERROR', e)
-                }))
-            }
-            catch (error) {
-                console.log('error', error)
+                const res = await this._notificationService.SendNotificationToMultipleTokens(notificationPayload);
+                console.log(
+                    'RESS',
+                    res?.responses?.map((e) => {
+                        console.log('ERROR', e);
+                    }),
+                );
+            } catch (error) {
+                console.log('error', error);
             }
         } else {
-            console.log('NO TOKENS TO SEND NOTIFICAITON')
+            console.log('NO TOKENS TO SEND NOTIFICATION');
         }
 
-
         return { message: 'Application approved successfully' };
+    }
+
+    async RejectApplication(
+        userId: string,
+        data: RejectApplicationRequestDTO,
+    ): Promise<ApplicationRejectMessageResponseDTO> {
+        const vendor = await this._dbService.user.findUnique({
+            where: { id: userId },
+            include: {
+                settings: true,
+            },
+        });
+
+        if (!vendor) {
+            throw new NotFoundException('Vendor not found');
+        }
+
+        if (vendor.status !== UserStatus.INACTIVE) {
+            throw new BadRequestException('Vendor is not in pending status');
+        }
+
+        await this._dbService.$transaction([
+            this._dbService.user.update({
+                where: { id: vendor.id },
+                data: { status: UserStatus.REJECTED },
+            }),
+            this._dbService.userSettings.update({
+                where: { userId: vendor.id },
+                data: { rejectionReason: data.rejectionReason },
+            }),
+        ]);
+
+        return {
+            message: 'Vendor rejected successfully',
+        };
     }
 
     async GetCustomersLocation(): Promise<AllUserLocationsResponseDTO> {
@@ -293,13 +464,13 @@ export default class AdminService {
                 settings: {
                     select: {
                         lat: true,
-                        long: true
-                    }
-                }
+                        long: true,
+                    },
+                },
             },
             where: {
                 type: UserType.USER,
-            }
+            },
         });
 
         if (!users) {
@@ -313,17 +484,17 @@ export default class AdminService {
         const couponCodeAlreadyExists = await this._dbService.coupon.findUnique({
             where: {
                 code: data.code.toUpperCase(),
-            }
-        })
+            },
+        });
 
         if (couponCodeAlreadyExists) {
-            throw new BadRequestException("Coupon code already exists");
+            throw new BadRequestException('Coupon code already exists');
         }
 
         if (data.type === CouponType.FIXED && !data.minOrderAmount) {
             throw new BadRequestException('Minimum order amount is required for fixed discount coupons');
         }
-    
+
         const coupon = await this._dbService.coupon.create({
             data: {
                 code: data.code.toUpperCase(),
@@ -337,8 +508,8 @@ export default class AdminService {
                 singleUse: data.singleUse,
                 minOrderAmount: data.minOrderAmount,
                 isActive: data.isActive,
-            }
-        })
+            },
+        });
 
         if (!coupon) {
             throw new BadRequestException('Error creating coupon');
@@ -364,7 +535,6 @@ export default class AdminService {
                 minOrderAmount: true,
                 isActive: true,
             },
-            
         });
         const couponsPaginated = await this._dbService.coupon.findMany({
             select: {
@@ -384,7 +554,7 @@ export default class AdminService {
             ...pagination,
             orderBy: {
                 createdAt: 'desc',
-            }
+            },
         });
 
         if (!couponsPaginated) {
@@ -393,16 +563,15 @@ export default class AdminService {
         const res = {
             count: couponsTotal.length,
             coupons: couponsPaginated,
-        }
+        };
         return res;
-
     }
 
     async getCouponUsage(id: string, query: PaginatedRequest): Promise<CouponUsagePaginatedResponseDTO> {
         const pagination = GetPaginationOptions(query);
         const coupon = await this._dbService.coupon.findUnique({
             where: {
-                id
+                id,
             },
             select: {
                 name: true,
@@ -411,8 +580,8 @@ export default class AdminService {
                 expiryDate: true,
                 discount: true,
                 type: true,
-            }
-        })
+            },
+        });
 
         if (!coupon) {
             throw new BadRequestException('Coupon not found');
@@ -421,14 +590,14 @@ export default class AdminService {
             where: {
                 couponId: id,
             },
-        })
+        });
 
         const couponCount = await this._dbService.couponUsage.findMany({
             where: {
                 couponId: id,
             },
             distinct: ['userId'],
-        })
+        });
 
         const couponUsagePaginated = await this._dbService.couponUsage.findMany({
             where: {
@@ -442,14 +611,14 @@ export default class AdminService {
                         firstName: true,
                         lastName: true,
                         phone: true,
-                    }
+                    },
                 },
                 coupon: {
                     select: {
                         id: true,
                         code: true,
                         name: true,
-                    }
+                    },
                 },
             },
             distinct: ['userId'],
@@ -468,35 +637,34 @@ export default class AdminService {
                         totalAmount: true,
                         userId: true,
                         orderNumber: true,
-                    }
+                    },
                 });
-        
+
                 return {
                     ...usage,
                     coupon: {
                         ...usage.coupon,
                         orders, // Attach filtered orders
-                    }
+                    },
                 };
-            })
+            }),
         );
-        
+
         if (!couponUsagePaginated) {
-            throw new Error('Coupon usage not found'); 
+            throw new Error('Coupon usage not found');
         }
-       
-        return { 
+
+        return {
             data: {
                 usage: couponUsageWithFilteredOrders,
                 totalUsageCount: couponDetails.length,
                 count: couponCount.length,
                 coupon,
-            }
-        }
+            },
+        };
     }
 
     async GetUserDetails(userId: string): Promise<UserDto> {
-
         const user = await this._dbService.user.findUnique({
             where: { id: userId },
             select: {
@@ -508,15 +676,16 @@ export default class AdminService {
                 type: true,
                 status: true,
                 receivedTips: true,
+                createdAt: true,
                 medias: {
                     where: { deletedAt: null },
                     select: {
                         id: true,
                         location: true,
-                        status: true
-                    }
-                }
-            }
+                        status: true,
+                    },
+                },
+            },
         });
 
         if (user.medias?.length) {
@@ -524,7 +693,7 @@ export default class AdminService {
                 user.medias.map(async (media) => ({
                     ...media,
                     location: await this._s3service.GetSignedUrl(media.location),
-                }))
+                })),
             );
         }
 
@@ -532,12 +701,12 @@ export default class AdminService {
             throw new BadRequestException('User not found');
         }
 
-        return user
+        return user;
     }
 
-    async GetDriverTips(userId:string, data:SlotRequest): Promise<any> {
+    async GetDriverTips(userId: string, data: SlotRequest): Promise<any> {
         const slotFilter = GetSlotFilterOptions(data.startDate, data.endDate);
-   
+
         const driver = await this._dbService.user.findFirst({
             where: {
                 id: userId,
@@ -549,7 +718,7 @@ export default class AdminService {
                 receivedTips: {
                     where: {
                         paid: true,
-                        ...slotFilter
+                        ...slotFilter,
                     },
                     select: {
                         id: true,
@@ -557,9 +726,9 @@ export default class AdminService {
                         paid: true,
                         orderId: true,
                         createdAt: true,
-                    }
-                }
-            }
+                    },
+                },
+            },
         });
 
         if (!driver) {
@@ -575,11 +744,11 @@ export default class AdminService {
         const tips = await this._dbService.tip.findMany({
             where: {
                 paid: true,
-            }
-        })
+            },
+        });
 
         const paginatedTips = await this._dbService.tip.findMany({
-            where:{
+            where: {
                 paid: true,
             },
             select: {
@@ -593,7 +762,7 @@ export default class AdminService {
             ...pagination,
             orderBy: {
                 createdAt: 'desc',
-            }
+            },
         });
 
         if (!paginatedTips) {
@@ -602,5 +771,219 @@ export default class AdminService {
 
         return { data: paginatedTips, count: tips.length };
     }
-}
 
+    async getSubVendorsForMainVendor(mainVendorId: string) {
+        const mainVendor = await this._dbService.user.findUnique({
+            where: { id: mainVendorId },
+            include: {
+                settings: { select: { laundryName: true } },
+            },
+        });
+
+        if (!mainVendor) {
+            throw new NotFoundException('Main vendor not found');
+        }
+
+        const isBranch = await this._dbService.vendorRelation.findFirst({
+            where: { branchId: mainVendorId },
+        });
+
+        console.log(mainVendorId);
+        if (isBranch) {
+            throw new BadRequestException('Specified vendor is not a main vendor');
+        }
+
+        const branches = await this._dbService.vendorRelation.findMany({
+            where: { mainVendorId },
+            include: {
+                branch: {
+                    include: {
+                        settings: { select: { laundryName: true } },
+                    },
+                },
+            },
+        });
+
+        const subVendors = branches.map((relation) => ({
+            id: relation.branch.id,
+            phone: relation.branch.phone,
+            laundryName: relation.branch.settings?.laundryName || null,
+            status: relation.branch.status,
+            createdAt: relation.branch.createdAt,
+        }));
+
+        return {
+            mainVendor: {
+                id: mainVendor.id,
+                phone: mainVendor.phone,
+                laundryName: mainVendor.settings?.laundryName,
+                status: mainVendor.status,
+            },
+            subVendors,
+            totalSubVendors: subVendors.length,
+        };
+    }
+
+    async getApplicationDocuments(userId: string) {
+        const documents = await this._dbService.media.findMany({
+            where: {
+                userId,
+                meta: {
+                    path: ['uploadedFor'],
+                    equals: 'application-verification',
+                },
+            },
+            select: {
+                id: true,
+                name: true,
+                path: true,
+                location: true,
+                access: true,
+                meta: true,
+                status: true,
+                updatedAt: true
+            },
+        });
+
+        function hasDocType(meta: any): meta is { docType: string } {
+            return meta && typeof meta === 'object' && typeof meta.docType === 'string';
+        }
+
+        // Helper function to get the appropriate URL for viewing
+        const getViewableUrl = async (doc: any) => {
+            // Only return URLs for ready media
+            if (doc.status !== 'READY') {
+                return null;
+            }
+
+            if (doc.access === 'PUBLIC') {
+                // Public media can use the direct path
+                return doc.path;
+            } else {
+                // Private media needs a signed URL
+                try {
+                    const signedUrlResponse = await this._mediaService.GetSignedUrl(doc.location);
+                    return signedUrlResponse.message; // The signed URL is in the message field
+                } catch (error) {
+                    console.error(`Failed to get signed URL for media ${doc.id}:`, error);
+                    return null;
+                }
+            }
+        };
+
+        // Find documents and get their viewable URLs
+        const vatNumberDoc = documents.find((doc) => hasDocType(doc.meta) && doc.meta.docType === 'VAT_NUMBER_DOC');
+        const businessCertDoc = documents.find(
+            (doc) => hasDocType(doc.meta) && doc.meta.docType === 'BUSINESS_CERT_DOC',
+        );
+
+        // Build response with viewable URLs
+        const response: any = {};
+
+        if (vatNumberDoc) {
+            response.vatNumberDoc = {
+                id: vatNumberDoc.id,
+                name: vatNumberDoc.name,
+                url: await getViewableUrl(vatNumberDoc),
+                access: vatNumberDoc.access,
+                status: vatNumberDoc.status,
+                updatedAt: vatNumberDoc.updatedAt
+            };
+        }
+
+        if (businessCertDoc) {
+            response.businessCertDoc = {
+                id: businessCertDoc.id,
+                name: businessCertDoc.name,
+                url: await getViewableUrl(businessCertDoc),
+                access: businessCertDoc.access,
+                status: businessCertDoc.status,
+                updatedAt: vatNumberDoc.updatedAt,
+            };
+        }
+
+        return response;
+    }
+
+    async uploadApplicationDocuments(
+        userId: string,
+        data: UploadApplicationDocumentsRequestDTO,
+    ): Promise<UploadApplicationDocumentsResponseDTO> {
+        const vendor = await this._dbService.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!vendor) {
+            throw new NotFoundException('Vendor not found');
+        }
+
+      
+        // Verify both documents exist
+        const [vatDoc, businessDoc] = await Promise.all([
+            this._dbService.media.findUnique({
+                where: { id: parseInt(data.vatNumberDocId) },
+            }),
+            this._dbService.media.findUnique({
+                where: { id: parseInt(data.businessCertDocId) },
+            }),
+        ]);
+
+        if (!vatDoc || !businessDoc) {
+            throw new NotFoundException('One or both documents not found');
+        }
+
+        // Prepare metadata
+        const vatDocMeta = {
+            ...((vatDoc.meta as object) || {}),
+            docType: 'VAT_NUMBER_DOC',
+            uploadedFor: 'application-verification',
+            uploadedBy: 'admin',
+        };
+
+        const businessDocMeta = {
+            ...((businessDoc.meta as object) || {}),
+            docType: 'BUSINESS_CERT_DOC',
+            uploadedFor: 'application-verification',
+            uploadedBy: 'admin',
+        };
+
+        // Execute all updates in a transaction
+        await this._dbService.$transaction(async (tx) => {
+            // 1. Update VAT document
+            await tx.media.update({
+                where: { id: vatDoc.id },
+                data: {
+                    userId: vendor.id,
+                    meta: vatDocMeta,
+                },
+            });
+
+            // 2. Update Business document
+            await tx.media.update({
+                where: { id: businessDoc.id },
+                data: {
+                    userId: vendor.id,
+                    meta: businessDocMeta,
+                },
+            });
+
+            // 3. Update or create user settings
+            await tx.userSettings.upsert({
+                where: { userId: vendor.id },
+                create: {
+                    userId: vendor.id,
+                    isDocumentsUploaded: true,
+                },
+                update: {
+                    isDocumentsUploaded: true,
+                },
+            });
+        });
+
+        return {
+            success: true,
+            message: 'Vendor documents uploaded successfully',
+            vendorId: vendor.id,
+        };
+    }
+}

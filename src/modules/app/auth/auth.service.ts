@@ -19,7 +19,10 @@ export class AuthModel {
 
 @Injectable()
 export default class AuthService {
-    constructor(private _cacheService: RedisService, private _databaseService: DatabaseService) {}
+    constructor(
+        private _cacheService: RedisService,
+        private _databaseService: DatabaseService,
+    ) {}
 
     private _generateToken() {
         return uuid();
