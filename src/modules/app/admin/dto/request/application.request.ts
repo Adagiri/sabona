@@ -1,5 +1,6 @@
 import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsEnum } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsEnum, IsNumber, Min, Max } from 'class-validator';
+import { Transform } from 'class-transformer';
 import PaginatedRequest from '../../../../../core/request/paginated.request';
 
 export enum ApplicantType {
@@ -14,20 +15,20 @@ export default class FindApplicationRequestDTO extends PaginatedRequest {
 }
 
 export class ApproveApplicationRequestDTO {
-    @ApiProperty()
-    @IsOptional()
+    @ApiProperty({ required: true })
+    @IsNotEmpty()
     @IsString()
-    mainVendorId?: string;
+    mainVendorId: string;
 
-    @ApiProperty()
-    @IsOptional()
+    @ApiProperty({ required: true })
+    @IsNotEmpty()
     @IsString()
     address: string;
 
-    @ApiProperty()
-    @IsOptional()
+    @ApiProperty({ required: true })
+    @IsNotEmpty()
     @IsString()
-    contactPhone: string; // Customer care phone number
+    contactPhone: string;
 }
 
 export class RejectApplicationRequestDTO {
@@ -54,4 +55,17 @@ export class AdminSearchMainVendorsRequestDTO {
     @IsNotEmpty()
     @IsString()
     laundryName: string;
+
+    @ApiPropertyOptional({
+        description: 'Maximum number of results to return',
+        default: 20,
+        minimum: 1,
+        maximum: 50,
+    })
+    @IsOptional()
+    @Transform(({ value }) => parseInt(value))
+    @IsNumber()
+    @Min(1)
+    @Max(50)
+    limit?: number = 20;
 }

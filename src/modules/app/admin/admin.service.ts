@@ -35,6 +35,7 @@ import {
     UploadApplicationDocumentsResponseDTO,
 } from './dto/response/application.response';
 import { MainVendorSearchResultDTO } from './dto/response/vendor.response';
+import MediaService from '../media/media.service';
 
 @Injectable()
 export default class AdminService {
@@ -42,6 +43,7 @@ export default class AdminService {
         private _dbService: DatabaseService,
         private _notificationService: NotificationService,
         private _s3service: S3Service,
+        private _mediaService: MediaService,
     ) {}
 
     async GetAllOrders(data: FindOrderRequestDTO): Promise<AllOrderListDto> {
@@ -233,8 +235,9 @@ export default class AdminService {
         return { data: applications, count };
     }
 
-    // ADMIN: SEARCH EXISTING MAIN VENDORS BY LAUNDRY NAME
     async searchMainVendors(data: AdminSearchMainVendorsRequestDTO): Promise<MainVendorSearchResultDTO[]> {
+        const limit = Math.min(data.limit || 50, 100); // Cap at 100 results max
+
         const mainVendors = await this._dbService.user.findMany({
             where: {
                 type: UserType.VENDOR,
@@ -256,7 +259,16 @@ export default class AdminService {
                 },
                 vendorRelationAsMain: true, // Get all branch relations
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy: [
+                // Prioritize exact matches
+                {
+                    settings: {
+                        laundryName: 'asc',
+                    },
+                },
+                { createdAt: 'desc' },
+            ],
+            take: limit, // Limit results
         });
 
         return mainVendors.map((vendor) => ({
@@ -664,6 +676,7 @@ export default class AdminService {
                 type: true,
                 status: true,
                 receivedTips: true,
+                createdAt: true,
                 medias: {
                     where: { deletedAt: null },
                     select: {
@@ -820,16 +833,76 @@ export default class AdminService {
                     equals: 'application-verification',
                 },
             },
+            select: {
+                id: true,
+                name: true,
+                path: true,
+                location: true,
+                access: true,
+                meta: true,
+                status: true,
+                updatedAt: true
+            },
         });
 
         function hasDocType(meta: any): meta is { docType: string } {
             return meta && typeof meta === 'object' && typeof meta.docType === 'string';
         }
 
-        return {
-            vatNumberDoc: documents.find((doc) => hasDocType(doc.meta) && doc.meta.docType === 'VAT_NUMBER_DOC'),
-            businessCertDoc: documents.find((doc) => hasDocType(doc.meta) && doc.meta.docType === 'BUSINESS_CERT_DOC'),
+        // Helper function to get the appropriate URL for viewing
+        const getViewableUrl = async (doc: any) => {
+            // Only return URLs for ready media
+            if (doc.status !== 'READY') {
+                return null;
+            }
+
+            if (doc.access === 'PUBLIC') {
+                // Public media can use the direct path
+                return doc.path;
+            } else {
+                // Private media needs a signed URL
+                try {
+                    const signedUrlResponse = await this._mediaService.GetSignedUrl(doc.location);
+                    return signedUrlResponse.message; // The signed URL is in the message field
+                } catch (error) {
+                    console.error(`Failed to get signed URL for media ${doc.id}:`, error);
+                    return null;
+                }
+            }
         };
+
+        // Find documents and get their viewable URLs
+        const vatNumberDoc = documents.find((doc) => hasDocType(doc.meta) && doc.meta.docType === 'VAT_NUMBER_DOC');
+        const businessCertDoc = documents.find(
+            (doc) => hasDocType(doc.meta) && doc.meta.docType === 'BUSINESS_CERT_DOC',
+        );
+
+        // Build response with viewable URLs
+        const response: any = {};
+
+        if (vatNumberDoc) {
+            response.vatNumberDoc = {
+                id: vatNumberDoc.id,
+                name: vatNumberDoc.name,
+                url: await getViewableUrl(vatNumberDoc),
+                access: vatNumberDoc.access,
+                status: vatNumberDoc.status,
+                updatedAt: vatNumberDoc.updatedAt
+            };
+        }
+
+        if (businessCertDoc) {
+            response.businessCertDoc = {
+                id: businessCertDoc.id,
+                name: businessCertDoc.name,
+                url: await getViewableUrl(businessCertDoc),
+                access: businessCertDoc.access,
+                status: businessCertDoc.status,
+                updatedAt: vatNumberDoc.updatedAt,
+            };
+        }
+
+        return response;
     }
 
     async uploadApplicationDocuments(
@@ -844,10 +917,7 @@ export default class AdminService {
             throw new NotFoundException('Vendor not found');
         }
 
-        if (vendor.status !== UserStatus.ACTIVE) {
-            throw new BadRequestException('Vendor must be approved before uploading documents');
-        }
-
+      
         // Verify both documents exist
         const [vatDoc, businessDoc] = await Promise.all([
             this._dbService.media.findUnique({

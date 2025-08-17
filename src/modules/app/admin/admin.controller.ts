@@ -112,6 +112,7 @@ export default class AdminController {
         response: [MainVendorSearchResultDTO],
     })
     async searchMainVendors(@Query() data: AdminSearchMainVendorsRequestDTO): Promise<MainVendorSearchResultDTO[]> {
+        console.log(data)
         return this._adminService.searchMainVendors(data);
     }
 
