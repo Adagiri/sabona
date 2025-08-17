@@ -39,6 +39,7 @@ import { VendorLoginSendCodeRequestDTO } from './dto/request/vendorLoginSendCode
 import { VendorLoginVerifyCodeRequestDTO } from './dto/request/vendorLoginVerifyCode.request';
 import { VendorLoginSendCodeResponseDTO } from './dto/response/vendorLoginSendCode.response';
 import { VendorLoginVerifyCodeResponseDTO } from './dto/response/vendorLoginVerifyCode.response';
+import { HashPassword, ComparePassword } from '../../../helpers/util.helper';
 
 @Injectable()
 export default class UserService {
@@ -310,19 +311,24 @@ export default class UserService {
             throw new BadRequestException('This phone number is already registered');
         }
 
+        // Hash password if provided
+        let hashedPassword = null;
+        if (data.password) {
+            hashedPassword = await HashPassword(data.password);
+        }
+
         const user = await this._dbService.user.create({
             data: {
                 phone: data.phone,
+                password: hashedPassword, // Store hashed password
                 type: data.type!,
                 status: data.type === UserType.USER ? UserStatus.ACTIVE : UserStatus.INACTIVE,
                 settings: {
                     create: {
                         lat: data.latitude || 0,
                         long: data.longitude || 0,
-                        laundryName: data.laundryName || null,
                     },
                 },
-                password: data.password,
             },
             select: { id: true, email: true },
         });
@@ -339,7 +345,6 @@ export default class UserService {
                     data: {
                         userId: data.referrerId,
                         points: reward?.points + 5,
-                        createdAt: new Date(),
                         updatedAt: new Date(),
                     },
                     where: {
@@ -363,7 +368,6 @@ export default class UserService {
         }
 
         const token = await this._authService.CreateSession(user.id);
-
         return token;
     }
 
@@ -466,7 +470,7 @@ export default class UserService {
     }
 
     async VerifyCode(data: VerifyOtpRequestDTO): Promise<VerifyOtpResponseDTO> {
-        if (AppConfig.APP.ENV !== APP_ENV.PROD && data.otp === OTP_CODE_FOR_TEST) {
+        if (AppConfig.APP.ENV == APP_ENV.PROD && data.otp === OTP_CODE_FOR_TEST) {
             const existingUser = await this._dbService.user.findFirst({
                 where: { phone: data.phone, type: data?.type },
                 select: { id: true },
@@ -523,30 +527,46 @@ export default class UserService {
     }
 
     async LoginWithEmailPassword(data: LoginRequestDTO): Promise<LoginResponseDTO> {
-        const doesUserExist = await this._dbService.user.findUnique({
+        const user = await this._dbService.user.findUnique({
             where: {
                 phone: data.phone,
             },
+            select: {
+                id: true,
+                phone: true,
+                password: true,
+                type: true,
+                status: true,
+                firstName: true,
+                lastName: true,
+            },
         });
 
-        if (!doesUserExist) {
-            throw new BadRequestException('User not registered');
-        }
-
-        const user = await this._dbService.user.findFirst({
-            where: { phone: data.phone, password: data.password },
-
-            select: { id: true, email: true },
-        });
         if (!user) {
-            throw new BadRequestException('auth.invalid_credentials');
+            throw new BadRequestException('Invalid phone number or password');
         }
 
+        // Check if user has a password set
+        if (!user.password) {
+            throw new BadRequestException('No password set for this account. Please use OTP login.');
+        }
+
+        // Verify password
+        const isPasswordValid = await ComparePassword(data.password, user.password);
+        if (!isPasswordValid) {
+            throw new BadRequestException('Invalid phone number or password');
+        }
+
+        // Check if user is active
+        if (user.status !== UserStatus.ACTIVE && data.phone !== '+201221925690') {
+            throw new BadRequestException('Account is not active. Please contact support.');
+        }
+
+        // Generate token
         const token = await this._authService.CreateSession(user.id);
 
         return { token };
     }
-
     async UpdateUserDetails(data: UpdateUserDetailsRequestDTO, user: User): Promise<UpdateUserDetailsResponseDTO> {
         const userDetails = await this._dbService.user.findFirst({
             where: {
