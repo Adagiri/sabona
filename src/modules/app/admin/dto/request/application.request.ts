@@ -15,8 +15,8 @@ export default class FindApplicationRequestDTO extends PaginatedRequest {
 }
 
 export class ApproveApplicationRequestDTO {
-    @ApiProperty({ required: true })
-    @IsNotEmpty()
+    @ApiProperty()
+    @IsOptional()
     @IsString()
     mainVendorId: string;
 
