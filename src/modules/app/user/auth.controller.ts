@@ -23,16 +23,6 @@ export default class AuthController {
     constructor(private _userService: UserService) {}
 
     @Post({
-        path: 'sendLoginCode',
-        description: 'send login code for existing users',
-        response: SendVerificationCodeResponseDTO,
-    })
-    SendLoginCode(@Body() data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
-        return this._userService.SendLoginCode(data);
-    }
-
-
-    @Post({
         path: '/vendor/login/send-code',
         description: 'Send OTP code to vendor phone for login',
         response: VendorLoginSendCodeResponseDTO,
@@ -57,6 +47,15 @@ export default class AuthController {
     })
     LoginWithEmailPassword(@Body() data: LoginRequestDTO): Promise<LoginResponseDTO> {
         return this._userService.LoginWithEmailPassword(data);
+    }
+
+    @Post({
+        path: 'sendLoginCode',
+        description: 'send login code for existing users',
+        response: SendVerificationCodeResponseDTO,
+    })
+    SendLoginCode(@Body() data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
+        return this._userService.SendLoginCode(data);
     }
 
     @Post({
