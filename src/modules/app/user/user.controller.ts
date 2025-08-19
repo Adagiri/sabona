@@ -17,8 +17,7 @@ import addCustomerAddressRequestDTO from './dto/request/addAddress.request';
 
 @ApiController({ version: '1', tag: 'user' })
 export default class UserController {
-    constructor(private _userService: UserService) { }
-
+    constructor(private _userService: UserService) {}
 
     @Authorized()
     @Get({
@@ -45,22 +44,19 @@ export default class UserController {
         description: 'Get user by id',
         response: GetUserByIdResponseDTO,
     })
-    Get(
-        @Param('id') id: string
-    ): Promise<GetUserByIdResponseDTO> {
+    Get(@Param('id') id: string): Promise<GetUserByIdResponseDTO> {
         return this._userService.Get(id);
     }
 
     @Authorized()
     @Patch({
         path: '/user/update',
-        description: "update user details",
-        response: UpdateUserDetailsResponseDTO
+        description: 'update user details',
+        response: UpdateUserDetailsResponseDTO,
     })
-
     UpdateUserDetails(
         @Body() data: UpdateUserDetailsRequestDTO,
-        @CurrentUser() user: User
+        @CurrentUser() user: User,
     ): Promise<UpdateUserDetailsResponseDTO> {
         return this._userService.UpdateUserDetails(data, user);
     }
@@ -73,8 +69,9 @@ export default class UserController {
     })
     async AddAddress(
         @Body() data: addCustomerAddressRequestDTO,
-        @CurrentUser() user: User): Promise<addCustomerAddressResponseDTO> {
-            return await this._userService.AddAddress(data, user)
+        @CurrentUser() user: User,
+    ): Promise<addCustomerAddressResponseDTO> {
+        return await this._userService.AddAddress(data, user);
     }
 
     @Authorized()
@@ -83,9 +80,8 @@ export default class UserController {
         description: 'Get all user addresses',
         response: getAllAddressesResponseDTO,
     })
-    async GetAllAddresses(
-        @CurrentUser() user: User): Promise<getAllAddressesResponseDTO> {
-            return await this._userService.GetAllAddresses(user)
+    async GetAllAddresses(@CurrentUser() user: User): Promise<getAllAddressesResponseDTO> {
+        return await this._userService.GetAllAddresses(user);
     }
 
     @Authorized()
@@ -97,7 +93,8 @@ export default class UserController {
     async EditAddress(
         @Body() data: editAddressRequestDTO,
         @Param() param: editAddressParamRequestDTO,
-        @CurrentUser() user: User): Promise<EditAddressResponseDTO> {
-            return await this._userService.EditAddress(data,param, user)
+        @CurrentUser() user: User,
+    ): Promise<EditAddressResponseDTO> {
+        return await this._userService.EditAddress(data, param, user);
     }
 }
