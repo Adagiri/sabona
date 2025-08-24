@@ -1,20 +1,27 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsString } from 'class-validator';
+
+class AssignedDriver {
+    @ApiProperty()
+    riderId: string;
+
+    @ApiProperty()
+    name: string;
+
+    @ApiProperty({ description: 'Distance in kilometers' })
+    distance: number;
+}
 
 export default class CreateOrderResponseDTO {
     @ApiProperty()
     id: string;
 
     @ApiProperty()
-    @IsNumber()
     userId: string;
 
     @ApiProperty()
-    @IsString()
     status: string;
 
     @ApiProperty()
-    @IsNumber()
     totalAmount: number;
 
     @ApiProperty()
@@ -22,4 +29,7 @@ export default class CreateOrderResponseDTO {
 
     @ApiProperty()
     updatedAt: Date;
+
+    @ApiProperty({ type: AssignedDriver, required: false, description: 'Assigned driver info (for regular orders)' })
+    assignedDriver?: AssignedDriver;
 }

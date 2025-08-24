@@ -1,7 +1,7 @@
 import { User, UserType } from '@prisma/client';
 import { ApiController, Authorized, CurrentUser, Get, Patch, Post } from '../../../core/decorators';
 import CustomerService from './customer.service';
-import { Body, Param, Query } from '@nestjs/common';
+import { BadRequestException, Body, Param, Query } from '@nestjs/common';
 import CreateOrderResponseDTO from './dto/response/createOrder.response';
 import CreateOrderRequestDTO from './dto/request/createOrder.request';
 import AcceptOrderRequestDTO from '../vendor/dto/request/acceptOrder.request';
@@ -18,6 +18,11 @@ import { GetUserCouponsResponseDTO } from './dto/response/getUserCoupons.respons
 import { CreateTipDTO } from './dto/request/createTip.request';
 import { HasTippedResponseDTO } from './dto/response/hasTipped.response';
 import { AddTipResponseDto } from './dto/response/addTip.response';
+import CustomOrderService from '../customOrder/customOrder.service';
+import { ValidateCustomLocationResponseDTO } from '../customOrder/dto/response/validateCustomLocation.response';
+import { ValidateCustomLocationRequestDTO } from '../customOrder/dto/request/validateCustomLocation.request';
+import { CreateCustomOrderResponseDTO } from '../customOrder/dto/response/createCustomOrder.response';
+import { CreateCustomOrderRequestDTO } from '../customOrder/dto/request/createCustomOrder.request';
 
 @ApiController({
     path: '/customer',
@@ -25,30 +30,60 @@ import { AddTipResponseDto } from './dto/response/addTip.response';
     version: '1',
 })
 export default class CustomerController {
-    constructor(private _customerService: CustomerService) { }
+    constructor(
+        private _customerService: CustomerService,
+        private _customOrderService: CustomOrderService,
+    ) {}
 
     @Authorized()
     @Post({
         path: '/createOrder',
-        description: 'Create order',
+        description: 'Create regular order (registered laundry with auto-assignment)',
         response: CreateOrderResponseDTO,
     })
-    async CreateOrder(
-        @Body() data: CreateOrderRequestDTO,
-        @CurrentUser() user: User): Promise<CreateOrderResponseDTO> {
-        return await this._customerService.CreateOrder(data, user)
+    async CreateOrder(@Body() data: CreateOrderRequestDTO, @CurrentUser() user: User): Promise<CreateOrderResponseDTO> {
+        if (data.orderType !== 'REGISTERED_LAUNDRY') {
+            throw new BadRequestException('Use /custom-order/create for custom orders');
+        }
+        return await this._customerService.CreateOrder(data, user);
+    }
+
+    @Authorized()
+    @Post({
+        path: '/create-custom-order',
+        description: 'Create custom order for non-registered laundry',
+        response: CreateCustomOrderResponseDTO,
+    })
+    async CreateCustomOrder(
+        @Body() data: CreateCustomOrderRequestDTO,
+        @CurrentUser() user: User,
+    ): Promise<CreateCustomOrderResponseDTO> {
+        return await this._customOrderService.createCustomOrder(data as any, user);
+    }
+
+    @Authorized()
+    @Post({
+        path: '/validate-custom-location',
+        description: 'Validate custom laundry location and get suggestions',
+        response: ValidateCustomLocationResponseDTO,
+    })
+    async validateCustomLocation(
+        @Body() data: ValidateCustomLocationRequestDTO,
+    ): Promise<ValidateCustomLocationResponseDTO> {
+        return await this._customOrderService.validateCustomLaundryLocation(data.lat, data.long);
     }
 
     @Authorized()
     @Patch({
         path: '/:orderId/cancel',
         description: 'Cancel order',
-        response: CancelOrderResponseDTO
+        response: CancelOrderResponseDTO,
     })
     async CancelOrder(
         @Param() params: AcceptOrderRequestDTO,
-        @CurrentUser() user: User): Promise<CancelOrderResponseDTO> {
-        return await this._customerService.CancelOrder(params, user)
+        @CurrentUser() user: User,
+    ): Promise<CancelOrderResponseDTO> {
+        return await this._customerService.CancelOrder(params, user);
     }
 
     @Authorized()
@@ -57,11 +92,9 @@ export default class CustomerController {
         description: 'Get all user orders',
         response: OrderListDto,
     })
-    async GetOrders(
-        @CurrentUser() user: User): Promise<OrderListDto> {
-        return await this._customerService.GetOrders(user)
+    async GetOrders(@CurrentUser() user: User): Promise<OrderListDto> {
+        return await this._customerService.GetOrders(user);
     }
-
 
     @Authorized()
     @Post({
@@ -69,10 +102,8 @@ export default class CustomerController {
         description: 'Create Feedback',
         response: CreateFeedbackResponseDTO,
     })
-    async AddFeedback(
-        @Body() data: CreateFeedbackDTO,
-        @CurrentUser() user: User): Promise<CreateFeedbackResponseDTO> {
-        return await this._customerService.AddFeedback(data, user)
+    async AddFeedback(@Body() data: CreateFeedbackDTO, @CurrentUser() user: User): Promise<CreateFeedbackResponseDTO> {
+        return await this._customerService.AddFeedback(data, user);
     }
 
     @Authorized()
@@ -83,9 +114,9 @@ export default class CustomerController {
     })
     async HasFeedbacks(
         @CurrentUser() user: User,
-        @Param() params: HasFeedBackRequestDTO)
-        : Promise<HasFeedbackResponseDTO> {
-        return await this._customerService.HasFeedback(params, user)
+        @Param() params: HasFeedBackRequestDTO,
+    ): Promise<HasFeedbackResponseDTO> {
+        return await this._customerService.HasFeedback(params, user);
     }
 
     @Authorized()
@@ -96,9 +127,10 @@ export default class CustomerController {
     })
     async validateCoupon(
         @CurrentUser() user: User,
-        @Param() params:ValidateCouponRequestDTO,
-        @Query() query: ValidateCouponQueryRequestDTO): Promise<ValidateCouponResponseDTO> {
-        return await this._customerService.validateCoupon(user, params, query)
+        @Param() params: ValidateCouponRequestDTO,
+        @Query() query: ValidateCouponQueryRequestDTO,
+    ): Promise<ValidateCouponResponseDTO> {
+        return await this._customerService.ValidateCoupon(user, params, query);
     }
 
     @Authorized()
@@ -110,8 +142,8 @@ export default class CustomerController {
     async GetUserCoupons(
         @CurrentUser() user: User,
         @Query() query: getUserCouponsQueryDTO,
-    ) : Promise<GetUserCouponsResponseDTO> {
-        return await this._customerService.getUserCoupons(user, query)
+    ): Promise<GetUserCouponsResponseDTO> {
+        return await this._customerService.getUserCoupons(user, query);
     }
 
     @Authorized(UserType.USER)
@@ -120,10 +152,8 @@ export default class CustomerController {
         description: 'Add Tip',
         response: CreateFeedbackResponseDTO,
     })
-    async AddTip(
-        @Body() data: CreateTipDTO,
-        @CurrentUser() user: User): Promise<AddTipResponseDto> {
-        return await this._customerService.AddTip(data, user)
+    async AddTip(@Body() data: CreateTipDTO, @CurrentUser() user: User): Promise<AddTipResponseDto> {
+        return await this._customerService.AddTip(data, user);
     }
 
     @Authorized()
@@ -132,13 +162,7 @@ export default class CustomerController {
         description: 'Check if user has tipped',
         response: HasTippedResponseDTO,
     })
-    async HasTipped(
-        @CurrentUser() user: User,
-        @Param() params: HasFeedBackRequestDTO)
-        : Promise<HasTippedResponseDTO> {
-        return await this._customerService.HasTipped(params, user)
+    async HasTipped(@CurrentUser() user: User, @Param() params: HasFeedBackRequestDTO): Promise<HasTippedResponseDTO> {
+        return await this._customerService.HasTipped(params, user);
     }
-
-    
-
 }

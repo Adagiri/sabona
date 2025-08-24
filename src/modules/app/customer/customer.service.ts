@@ -1,13 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
-import { OrderStatus, PaymentType, User, FeedbackType, CouponType, DeliveryType, TipType } from '@prisma/client';
+import { OrderStatus, PaymentType, User, FeedbackType, CouponType, TipType, OrderType, DeliveryType } from '@prisma/client';
 import CreateOrderRequestDTO from './dto/request/createOrder.request';
 import AcceptOrderRequestDTO from '../vendor/dto/request/acceptOrder.request';
 import CancelOrderResponseDTO from './dto/response/cancelOrder.response';
 import { OrderListDto } from './dto/response/orderlist.response.dto';
 import { extractTokens, GetPaginationOptions } from 'src/helpers/util.helper';
 import NotificationService from '../notification/notification.service';
-import { MultipleDeviceNotificationDto } from '../notification/dto/request/notification.request';
 import CreateFeedbackDTO from './dto/request/createFeeback.request';
 import CreateFeedbackResponseDTO from './dto/response/createFeedback.response';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
@@ -15,151 +14,91 @@ import { HasFeedBackRequestDTO } from './dto/request/hasFeedback.request';
 import { HasFeedbackResponseDTO } from './dto/response/hasFeedback.response.dto';
 import { ValidateCouponQueryRequestDTO, ValidateCouponRequestDTO } from './dto/request/validateCoupon.request';
 import { ValidateCouponResponseDTO } from './dto/response/validateCoupon.response';
-import { DELIVERY_CHARGES, SERVICE_CHARGES } from 'src/constants';
 import { coupon, getUserCouponsQueryDTO } from './dto/request/getUserCoupons.request';
 import { GetUserCouponsResponseDTO } from './dto/response/getUserCoupons.response';
 import { CreateTipDTO } from './dto/request/createTip.request';
 import { HasTippedResponseDTO } from './dto/response/hasTipped.response';
 import { AddTipResponseDto } from './dto/response/addTip.response';
+import LocationService from '../location/location.service';
+import { DELIVERY_CHARGES } from 'src/constants';
 
 @Injectable()
 export default class CustomerService {
     constructor(
         private _dbService: DatabaseService,
         private _notificationService: NotificationService,
-    ) { }
+        private _locationService: LocationService,
+    ) {}
 
+    /**
+     * Create regular order (REGISTERED_LAUNDRY only)
+     * Custom orders handled by CustomOrderService
+     */
     async CreateOrder(data: CreateOrderRequestDTO, user: User): Promise<any> {
-        // Fetch customer device tokens
-        const customerDeviceTokensPromise = this._dbService.deviceToken.findMany({
-            where: {
-                userId: user.id,
-                deletedAt: null,
-            },
-            select: {
-                token: true,
-            },
-        });
-
-        const vendorId = await this._dbService.laundry.findMany({
-            where: {
-                id: data.laundryId,
-            },
-            select: {
-                vendorId: true,
-            }
-
-        });
-
-        const vendorsDeviceTokensPromise = await this._dbService.deviceToken.findMany({
-            where: {
-                userId: vendorId[0].vendorId,
-                deletedAt: null,
-            },
-            select: {
-                token: true,
-            },
-        });
-
-        if (data.couponId){  
-            const revalidateCoupon = await this._dbService.coupon.findFirst({
-                where: {
-                    id: data.couponId,
-                    isActive: true,
-                },
-                select:{
-                    singleUse: true,
-                    usageLimit:true,
-                    discount:true,
-                    type:true,
-                    minOrderAmount:true,
-                    maxDiscount:true,
-                }
-            })
-            if (!revalidateCoupon) {
-                throw new BadRequestException("Coupon is not valid");
-            }
-            const cartAmountBeforeDiscount = data.baseAmount - (data.deliveryType === DeliveryType.EXPRESS ?  DELIVERY_CHARGES.EXPRESS : DELIVERY_CHARGES.NORMAL) - SERVICE_CHARGES;
-
-            if (revalidateCoupon.minOrderAmount && cartAmountBeforeDiscount < revalidateCoupon.minOrderAmount) {
-                throw new BadRequestException("Minimum order amount not met");
-            }
-
-            if (revalidateCoupon.type === CouponType.FIXED) {
-                if (data.totalAmount !== data.baseAmount - revalidateCoupon.discount){
-                    throw new BadRequestException("Invalid amount calculation");
-                }
-            } else if (revalidateCoupon.type === CouponType.PERCENTAGE) {
-                const baseDiscount = cartAmountBeforeDiscount * revalidateCoupon.discount / 100;
-
-                // Apply the maximum discount cap if it's defined
-                const cappedDiscount = revalidateCoupon.maxDiscount 
-                    ? Math.min(baseDiscount, revalidateCoupon.maxDiscount) 
-                    : baseDiscount;
-                
-                // Calculate the total discount
-                const discount = cartAmountBeforeDiscount - cappedDiscount;
-                
-                // Validate the total amount
-                const expectedTotalAmount = discount + 
-                    (data.deliveryType === DeliveryType.EXPRESS ? DELIVERY_CHARGES.EXPRESS : DELIVERY_CHARGES.NORMAL) + 
-                    SERVICE_CHARGES;
-                
-                if (data.totalAmount !== expectedTotalAmount) {
-                    throw new BadRequestException("Invalid amount calculation");
-                }
-
-            }
-            
-            if (revalidateCoupon.singleUse){
-                const couponUsed = await this._dbService.couponUsage.findFirst({
-                    where: {
-                        userId: user.id,
-                        couponId: data.couponId,
-                    }
-                });
-    
-                if (couponUsed) {
-                    throw new BadRequestException("Coupon already used");
-                }
-            }
-
-            if (revalidateCoupon.usageLimit !== null){
-                const couponUsage = await this._dbService.couponUsage.findMany({
-                    where: {
-                        couponId: data.couponId,
-                    }
-                });
-
-                if (couponUsage.length >= revalidateCoupon.usageLimit){
-                    throw new BadRequestException("Coupon limit reached");
-                }
-            }
-
-            const couponUsed = await this._dbService.couponUsage.create({
-                data: {
-                    userId: user.id,
-                    couponId: data.couponId,
-                }
-            });
-            if (!couponUsed) {
-                throw new BadRequestException("Error using coupon");
-            }
-            
+        // Only handle registered laundry orders
+        if (data.orderType !== OrderType.REGISTERED_LAUNDRY) {
+            throw new BadRequestException(
+                'This endpoint only handles registered laundry orders. Use /custom-order/create for custom orders.',
+            );
         }
 
-        // Create the order
-        const orderPromise = this._dbService.order.create({
+        // Validate required fields for regular orders
+        if (!data.laundryId || !data.services || data.services.length === 0) {
+            throw new BadRequestException('laundryId and services are required for registered laundry orders');
+        }
+
+        // Validate laundry exists
+        const laundry = await this._dbService.laundry.findUnique({
+            where: { id: data.laundryId },
+            select: { vendorId: true, name: true },
+        });
+
+        if (!laundry) {
+            throw new BadRequestException('Laundry not found');
+        }
+
+        // Find closest available driver
+        const closestDriver = await this._locationService.findClosestAvailableDriver(
+            data.pickupLat,
+            data.pickupLong,
+            50, // 50km max radius
+        );
+
+        if (!closestDriver) {
+            throw new BadRequestException('No available drivers in your area at the moment. Please try again later.');
+        }
+
+        // Handle coupon validation if provided
+        if (data.couponId) {
+            await this.validateCoupon(data, user);
+        }
+
+        // Get device tokens for notifications
+        const [customerDeviceTokens, vendorDeviceTokens] = await Promise.all([
+            this._dbService.deviceToken.findMany({
+                where: { userId: user.id, deletedAt: null },
+                select: { token: true },
+            }),
+            this._dbService.deviceToken.findMany({
+                where: { userId: laundry.vendorId, deletedAt: null },
+                select: { token: true },
+            }),
+        ]);
+
+        // Create order
+        const order = await this._dbService.order.create({
             data: {
                 userId: user.id,
+                orderType: OrderType.REGISTERED_LAUNDRY,
                 laundryId: data.laundryId,
                 totalAmount: data.totalAmount,
-                notes: data.note,
-                paymentType: data.paymentType,
-                baseAmount: data.baseAmount ? data.baseAmount : data.totalAmount,
-                discountAmount: data.discountAmount ? data.discountAmount : 0,
+                baseAmount: data.baseAmount || data.totalAmount,
+                discountAmount: data.discountAmount || 0,
                 couponId: data.couponId,
-                status: data.paymentType === PaymentType.CASH ? OrderStatus.PENDING : OrderStatus?.PENDING_PAYMENT,
+                paymentType: data.paymentType,
+                status: data.paymentType === PaymentType.CASH ? OrderStatus.PENDING : OrderStatus.PENDING_PAYMENT,
+                deliveryType: data.deliveryType,
+                notes: data.note,
                 pickup: {
                     create: {
                         pickupAddress: data.pickupAddress,
@@ -177,7 +116,6 @@ export default class CustomerService {
                         deliveryDate: data.deliveryDate,
                     },
                 },
-                deliveryType: data.deliveryType,
                 services: {
                     create: data.services.map((service) => ({
                         laundryServiceId: service.serviceId,
@@ -192,106 +130,200 @@ export default class CustomerService {
             },
         });
 
-        // Execute promises in parallel
-        const [customerDeviceTokens, vendorsDeviceTokens, order] = await Promise.all([customerDeviceTokensPromise, vendorsDeviceTokensPromise, orderPromise]);
-
-        // Extract Customer tokens
-        const customserTokens = extractTokens(customerDeviceTokens);
-
-        // Extract Vendor tokens
-        const vendorTokens = extractTokens(vendorsDeviceTokens);
-
-        // Send Customer notification Data
-        const customerNotificationData: MultipleDeviceNotificationDto = {
-            tokens: customserTokens,
-            title: "Order Placed!!",
-            body: "Your order has been placed successfully.",
-            notificationData: {
+        // AUTO-ASSIGN closest driver
+        await this._dbService.riderOrder.create({
+            data: {
                 orderId: order.id,
-                key: 'FETCH_ORDERS',
-                route: 'Orders',
+                riderId: closestDriver.riderId,
+                type: 'RIDER_PICKUP',
             },
+        });
 
-        };
+        // Update pickup with assigned rider
+        await this._dbService.pickup.update({
+            where: { orderId: order.id },
+            data: { riderId: closestDriver.riderId },
+        });
 
-        // Send Vendor notification Data
-        const vendorNotificationData: MultipleDeviceNotificationDto = {
-            tokens: vendorTokens,
-            title: "New Order!!",
-            body: "You have recieved a new order.",
-            notificationData: {
-                orderId: order.id,
-                key: 'FETCH_ORDER_REQUESTS',
-                route: 'Home',
-            }
-        };
+        // Extract tokens
+        const customerTokens = extractTokens(customerDeviceTokens);
+        const vendorTokens = extractTokens(vendorDeviceTokens);
 
-        if (customserTokens?.length) {
-            const res = await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
-            if (res) {
-                const createNotification = await this._dbService.notification.create({
+        // Get driver device tokens
+        const driverDeviceTokens = await this._dbService.deviceToken.findMany({
+            where: { userId: closestDriver.riderId, deletedAt: null },
+            select: { token: true },
+        });
+        const driverTokens = extractTokens(driverDeviceTokens);
+
+        // Send targeted notification to assigned driver only
+        if (driverTokens?.length) {
+            const driverNotificationData = {
+                tokens: driverTokens,
+                title: 'New Pickup Assignment!',
+                body: `Pickup order #${order.orderNumber} - ${closestDriver.distance}km away from ${laundry.name}`,
+                notificationData: {
+                    orderId: order.id,
+                    key: 'FETCH_ASSIGNED_ORDERS',
+                    route: 'AssignedRides',
+                },
+            };
+
+            await this._notificationService.SendNotificationToMultipleTokens(driverNotificationData);
+
+            await this._dbService.notification.create({
+                data: {
+                    userId: closestDriver.riderId,
+                    orderId: order.id,
+                    message: `New pickup assignment - ${closestDriver.distance}km away`,
+                    status: 'UNREAD',
                     data: {
-                        userId: user.id,
                         orderId: order.id,
-                        message: "Your order has been placed successfully.",
-                        status: "UNREAD",
-                        data: {
-                            orderId: order.id,
-                            key: 'FETCH_ORDERS',
-                            route: 'Orders',
-                        },
-                        type: "ORDER_PLACED",
-                    }
-                });
-                if (createNotification) {
-                    console.log("Customer Notification created successfully");
-                }
-                else {
-                    console.log("Error creating notification");
-                }
+                        key: 'FETCH_ASSIGNED_ORDERS',
+                        route: 'AssignedRides',
+                    },
+                    type: 'ORDER_PLACED',
+                },
+            });
+        }
 
-            }
+        // Notify customer
+        if (customerTokens?.length) {
+            const customerNotificationData = {
+                tokens: customerTokens,
+                title: 'Order Placed & Driver Assigned!',
+                body: `Your order has been placed and assigned to a driver ${closestDriver.distance}km away`,
+                notificationData: {
+                    orderId: order.id,
+                    key: 'FETCH_ORDERS',
+                    route: 'Orders',
+                },
+            };
+
+            await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
+
+            await this._dbService.notification.create({
+                data: {
+                    userId: user.id,
+                    orderId: order.id,
+                    message: 'Your order has been placed and assigned to a driver.',
+                    status: 'UNREAD',
+                    data: {
+                        orderId: order.id,
+                        key: 'FETCH_ORDERS',
+                        route: 'Orders',
+                    },
+                    type: 'ORDER_PLACED',
+                },
+            });
         }
-        else {
-            console.log("No customer tokens found");
-        }
+
+        // Notify vendor
         if (vendorTokens?.length) {
-            const res = await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
-            if (res) {
-                const createNotification = await this._dbService.notification.create({
+            const vendorNotificationData = {
+                tokens: vendorTokens,
+                title: 'New Order!',
+                body: `New order #${order.orderNumber} - driver assigned and on the way`,
+                notificationData: {
+                    orderId: order.id,
+                    key: 'FETCH_ORDER_REQUESTS',
+                    route: 'Home',
+                },
+            };
+
+            await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
+
+            await this._dbService.notification.create({
+                data: {
+                    userId: laundry.vendorId,
+                    orderId: order.id,
+                    message: 'You have received a new order.',
+                    status: 'UNREAD',
                     data: {
-                        userId: vendorId[0].vendorId,
                         orderId: order.id,
-                        message: "You have recieved a new order.",
-                        status: "UNREAD",
-                        data: {
-                            orderId: order.id,
-                            key: 'FETCH_ORDER_REQUESTS',
-                            route: 'Home',
-                        },
-                        type: "ORDER_PLACED",
-                    }
-                });
-                if (createNotification) {
-                    console.log("Vendor Notification created successfully");
-                }
-                else {
-                    console.log("Error creating notification");
-                }
-            }
-        } else {
-            console.log("No vendor tokens found");
+                        key: 'FETCH_ORDER_REQUESTS',
+                        route: 'Home',
+                    },
+                    type: 'ORDER_PLACED',
+                },
+            });
         }
 
-
-        if (!order) {
-            throw new BadRequestException("Error creating order");
-        }
-
-        return { data: order };
+        return {
+            data: order,
+            assignedDriver: {
+                riderId: closestDriver.riderId,
+                name: `${closestDriver.firstName} ${closestDriver.lastName}`,
+                distance: closestDriver.distance,
+                phone: closestDriver.phone,
+            },
+            message: `Order created and assigned to driver ${closestDriver.distance}km away`,
+        };
     }
 
+    /**
+     * Validate coupon for regular orders
+     */
+    private async validateCoupon(data: CreateOrderRequestDTO, user: User): Promise<void> {
+        const revalidateCoupon = await this._dbService.coupon.findFirst({
+            where: {
+                id: data.couponId,
+                isActive: true,
+            },
+            select: {
+                singleUse: true,
+                usageLimit: true,
+                discount: true,
+                type: true,
+                minOrderAmount: true,
+                maxDiscount: true,
+            },
+        });
 
+        if (!revalidateCoupon) {
+            throw new BadRequestException('Coupon is not valid');
+        }
+
+        const cartAmountBeforeDiscount =
+            data.baseAmount! -
+            (data.deliveryType === DeliveryType.EXPRESS ? DELIVERY_CHARGES.EXPRESS : DELIVERY_CHARGES.NORMAL);
+
+        if (revalidateCoupon.minOrderAmount && cartAmountBeforeDiscount < revalidateCoupon.minOrderAmount) {
+            throw new BadRequestException('Minimum order amount not met');
+        }
+
+        // Validate coupon usage
+        if (revalidateCoupon.singleUse) {
+            const couponUsed = await this._dbService.couponUsage.findFirst({
+                where: {
+                    userId: user.id,
+                    couponId: data.couponId,
+                },
+            });
+
+            if (couponUsed) {
+                throw new BadRequestException('Coupon already used');
+            }
+        }
+
+        if (revalidateCoupon.usageLimit !== null) {
+            const couponUsage = await this._dbService.couponUsage.findMany({
+                where: { couponId: data.couponId },
+            });
+
+            if (couponUsage.length >= revalidateCoupon.usageLimit) {
+                throw new BadRequestException('Coupon limit reached');
+            }
+        }
+
+        // Create coupon usage record
+        await this._dbService.couponUsage.create({
+            data: {
+                userId: user.id,
+                couponId: data.couponId,
+            },
+        });
+    }
 
     async CancelOrder(params: AcceptOrderRequestDTO, user: User): Promise<CancelOrderResponseDTO> {
         const order = await this._dbService.order.findUnique({
@@ -300,30 +332,30 @@ export default class CustomerService {
             },
             select: {
                 status: true,
-            }
-        })
+            },
+        });
 
         if (!order) {
-            throw new Error("Order does not exist");
+            throw new Error('Order does not exist');
         }
 
         const isUsersOrder = await this._dbService.order.findFirst({
             where: {
                 id: params.orderId,
-                userId: user.id
-            }
-        })
+                userId: user.id,
+            },
+        });
 
         if (!isUsersOrder) {
-            throw new BadRequestException("Order does not belong to user");
+            throw new BadRequestException('Order does not belong to user');
         }
 
         if (order.status === 'CANCELLED') {
-            throw new BadRequestException("Order already cancelled");
+            throw new BadRequestException('Order already cancelled');
         }
 
         if (order.status !== 'PENDING') {
-            throw new BadRequestException("Order cannot be cancelled");
+            throw new BadRequestException('Order cannot be cancelled');
         }
 
         const cancelledOrder = await this._dbService.order.update({
@@ -331,12 +363,12 @@ export default class CustomerService {
                 id: params.orderId,
             },
             data: {
-                status: 'CANCELLED'
+                status: 'CANCELLED',
             },
-        })
+        });
 
         if (!cancelledOrder) {
-            throw new BadRequestException("Error cancelling the order");
+            throw new BadRequestException('Error cancelling the order');
         }
 
         const orderCancelled = await this._dbService.order.findUnique({
@@ -347,11 +379,10 @@ export default class CustomerService {
                 id: true,
                 status: true,
                 userId: true,
-            }
-        })
+            },
+        });
 
         return orderCancelled;
-
     }
 
     async GetOrders(user: User): Promise<OrderListDto> {
@@ -374,19 +405,19 @@ export default class CustomerService {
                 laundry: {
                     select: {
                         name: true,
-                    }
+                    },
                 },
             },
             orderBy: {
                 createdAt: 'desc',
-            }
+            },
         });
 
         if (!orders) {
-            throw new BadRequestException("Error fetching orders");
+            throw new BadRequestException('Error fetching orders');
         }
 
-        const ordersWithTotalQuantity = orders.map(order => {
+        const ordersWithTotalQuantity = orders.map((order) => {
             const totalQuantity = order.services.reduce((orderTotal, service) => {
                 const serviceTotal = service.items.reduce((itemTotal, item) => itemTotal + item.quantity, 0);
                 return orderTotal + serviceTotal;
@@ -402,7 +433,6 @@ export default class CustomerService {
     }
 
     async AddFeedback(data: CreateFeedbackDTO, user: User): Promise<CreateFeedbackResponseDTO> {
-
         const {
             pickupRiderRating,
             deliveryRiderRating,
@@ -414,58 +444,56 @@ export default class CustomerService {
             pickupRiderOrderId,
             deliveryRiderOrderId,
             vendorOrderId,
-            laundryId
+            laundryId,
         } = data;
 
         const isOrderCompleted = await this._dbService.order.findFirst({
             where: {
                 id: orderId,
-                status: "COMPLETED",
+                status: 'COMPLETED',
             },
         });
 
-        const createFeedback = async (
-            rating: number | undefined,
-            comments: string | undefined,
-            type: FeedbackType,
-        ) => {
+        const createFeedback = async (rating: number | undefined, comments: string | undefined, type: FeedbackType) => {
             if (rating !== 0) {
                 const res = await this._dbService.feedback.create({
                     data: {
                         userId: user.id,
                         rating,
-                        comments: comments ?? "",
+                        comments: comments ?? '',
                         type,
                         orderId,
-                        riderOrderId: type === "RIDER_PICKUP" ? pickupRiderOrderId : type === "RIDER_DELIVERY" ? deliveryRiderOrderId : null,
-                        vendorOrderId: type === "VENDOR" ? vendorOrderId : null,
-                        laundryId:type === "VENDOR" ? laundryId : null,
+                        riderOrderId:
+                            type === 'RIDER_PICKUP'
+                                ? pickupRiderOrderId
+                                : type === 'RIDER_DELIVERY'
+                                  ? deliveryRiderOrderId
+                                  : null,
+                        vendorOrderId: type === 'VENDOR' ? vendorOrderId : null,
+                        laundryId: type === 'VENDOR' ? laundryId : null,
                     },
                 });
                 if (res) {
-                    return true
+                    return true;
                 }
             }
         };
 
         if (isOrderCompleted) {
             const feedbacksCreated = await Promise.all([
-                createFeedback(vendorRating, vendorFeedback, "VENDOR"),
-                createFeedback(pickupRiderRating, pickupRiderFeedback, "RIDER_PICKUP"),
-                createFeedback(deliveryRiderRating, deliveryRiderFeedback, "RIDER_DELIVERY"),
+                createFeedback(vendorRating, vendorFeedback, 'VENDOR'),
+                createFeedback(pickupRiderRating, pickupRiderFeedback, 'RIDER_PICKUP'),
+                createFeedback(deliveryRiderRating, deliveryRiderFeedback, 'RIDER_DELIVERY'),
             ]);
 
             if (feedbacksCreated.some((feedback) => feedback === true)) {
-                return { message: "Feedback added successfully" };
+                return { message: 'Feedback added successfully' };
+            } else {
+                throw new BadRequestException('Error adding feedback');
             }
-            else {
-                throw new BadRequestException("Error adding feedback");
-            }
+        } else {
+            throw new BadRequestException('Order is not completed');
         }
-        else {
-            throw new BadRequestException("Order is not completed");
-        }
-
     }
 
     async HasFeedback(params: HasFeedBackRequestDTO, user: User): Promise<HasFeedbackResponseDTO> {
@@ -473,18 +501,21 @@ export default class CustomerService {
             where: {
                 userId: user?.id,
                 orderId: params.orderId,
-            }
+            },
         });
 
         if (feedback) {
-            return { hasFeedback: true }
-        }
-        else {
-            return { hasFeedback: false }
+            return { hasFeedback: true };
+        } else {
+            return { hasFeedback: false };
         }
     }
 
-    async validateCoupon(user: User, params: ValidateCouponRequestDTO, query: ValidateCouponQueryRequestDTO): Promise<ValidateCouponResponseDTO> {
+    async ValidateCoupon(
+        user: User,
+        params: ValidateCouponRequestDTO,
+        query: ValidateCouponQueryRequestDTO,
+    ): Promise<ValidateCouponResponseDTO> {
         const coupon = await this._dbService.coupon.findFirst({
             where: {
                 code: params.code.toUpperCase(),
@@ -496,15 +527,15 @@ export default class CustomerService {
                 name: true,
                 type: true,
                 discount: true,
-                minOrderAmount:true,
+                minOrderAmount: true,
                 code: true,
                 maxDiscount: true,
                 usageLimit: true,
-            }
+            },
         });
 
         if (!coupon) {
-            throw new BadRequestException("Invalid coupon");
+            throw new BadRequestException('Invalid coupon');
         }
 
         if (coupon.singleUse) {
@@ -512,11 +543,11 @@ export default class CustomerService {
                 where: {
                     userId: user.id,
                     couponId: coupon.id,
-                }
+                },
             });
 
             if (couponUsed) {
-                throw new BadRequestException("Coupon already used");
+                throw new BadRequestException('Coupon already used');
             }
         }
 
@@ -524,30 +555,34 @@ export default class CustomerService {
             const couponUsage = await this._dbService.couponUsage.findMany({
                 where: {
                     couponId: coupon.id,
-                }
+                },
             });
 
-            if (couponUsage.length >= coupon.usageLimit){
-                throw new BadRequestException("Coupon limit reached");
+            if (couponUsage.length >= coupon.usageLimit) {
+                throw new BadRequestException('Coupon limit reached');
             }
         }
 
-        if (coupon.type === CouponType.FIXED && !query.cartAmount){
-            throw new BadRequestException("Cart amount required for fixed coupon");
+        if (coupon.type === CouponType.FIXED && !query.cartAmount) {
+            throw new BadRequestException('Cart amount required for fixed coupon');
         }
-       
+
         if (coupon.minOrderAmount && query.cartAmount < coupon.minOrderAmount) {
-            throw new BadRequestException(`Minimum order amount should be ${coupon.minOrderAmount}SAR to use the ${coupon.code} coupon`);
+            throw new BadRequestException(
+                `Minimum order amount should be ${coupon.minOrderAmount}SAR to use the ${coupon.code} coupon`,
+            );
         }
-        if (coupon.type === CouponType.FIXED && query.cartAmount < coupon.discount){
-            throw new BadRequestException(`Minimum cart amount should be ${coupon.discount}SAR to use the ${coupon.code} coupon`);
+        if (coupon.type === CouponType.FIXED && query.cartAmount < coupon.discount) {
+            throw new BadRequestException(
+                `Minimum cart amount should be ${coupon.discount}SAR to use the ${coupon.code} coupon`,
+            );
         }
 
         return coupon;
     }
 
     async getUserCoupons(user: User, query: getUserCouponsQueryDTO): Promise<GetUserCouponsResponseDTO> {
-         switch(query.couponFilter){
+        switch (query.couponFilter) {
             case coupon.ACTIVE: {
                 const pagination = GetPaginationOptions(query);
                 const coupons = await this._dbService.coupon.findMany({
@@ -567,8 +602,8 @@ export default class CustomerService {
                     },
                     orderBy: {
                         createdAt: 'desc',
-                    }
-                })
+                    },
+                });
                 const couponsPaginated = await this._dbService.coupon.findMany({
                     where: {
                         isActive: true,
@@ -587,12 +622,12 @@ export default class CustomerService {
                     ...pagination,
                     orderBy: {
                         createdAt: 'desc',
-                    }
-                })
+                    },
+                });
                 const data = {
                     totalCoupons: coupons.length,
-                    vouchers:couponsPaginated
-                }
+                    vouchers: couponsPaginated,
+                };
                 return data;
             }
 
@@ -613,8 +648,8 @@ export default class CustomerService {
                                 minOrderAmount: true,
                                 maxDiscount: true,
                                 singleUse: true,
-                            }
-                        }
+                            },
+                        },
                     },
                     orderBy: {
                         createdAt: 'desc',
@@ -637,29 +672,27 @@ export default class CustomerService {
                                 minOrderAmount: true,
                                 maxDiscount: true,
                                 singleUse: true,
-                            }
-                        }
+                            },
+                        },
                     },
                     distinct: ['couponId'],
                     orderBy: {
                         createdAt: 'desc',
                     },
                     ...pagination,
-                    
-                    })
+                });
 
-                    const flattenCoupons = (coupons) => 
-                        coupons.map((couponUsage) => ({
-                            ...couponUsage.coupon, // Spread coupon properties
-                        }));
+                const flattenCoupons = (coupons) =>
+                    coupons.map((couponUsage) => ({
+                        ...couponUsage.coupon, // Spread coupon properties
+                    }));
 
-                    const data=  {
-                        totalCoupons: usedCoupons.length,
-                        vouchers: flattenCoupons(usedCouponsPaginated)
-                    }
-                    return data;
-                }
-
+                const data = {
+                    totalCoupons: usedCoupons.length,
+                    vouchers: flattenCoupons(usedCouponsPaginated),
+                };
+                return data;
+            }
 
             case coupon.EXPIRED: {
                 const pagination = GetPaginationOptions(query);
@@ -667,9 +700,9 @@ export default class CustomerService {
                     where: {
                         userId: user.id,
                         coupon: {
-                           expiryDate : {
-                                 lt: new Date(),
-                           }
+                            expiryDate: {
+                                lt: new Date(),
+                            },
                         },
                     },
                     select: {
@@ -682,19 +715,18 @@ export default class CustomerService {
                                 discount: true,
                                 minOrderAmount: true,
                                 maxDiscount: true,
-                            }
-                        }
+                            },
+                        },
                     },
-                    distinct: ['couponId'], 
-                })
-                const expiredCouponsPaginated = 
-                await this._dbService.couponUsage.findMany({
+                    distinct: ['couponId'],
+                });
+                const expiredCouponsPaginated = await this._dbService.couponUsage.findMany({
                     where: {
                         userId: user.id,
                         coupon: {
-                           expiryDate : {
-                                 lt: new Date(),
-                           }
+                            expiryDate: {
+                                lt: new Date(),
+                            },
                         },
                     },
                     select: {
@@ -707,125 +739,122 @@ export default class CustomerService {
                                 discount: true,
                                 minOrderAmount: true,
                                 maxDiscount: true,
-                            }
-                        }
+                            },
+                        },
                     },
-                    distinct: ['couponId'], 
+                    distinct: ['couponId'],
                     ...pagination,
-                })
-                const flattenCoupons = (coupons) => 
+                });
+                const flattenCoupons = (coupons) =>
                     coupons.map((couponUsage) => ({
                         ...couponUsage.coupon, // Spread coupon properties
                     }));
-            
+
                 const data = {
                     totalCoupons: expiredCoupons.length,
-                    vouchers: flattenCoupons(expiredCouponsPaginated)
-                }
+                    vouchers: flattenCoupons(expiredCouponsPaginated),
+                };
                 return data;
             }
         }
+    }
+
+    async AddTip(data: CreateTipDTO, user: User): Promise<AddTipResponseDto> {
+        const order = await this._dbService.order.findFirst({
+            where: {
+                id: data.orderId,
+                userId: user.id,
+            },
+            select: {
+                id: true,
+                status: true,
+                totalAmount: true,
+            },
+        });
+
+        if (!order) {
+            throw new BadRequestException('Order not found');
         }
 
-        async AddTip(data: CreateTipDTO, user: User): Promise<AddTipResponseDto> {
-            const order = await this._dbService.order.findFirst({
-                where: {
-                    id: data.orderId,
+        if (order.status !== 'COMPLETED') {
+            throw new BadRequestException('Order not completed');
+        }
+
+        const createTip = async (riderId: string | null, amount: number, type: TipType) => {
+            if (!riderId) return null;
+            return await this._dbService.tip.create({
+                data: {
+                    orderId: data.orderId,
                     userId: user.id,
+                    riderId,
+                    amount,
+                    type,
                 },
                 select: {
                     id: true,
-                    status: true,
-                    totalAmount: true,
-                }
+                },
+            });
+            // if (tip) {
+            //     return true
+            // }
+        };
+
+        const [pickupTip, deliveryTip] = await Promise.all([
+            createTip(data.pickupRiderId, data.pickupRiderAmount, TipType.RIDER_PICKUP),
+            createTip(data.deliveryRiderId, data.deliveryRiderAmount, TipType.RIDER_DELIVERY),
+        ]);
+
+        const createdTips = [pickupTip, deliveryTip].filter(Boolean);
+
+        if (createdTips.length > 0) {
+            // Create Tip Transaction
+            const tipTransaction = await this._dbService.tipTransaction.create({
+                data: {
+                    amount: (data.pickupRiderAmount ?? 0) + (data.deliveryRiderAmount ?? 0),
+                },
+                select: {
+                    id: true,
+                    amount: true,
+                },
             });
 
-            if (!order) {
-                throw new BadRequestException("Order not found");
+            if (!tipTransaction) {
+                throw new BadRequestException('Error adding tip');
             }
 
-            if (order.status !== "COMPLETED") {
-                throw new BadRequestException("Order not completed");
-            }
-
-            const createTip = async (riderId: string | null, amount: number, type: TipType)=> {
-                if (!riderId) return null
-                   return await this._dbService.tip.create({
-                        data: {
-                            orderId: data.orderId,
-                            userId: user.id,
-                            riderId,
-                            amount,
-                            type,
-                        },
-                        select : {
-                            id: true,
-                        }
-                    })
-                    // if (tip) {
-                    //     return true
-                    // }
-            }
-
-            const [pickupTip, deliveryTip] = await Promise.all([
-                createTip(data.pickupRiderId, data.pickupRiderAmount, TipType.RIDER_PICKUP),
-                createTip(data.deliveryRiderId, data.deliveryRiderAmount, TipType.RIDER_DELIVERY)
-            ]);
-
-            const createdTips = [pickupTip, deliveryTip].filter(Boolean);
-
-            if (createdTips.length > 0) {
-                // Create Tip Transaction
-                const tipTransaction = await this._dbService.tipTransaction.create({
-                    data: {
-                        amount: (data.pickupRiderAmount ?? 0) + (data.deliveryRiderAmount ?? 0),
-                    },
-                    select: {
-                        id: true,
-                        amount: true,
-                    }
-                });
-
-                if (!tipTransaction) {
-                    throw new BadRequestException("Error adding tip");
-                }
-
-                // Update tips with transaction ID
-                await this._dbService.tip.updateMany({
-                    where: {
-                        id: { in: createdTips.map((tip) => tip.id) },
-                    },
-                    data: {
-                        transactionId: tipTransaction.id,
-                    }
-                });
-
-                const res= {
-                    transactionId: tipTransaction.id,
-                    amount: tipTransaction.amount,
-                }
-
-                return { data: res };
-            }
-            else {
-                throw new BadRequestException("Error adding feedback");
-            }
-        }
-
-        async HasTipped(params: HasFeedBackRequestDTO, user: User): Promise<HasTippedResponseDTO> {
-            const tip = await this._dbService.tip.findFirst({
+            // Update tips with transaction ID
+            await this._dbService.tip.updateMany({
                 where: {
-                    userId: user.id,
-                    orderId: params.orderId,
-                    paid: true,
-                }
+                    id: { in: createdTips.map((tip) => tip.id) },
+                },
+                data: {
+                    transactionId: tipTransaction.id,
+                },
             });
-            if (tip) {
-                return { hasTipped: true }
-            }
-            else {
-                return { hasTipped: false }
+
+            const res = {
+                transactionId: tipTransaction.id,
+                amount: tipTransaction.amount,
+            };
+
+            return { data: res };
+        } else {
+            throw new BadRequestException('Error adding feedback');
         }
     }
 
+    async HasTipped(params: HasFeedBackRequestDTO, user: User): Promise<HasTippedResponseDTO> {
+        const tip = await this._dbService.tip.findFirst({
+            where: {
+                userId: user.id,
+                orderId: params.orderId,
+                paid: true,
+            },
+        });
+        if (tip) {
+            return { hasTipped: true };
+        } else {
+            return { hasTipped: false };
+        }
+    }
 }

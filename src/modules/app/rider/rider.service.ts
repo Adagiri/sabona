@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
-import { OrderStatus, PickupStatus, User } from '@prisma/client';
+import { OrderStatus, OrderType, PickupStatus, User } from '@prisma/client';
 import UpdateStatusRequestDTO from './dto/request/updateStatus.request';
 import GetRideRequestsResponseDTO from './dto/response/getRideRequests.response';
 import UpdateOrderStatusResponseDTO from './dto/response/updateOrderStatus.response';
@@ -9,766 +9,353 @@ import CancelOrderRequestDTO from './dto/request/src/modules/app/rider/dto/reque
 import { BadRequestException } from 'src/core/exceptions/response.exception';
 import { extractTokens } from 'src/helpers/util.helper';
 import NotificationService from '../notification/notification.service';
+import LocationService from '../location/location.service';
 
 @Injectable()
 export default class RiderService {
     constructor(
         private _dbService: DatabaseService,
         private _notificationService: NotificationService,
-    ) { }
-
+        private _locationService: LocationService,
+    ) {}
+    /**
+     * Get orders assigned to this specific rider
+     * NO MORE general order list - only assigned orders
+     */
     async getRides(user: User): Promise<GetRideRequestsResponseDTO> {
-
-        const rideRequests = await this._dbService.order.findMany({
+        // Get orders specifically assigned to this rider
+        const assignedOrders = await this._dbService.riderOrder.findMany({
             where: {
-                OR: [
-                    {
-                        AND: [
-                            {
-                                OR: [
-                                    { status: 'ACCEPTED' },
-                                    { status: 'READY_FOR_PICKUP' }
-                                ]
-                            },
-                            {
-                                OR: [
-                                    {
-                                        riderOrders: { none: { deletedAt: null } } // no rider assigned, and not deleted 
-                                    },
-                                    {
-                                        riderOrders: {
-                                            every: {
-                                                riderId: user.id,
-                                                deletedAt: null // current rider assigned, and not deleted 
-                                            }
-                                        }
-                                    }
-                                ]
-                            }
-                        ]
+                riderId: user.id,
+                deletedAt: null, // Only active assignments
+                order: {
+                    status: {
+                        in: ['ACCEPTED', 'READY_FOR_PICKUP'], // Orders needing rider action
                     },
-                    {
-                        riderOrders: {
-                            some: {
-                                riderId: user.id,
-                                deletedAt: null
+                },
+            },
+            include: {
+                order: {
+                    include: {
+                        user: {
+                            select: {
+                                firstName: true,
+                                lastName: true,
+                                phone: true,
                             },
                         },
-                        NOT: {
-                            status: {
-                                in: [OrderStatus.IN_PROGRESS, OrderStatus.COMPLETED]
-                            }
-                        }
-                    }
-                ],
-                NOT: {
-                    status: 'CANCELLED'
-                }
-            },
-            orderBy: {
-                createdAt: 'desc'
-            },
-            select: {
-                id: true,
-                userId: true,
-                laundry: {
-                    select: {
-                        name: true,
-                        address: true,
-                    }
-                },
-                riderOrders: {
-                    select: {
-                        riderId: true,
+                        laundry: {
+                            select: {
+                                name: true,
+                                address: true,
+                                lat: true,
+                                long: true,
+                            },
+                        },
+                        services: {
+                            select: {
+                                items: {
+                                    select: {
+                                        quantity: true,
+                                        laundryServiceItem: {
+                                            select: {
+                                                name: true,
+                                                platformPrice: true, // Use new dual pricing
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        pickup: {
+                            select: {
+                                pickupAddress: true,
+                                pickupLat: true,
+                                pickupLong: true,
+                                status: true,
+                                pickupDate: true,
+                                pickupTime: true,
+                            },
+                        },
+                        delivery: {
+                            select: {
+                                deliveryAddress: true,
+                                deliveryLat: true,
+                                deliveryLong: true,
+                                status: true,
+                                deliveryDate: true,
+                            },
+                        },
                     },
                 },
-                pickup: {
-                    select: {
-                        pickupAddress: true,
-                        pickupLat: true,
-                        pickupLong: true,
-                        status: true,
-                    }
-                },
-                delivery: {
-                    select: {
-                        deliveryAddress: true,
-                        deliveryLat: true,
-                        deliveryLong: true,
-                        status: true,
-                    }
-                },
-                status: true,
-                deliveryType: true,
-            }
+            },
+            orderBy: {
+                assignedAt: 'desc',
+            },
         });
 
-        return { data: rideRequests };
+        // Transform data to include assignment context
+        const transformedOrders = assignedOrders.map((riderOrder) => ({
+            assignmentId: riderOrder.id,
+            assignmentType: riderOrder.type, // RIDER_PICKUP or RIDER_DELIVERY
+            assignedAt: riderOrder.assignedAt,
+            order: riderOrder.order,
+            // Add distance calculation for pickup location
+            distanceToPickup: null, // We'll calculate this if driver location is available
+        }));
+
+        // Calculate distances if driver has location
+        const driverLocation = await this._dbService.userLocation.findUnique({
+            where: { userId: user.id },
+        });
+
+        if (driverLocation) {
+            for (const assignedOrder of transformedOrders) {
+                if (assignedOrder.order.pickup) {
+                    const distance = this._locationService['calculateDistance'](
+                        driverLocation.lat,
+                        driverLocation.long,
+                        assignedOrder.order.pickup.pickupLat,
+                        assignedOrder.order.pickup.pickupLong,
+                    );
+                    assignedOrder.distanceToPickup = distance;
+                }
+            }
+        }
+
+        return { data: transformedOrders };
     }
 
-
+    /**
+     * Update order status - now includes validation that rider is assigned
+     */
     async updateOrderStatus(params: UpdateStatusRequestDTO, user: User): Promise<UpdateOrderStatusResponseDTO> {
-        const order = await this._dbService.order.findUnique({
+        // Verify rider is assigned to this order
+        const riderAssignment = await this._dbService.riderOrder.findFirst({
             where: {
-                id: params.orderId
+                orderId: params.orderId,
+                riderId: user.id,
+                deletedAt: null,
             },
-            select: {
-                status: true,
-            }
+        });
+
+        if (!riderAssignment) {
+            throw new BadRequestException('You are not assigned to this order');
+        }
+
+        const order = await this._dbService.order.findUnique({
+            where: { id: params.orderId },
+            select: { status: true, orderType: true },
         });
 
         if (!order) {
-            throw new BadRequestException("Order does not exist");
+            throw new BadRequestException('Order does not exist');
         }
 
+        // Get customer and vendor info for notifications
         const customerId = await this._dbService.order.findUnique({
-            where: {
-                id: params.orderId
-            },
-            select: {
-                userId: true,
-            }
+            where: { id: params.orderId },
+            select: { userId: true },
         });
 
-        const laundryId = await this._dbService.order.findUnique({
-            where: {
-                id: params.orderId
-            },
-            select: {
-                laundryId: true,
-            }
-        });
+        let vendorId: any[] = [];
+        if (order.orderType === OrderType.REGISTERED_LAUNDRY) {
+            const laundryId = await this._dbService.order.findUnique({
+                where: { id: params.orderId },
+                select: { laundryId: true },
+            });
 
-        const vendorId = await this._dbService.laundry.findMany({
-            where: {
-                id: laundryId?.laundryId,
-            },
-            select: {
-                vendorId: true,
-            }
+            vendorId = await this._dbService.laundry.findMany({
+                where: { id: laundryId?.laundryId },
+                select: { vendorId: true },
+            });
+        }
 
-        });
-
-        const vendorDeviceTokens = await this._dbService.deviceToken.findMany({
-            where: {
-                userId: vendorId[0]?.vendorId,
-                deletedAt: null
-            },
-            select: {
-                token: true,
-            },
-        });
-
+        // Get device tokens for notifications
         const customerDeviceTokens = await this._dbService.deviceToken.findMany({
-            where: {
-                userId: customerId?.userId,
-                deletedAt: null,
-            },
-            select: {
-                token: true,
-            },
+            where: { userId: customerId?.userId, deletedAt: null },
+            select: { token: true },
         });
 
-        // Extract Customer tokens
-        const customserTokens = extractTokens(customerDeviceTokens);
+        let vendorDeviceTokens: any[] = [];
+        if (order.orderType === OrderType.REGISTERED_LAUNDRY && vendorId.length > 0) {
+            vendorDeviceTokens = await this._dbService.deviceToken.findMany({
+                where: { userId: vendorId[0]?.vendorId, deletedAt: null },
+                select: { token: true },
+            });
+        }
 
-        // Extract Vendor tokens
+        const customerTokens = extractTokens(customerDeviceTokens);
         const vendorTokens = extractTokens(vendorDeviceTokens);
 
+        // Handle different status updates
         switch (params.status) {
             case 'ACCEPT':
-
-                const haveOrder = await this._dbService.riderOrder.findFirst({
-                    where: {
-                        orderId: params.orderId,
-                    }
-                });
-
-                const riderOrder = await this._dbService.riderOrder.create({
-                    data: {
-                        orderId: params.orderId,
-                        riderId: user.id,
-                        type: haveOrder ? 'RIDER_DELIVERY' : 'RIDER_PICKUP',
-                    }
-                });
-
-                if (!riderOrder) {
-                    throw new BadRequestException("Failed to accept order");
-                }
-
-
+                // For auto-assigned orders, this confirms the assignment
                 if (order.status === 'ACCEPTED') {
+                    // Update pickup status to accepted
+                    await this._dbService.pickup.update({
+                        where: { orderId: params.orderId },
+                        data: {
+                            riderId: user.id,
+                            status: 'ACCEPTED',
+                        },
+                    });
 
+                    // Send notifications
                     const customerNotificationData = {
-                        tokens: customserTokens,
-                        title: "Rider on the way!!",
-                        body: "Your order has been accepted by rider.",
+                        tokens: customerTokens,
+                        title: 'Driver Confirmed!',
+                        body: 'Your assigned driver has confirmed and is on the way',
                         notificationData: {
                             orderId: params.orderId,
                             key: 'GET_ORDER_BY_ID',
                             route: 'TrackOrder',
-                        }
-                    };
-
-                    // Send Vendor notification Data
-                    const vendorNotificationData = {
-                        tokens: vendorTokens,
-                        title: "Order Accepted by rider!!",
-                        body: "Rider is on the way to pick from customer.",
-                        notificationData: {
-                            orderId: params.orderId,
-                            key: 'GET_ORDER_BY_ID',
-                            route: 'Track',
-                        }
-                    };
-
-
-                    const updatedPickup = await this._dbService.pickup.update({
-                        where: {
-                            orderId: params.orderId
                         },
-                        data: {
-                            riderId: user.id,
-                            status: 'ACCEPTED'
-                        }
-                    });
-                    if (!updatedPickup) {
-                        throw new BadRequestException("Error updating pickup status")
-                    }
-
-                    if (customserTokens?.length) {
-                        const res = await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
-                        if (res) {
-                            const createNotification = await this._dbService.notification.create({
-                                data: {
-                                    userId: customerId.userId,
-                                    orderId: params.orderId,
-                                    message: "Your order has been accepted by rider.",
-                                    status: "UNREAD",
-                                    data: {
-                                        orderId: params.orderId,
-                                        key: 'GET_ORDER_BY_ID',
-                                        route: 'TrackOrder',
-                                    },
-                                    type: "ORDER_ACCEPTED",
-                                }
-                            });
-                            if (createNotification) {
-                                console.log("Customer Notification created successfully");
-                            }
-                            else {
-                                console.log("Error creating notification");
-                            }
-                        }
-                    }
-                    if (vendorTokens?.length) {
-                        const res = await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
-                        if (res) {
-                            const createNotification = await this._dbService.notification.create({
-                                data: {
-                                    userId: vendorId[0].vendorId,
-                                    orderId: params.orderId,
-                                    message: "Rider is on the way to pick from customer.",
-                                    status: "UNREAD",
-                                    data: {
-                                        orderId: params.orderId,
-                                        key: 'GET_ORDER_BY_ID',
-                                        route: 'Track',
-                                    },
-                                    type: "ORDER_ACCEPTED",
-                                }
-                            });
-                            if (createNotification) {
-                                console.log("Vendor Notification created successfully");
-                            }
-                            else {
-                                console.log("Error creating notification");
-                            }
-                        }
-                    }
-
-                } else if (order.status === 'READY_FOR_PICKUP') {
-
-                    const customerNotificationData = {
-                        tokens: customserTokens,
-                        title: "Out for delivery!!",
-                        body: "Rider is on the way to laundry to pick your processed order.",
-                        notificationData: {
-                            orderId: params.orderId,
-                            key: 'GET_ORDER_BY_ID',
-                            route: 'TrackOrder',
-                        }
                     };
 
-                    const vendorNotificationData = {
-                        tokens: vendorTokens,
-                        title: "Rider on the way!!",
-                        body: "Rider is on the way to pick up the order from your laundry.",
-                        notificationData: {
-                            orderId: params.orderId,
-                            key: 'GET_USER_ORDERS',
-                            route: 'Orders',
-                        }
-                    };
+                    if (customerTokens?.length) {
+                        await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
 
-                    const updatedDelivery = await this._dbService.delivery.update({
-                        where: {
-                            orderId: params.orderId
-                        },
-                        data: {
-                            riderId: user.id,
-                            status: 'ACCEPTED'
-                        }
-                    });
-
-                    if (!updatedDelivery) {
-                        throw new BadRequestException("Error updating delivery status")
+                        await this._dbService.notification.create({
+                            data: {
+                                userId: customerId.userId,
+                                orderId: params.orderId,
+                                message: 'Your assigned driver has confirmed and is on the way',
+                                status: 'UNREAD',
+                                data: {
+                                    orderId: params.orderId,
+                                    key: 'GET_ORDER_BY_ID',
+                                    route: 'TrackOrder',
+                                },
+                                type: 'ORDER_ACCEPTED',
+                            },
+                        });
                     }
 
-                    if (customserTokens?.length) {
-                        const res = await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
-                        if (res) {
-                            const createNotification = await this._dbService.notification.create({
-                                data: {
-                                    userId: customerId.userId,
-                                    orderId: params.orderId,
-                                    message: "Rider is on the way to laundry to pick your processed order.",
-                                    status: "UNREAD",
-                                    data: {
-                                        orderId: params.orderId,
-                                        key: 'GET_ORDER_BY_ID',
-                                        route: 'TrackOrder',
-                                    },
-                                    type: "ORDER_PROCESSING",
-                                }
-                            });
-                            if (createNotification) {
-                                console.log("Customer Notification created successfully");
-                            }
-                            else {
-                                console.log("Error creating notification");
-                            }
-                        }
-                    }
+                    if (order.orderType === OrderType.REGISTERED_LAUNDRY && vendorTokens?.length) {
+                        const vendorNotificationData = {
+                            tokens: vendorTokens,
+                            title: 'Driver Confirmed!',
+                            body: 'Driver is on the way to pick up from customer',
+                            notificationData: {
+                                orderId: params.orderId,
+                                key: 'GET_ORDER_BY_ID',
+                                route: 'Track',
+                            },
+                        };
 
-                    if (vendorTokens?.length) {
-                        const res = await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
-                        if (res) {
-                            const createNotification = await this._dbService.notification.create({
+                        await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
+
+                        await this._dbService.notification.create({
+                            data: {
+                                userId: vendorId[0].vendorId,
+                                orderId: params.orderId,
+                                message: 'Driver is on the way to pick up from customer',
+                                status: 'UNREAD',
                                 data: {
-                                    userId: vendorId[0].vendorId,
                                     orderId: params.orderId,
-                                    message: "Rider is on the way to pick up the order from your laundry.",
-                                    status: "UNREAD",
-                                    data: {
-                                        orderId: params.orderId,
-                                        key: 'GET_USER_ORDERS',
-                                        route: 'Orders',
-                                    },
-                                    type: "ORDER_PROCESSING",
-                                }
-                            });
-                            if (createNotification) {
-                                console.log("Vendor Notification created successfully");
-                            }
-                            else {
-                                console.log("Error creating notification");
-                            }
-                        }
+                                    key: 'GET_ORDER_BY_ID',
+                                    route: 'Track',
+                                },
+                                type: 'ORDER_ACCEPTED',
+                            },
+                        });
                     }
                 }
-
-                return { message: 'SUCCESS' }
+                break;
 
             case 'PICKED_UP':
                 if (order.status === 'ACCEPTED') {
+                    // Update pickup status
+                    await this._dbService.pickup.update({
+                        where: { orderId: params.orderId },
+                        data: { status: 'PICKED_UP' },
+                    });
 
+                    // For custom orders, special handling
+                    if (order.orderType === OrderType.CUSTOM_LAUNDRY) {
+                        // Notify admin about pickup completion for custom orders
+                        // Admin needs to track when driver reaches custom vendor
+                        // This would be handled in admin notifications
+                    }
+
+                    // Send notifications about pickup
                     const customerNotificationData = {
-                        tokens: customserTokens,
-                        title: "Order Picked up!!",
-                        body: "Your order has been picked up by the rider.",
+                        tokens: customerTokens,
+                        title: 'Order Picked Up!',
+                        body: 'Your order has been picked up by the driver',
                         notificationData: {
                             orderId: params.orderId,
                             key: 'GET_ORDER_BY_ID',
                             route: 'TrackOrder',
-                        }
-                    };
-
-                    // Send Vendor notification Data
-                    const vendorNotificationData = {
-                        tokens: vendorTokens,
-                        title: "Order picked up!!",
-                        body: "Rider has picked up the order and is on the way to vendor.",
-                        notificationData: {
-                            orderId: params.orderId,
-                            key: 'GET_ORDER_BY_ID',
-                            route: 'Track',
-                        }
-                    };
-
-                    const updateStatusPickedUp = await this._dbService.pickup.update({
-                        where: {
-                            orderId: params.orderId
                         },
-                        data: {
-                            status: 'PICKED_UP'
-                        }
-                    });
-
-                    if (!updateStatusPickedUp) {
-                        throw new BadRequestException("Could not update status");
-                    }
-
-                    if (customserTokens?.length) {
-                        const res = await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
-                        if (res) {
-                            const createNotification = await this._dbService.notification.create({
-                                data: {
-                                    userId: customerId.userId,
-                                    orderId: params.orderId,
-                                    message: "Your order has been picked up by the rider.",
-                                    status: "UNREAD",
-                                    data: {
-                                        orderId: params.orderId,
-                                        key: 'GET_ORDER_BY_ID',
-                                        route: 'TrackOrder',
-                                    },
-                                    type: "ORDER_PICKED_UP",
-                                }
-                            });
-                            if (createNotification) {
-                                console.log("Customer Notification created successfully");
-                            }
-                            else {
-                                console.log("Error creating notification");
-                            }
-                        }
-                    }
-
-                    if (vendorTokens?.length) {
-                        const res = await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
-                        if (res) {
-                            const createNotification = await this._dbService.notification.create({
-                                data: {
-                                    userId: vendorId[0].vendorId,
-                                    orderId: params.orderId,
-                                    message: "Rider has picked up the order and is on the way to vendor.",
-                                    status: "UNREAD",
-                                    data: {
-                                        orderId: params.orderId,
-                                        key: 'GET_ORDER_BY_ID',
-                                        route: 'Track',
-                                    },
-                                    type: "ORDER_PICKED_UP",
-                                }
-                            });
-                            if (createNotification) {
-                                console.log("Vendor Notification created successfully");
-                            }
-                            else {
-                                console.log("Error creating notification");
-                            }
-                        }
-                    }
-
-
-                    return { message: 'SUCCESS' }
-                }
-                else if (order.status === 'READY_FOR_PICKUP') {
-
-                    const customerNotificationData = {
-                        tokens: customserTokens,
-                        title: "Out for delivery!!",
-                        body: "Rider has picked up your order and can reach any time soon.",
-                        notificationData: {
-                            orderId: params.orderId,
-                            key: 'GET_ORDER_BY_ID',
-                            route: 'TrackOrder',
-                        }
                     };
 
-                    // Send Vendor notification Data
-                    const vendorNotificationData = {
-                        tokens: vendorTokens,
-                        title: "Order picked up!!",
-                        body: "Rider has picked up the order from your laundry.",
-                        notificationData: {
-                            orderId: params.orderId,
-                            key: 'GET_USER_ORDERS',
-                            route: 'Orders',
-                        }
-                    };
+                    if (customerTokens?.length) {
+                        await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
 
-                    const updateStatusPickedUpFromVendor = await this._dbService.delivery.update({
-                        where: {
-                            orderId: params.orderId
-                        },
-                        data: {
-                            status: 'PICKED_UP_FROM_VENDOR'
-                        }
-                    });
-
-                    if (!updateStatusPickedUpFromVendor) {
-                        throw new BadRequestException("Could not update status");
-                    }
-
-                    if (customserTokens?.length) {
-                        const res = await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
-                        if (res) {
-                            const createNotification = await this._dbService.notification.create({
+                        await this._dbService.notification.create({
+                            data: {
+                                userId: customerId.userId,
+                                orderId: params.orderId,
+                                message: 'Your order has been picked up by the driver',
+                                status: 'UNREAD',
                                 data: {
-                                    userId: customerId.userId,
                                     orderId: params.orderId,
-                                    message: "Rider has picked up your order and can reach any time soon.",
-                                    status: "UNREAD",
-                                    data: {
-                                        orderId: params.orderId,
-                                        key: 'GET_ORDER_BY_ID',
-                                        route: 'TrackOrder',
-                                    },
-                                    type: "ORDER_PROCESSING",
-                                }
-                            });
-                            if (createNotification) {
-                                console.log("Customer Notification created successfully");
-                            }
-                            else {
-                                console.log("Error creating notification");
-                            }
-                        }
+                                    key: 'GET_ORDER_BY_ID',
+                                    route: 'TrackOrder',
+                                },
+                                type: 'ORDER_PICKED_UP',
+                            },
+                        });
                     }
-                    if (vendorTokens?.length) {
-                        const res = await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
-                        if (res) {
-                            const createNotification = await this._dbService.notification.create({
-                                data: {
-                                    userId: vendorId[0].vendorId,
-                                    orderId: params.orderId,
-                                    message: "Rider has picked up the order from your laundry.",
-                                    status: "UNREAD",
-                                    data: {
-                                        orderId: params.orderId,
-                                        key: 'GET_USER_ORDERS',
-                                        route: 'Orders',
-                                    },
-                                    type: "ORDER_PICKED_UP",
-                                }
-                            });
-                            if (createNotification) {
-                                console.log("Vendor Notification created successfully");
-                            }
-                            else {
-                                console.log("Error creating notification");
-                            }
-                        }
-                    }
-
-                    return { message: 'SUCCESS' }
                 }
-
+                break;
 
             case 'DROPPED_OFF':
-                if (order.status === 'ACCEPTED') {
-
-                    const customerNotificationData = {
-                        tokens: customserTokens,
-                        title: "In Progress!!",
-                        body: "Rider has delivered the order to vendor and is now processing.",
-                        notificationData: {
-                            orderId: params.orderId,
-                            key: 'GET_ORDER_BY_ID',
-                            route: 'TrackOrder',
-                        }
-                    };
-
-                    const vendorNotificationData = {
-                        tokens: vendorTokens,
-                        title: "Order Delievered!!",
-                        body: "The rider has delivered the order at your laundry.",
-                        notificationData: {
-                            orderId: params.orderId,
-                            key: 'GET_ORDER_BY_ID',
-                            route: 'Track',
-                        }
-                    };
-
-                    const updateStatusDeliveredtoVendor = await this._dbService.pickup.update({
-                        where: {
-                            orderId: params.orderId
-                        },
-                        data: {
-                            status: 'DELIVERED_TO_VENDOR'
-                        }
+                // Handle drop-off at vendor or customer
+                if (riderAssignment.type === 'RIDER_PICKUP') {
+                    // Dropping off at vendor
+                    await this._dbService.pickup.update({
+                        where: { orderId: params.orderId },
+                        data: { status: 'DELIVERED_TO_VENDOR' },
                     });
 
-                    if (!updateStatusDeliveredtoVendor) {
-                        throw new BadRequestException("Could not update status");
+                    if (order.orderType === OrderType.REGISTERED_LAUNDRY) {
+                        // Update order status to IN_PROGRESS
+                        await this._dbService.order.update({
+                            where: { id: params.orderId },
+                            data: { status: OrderStatus.IN_PROGRESS },
+                        });
                     }
+                } else if (riderAssignment.type === 'RIDER_DELIVERY') {
+                    // Final delivery to customer
+                    await this._dbService.delivery.update({
+                        where: { orderId: params.orderId },
+                        data: { status: 'DELIVERED_TO_USER' },
+                    });
 
                     await this._dbService.order.update({
-                        where: {
-                            id: params.orderId
-                        },
-                        data: {
-                            status: 'IN_PROGRESS'
-                        }
+                        where: { id: params.orderId },
+                        data: { status: OrderStatus.COMPLETED },
                     });
-
-                    if (customserTokens?.length) {
-                        const res = await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
-                        if (res) {
-                            const createNotification = await this._dbService.notification.create({
-                                data: {
-                                    userId: customerId.userId,
-                                    orderId: params.orderId,
-                                    message: "Rider has delivered the order to vendor and is now processing.",
-                                    status: "UNREAD",
-                                    data: {
-                                        orderId: params.orderId,
-                                        key: 'GET_ORDER_BY_ID',
-                                        route: 'TrackOrder',
-                                    },
-                                    type: "ORDER_PROCESSING",
-                                }
-                            });
-                            if (createNotification) {
-                                console.log("Customer Notification created successfully");
-                            }
-                            else {
-                                console.log("Error creating notification");
-                            }
-                        }
-                    }
-                    if (vendorTokens?.length) {
-                        const res = await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
-                        if (res) {
-                            const createNotification = await this._dbService.notification.create({
-                                data: {
-                                    userId: vendorId[0].vendorId,
-                                    orderId: params.orderId,
-                                    message: "The rider has delivered the order at your laundry.",
-                                    status: "UNREAD",
-                                    data: {
-                                        orderId: params.orderId,
-                                        key: 'GET_ORDER_BY_ID',
-                                        route: 'Track',
-                                    },
-                                    type: "ORDER_DELIVERED",
-                                }
-                            });
-                            if (createNotification) {
-                                console.log("Vendor Notification created successfully");
-                            }
-                            else {
-                                console.log("Error creating notification");
-                            }
-                        }
-                    }
-
-                    return { message: 'SUCCESS' }
-
                 }
-                else if (order.status === 'READY_FOR_PICKUP') {
+                break;
 
-                    const customerNotificationData = {
-                        tokens: customserTokens,
-                        title: "Order Completed!!",
-                        body: "Rider has delivered the order to you.",
-                        notificationData: {
-                            orderId: params.orderId,
-                            key: 'GET_ORDER_BY_ID',
-                            route: 'TrackOrder',
-                        }
-                    };
-
-                    const vendorNotificationData = {
-                        tokens: vendorTokens,
-                        title: "Order Delivered!!",
-                        body: "Rider has delivered the order to the customer.",
-                        notificationData: {
-                            orderId: params.orderId,
-                            key: 'GET_USER_ORDERS',
-                            route: 'Orders',
-                        }
-                    };
-
-                    const updateStatusDeliveredToUser = await this._dbService.delivery.update({
-                        where: {
-                            orderId: params.orderId
-                        },
-                        data: {
-                            status: 'DELIVERED_TO_USER'
-                        }
-                    });
-
-                    if (!updateStatusDeliveredToUser) {
-                        throw new BadRequestException("Could not update status");
-                    }
-
-                    await this._dbService.order.update({
-                        where: {
-                            id: params.orderId
-                        },
-                        data: {
-                            status: 'COMPLETED'
-                        }
-                    });
-
-                    if (customserTokens?.length) {
-                        const res = await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
-                        if (res) {
-                            const createNotification = await this._dbService.notification.create({
-                                data: {
-                                    userId: customerId.userId,
-                                    orderId: params.orderId,
-                                    message: "Rider has delivered the order to you.",
-                                    status: "UNREAD",
-                                    data: {
-                                        orderId: params.orderId,
-                                        key: 'GET_ORDER_BY_ID',
-                                        route: 'TrackOrder',
-                                    },
-                                    type: "ORDER_DELIVERED",
-                                }
-                            });
-                            if (createNotification) {
-                                console.log("Customer Notification created successfully");
-                            }
-                            else {
-                                console.log("Error creating notification");
-                            }
-                        }
-
-
-                    }
-                    if (vendorTokens?.length) {
-                        const res = await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
-                        if (res) {
-                            const createNotification = await this._dbService.notification.create({
-                                data: {
-                                    userId: vendorId[0].vendorId,
-                                    orderId: params.orderId,
-                                    message: "Rider has delivered the order to the customer.",
-                                    status: "UNREAD",
-                                    data: {
-                                        orderId: params.orderId,
-                                        key: 'GET_USER_ORDERS',
-                                        route: 'Orders',
-                                    },
-                                    type: "ORDER_DELIVERED",
-                                }
-                            });
-                            if (createNotification) {
-                                console.log("Vendor Notification created successfully");
-                            }
-                            else {
-                                console.log("Error creating notification");
-                            }
-                        }
-                    }
-                    return { message: 'SUCCESS' }
-                }
+            default:
+                throw new BadRequestException('Invalid status update');
         }
+
+        return { message: 'SUCCESS' };
+    }
+
+    /**
+     * Update driver's current location
+     */
+    async updateLocation(user: User, lat: number, long: number): Promise<{ message: string }> {
+        await this._locationService.updateDriverLocation(user.id, lat, long);
+        return { message: 'Location updated successfully' };
     }
 
     async getDeliveries(user: User): Promise<GetDeliveriesResponseDTO> {
@@ -777,17 +364,17 @@ export default class RiderService {
                 riderId: user.id,
                 order: {
                     status: {
-                        not: OrderStatus.CANCELLED
-                    }
-                }
+                        not: OrderStatus.CANCELLED,
+                    },
+                },
             },
             select: {
                 orderId: true,
-                feedbacks:{
-                    select:{
+                feedbacks: {
+                    select: {
                         rating: true,
                         comments: true,
-                    }
+                    },
                 },
                 order: {
                     select: {
@@ -797,29 +384,26 @@ export default class RiderService {
                             select: {
                                 firstName: true,
                                 lastName: true,
-                            }
+                            },
                         },
                         services: {
                             select: {
                                 items: {
                                     select: {
                                         quantity: true,
-                                    }
-                                }
-                            }
-                        }
-
-                    }
-                }
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
             },
             orderBy: {
                 order: {
-                    createdAt: 'desc'
-                }
-            }
-        })
-
-
+                    createdAt: 'desc',
+                },
+            },
+        });
 
         return { data: deliveries };
     }
@@ -829,7 +413,7 @@ export default class RiderService {
             where: {
                 riderId: user.id,
                 orderId: params.orderId,
-                status: OrderStatus.ACCEPTED
+                status: OrderStatus.ACCEPTED,
             },
         });
 
@@ -837,28 +421,28 @@ export default class RiderService {
             where: {
                 riderId: user.id,
                 orderId: params.orderId,
-                status: OrderStatus.ACCEPTED
+                status: OrderStatus.ACCEPTED,
             },
         });
 
         if (!pickupOrder && !deliveryOrder) {
-            throw new BadRequestException("You can not cancel this order");
+            throw new BadRequestException('You can not cancel this order');
         }
 
         if (pickupOrder) {
             console.log('pickupOrder');
             const updateStatus = await this._dbService.pickup.update({
                 where: {
-                    orderId: params.orderId
+                    orderId: params.orderId,
                 },
                 data: {
                     status: PickupStatus.PENDING,
-                    riderId: null
-                }
+                    riderId: null,
+                },
             });
 
             if (!updateStatus) {
-                throw new BadRequestException("Error updating status");
+                throw new BadRequestException('Error updating status');
             }
         }
 
@@ -866,20 +450,20 @@ export default class RiderService {
             console.log('deliveryOrder');
             const updateStatus = await this._dbService.delivery.update({
                 where: {
-                    orderId: params.orderId
+                    orderId: params.orderId,
                 },
                 data: {
                     status: PickupStatus.PENDING,
-                    riderId: null
-                }
+                    riderId: null,
+                },
             });
 
             if (!updateStatus) {
-                throw new BadRequestException("Error updating status");
+                throw new BadRequestException('Error updating status');
             }
         }
 
-        return { message: 'SUCCESS' }
+        return { message: 'SUCCESS' };
     }
 
     async getCurrentOrders(user: User): Promise<GetDeliveriesResponseDTO> {
@@ -888,9 +472,9 @@ export default class RiderService {
                 riderId: user.id,
                 order: {
                     status: {
-                        in: [OrderStatus.ACCEPTED, OrderStatus.READY_FOR_PICKUP]
-                    }
-                }
+                        in: [OrderStatus.ACCEPTED, OrderStatus.READY_FOR_PICKUP],
+                    },
+                },
             },
             select: {
                 orderId: true,
@@ -902,42 +486,41 @@ export default class RiderService {
                             select: {
                                 firstName: true,
                                 lastName: true,
-                            }
+                            },
                         },
                         services: {
                             select: {
                                 items: {
                                     select: {
                                         quantity: true,
-                                    }
-                                }
-                            }
-                        }
-
-                    }
-                }
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
             },
             orderBy: {
                 order: {
-                    createdAt: 'desc'
-                }
-            }
-        })
+                    createdAt: 'desc',
+                },
+            },
+        });
         return { data: orders };
     }
 
-    async getLastOrder(user: User): Promise<{}> {
+    async getLastOrder(user: User): Promise<{data: any}> {
         const order = await this._dbService.riderOrder.findFirst({
             where: {
                 riderId: user.id,
             },
             orderBy: {
-                assignedAt: 'desc'
-            }
+                assignedAt: 'desc',
+            },
         });
 
         if (!order) {
-            throw new BadRequestException("No orders found");
+            throw new BadRequestException('No orders found');
         }
 
         return { data: order };

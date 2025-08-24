@@ -758,6 +758,8 @@ export default class VendorService {
 
         const items = data.items.map((item) => ({
             name: item.name,
+            vendorPrice: item.vendorPrice,
+            platformPrice: item.platformPrice,
             price: item.price,
             categoryId: item.categoryId,
             laundryServiceId: serviceId,

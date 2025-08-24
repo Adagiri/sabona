@@ -18,6 +18,6 @@ export default class OrderController {
         response: GetOrderByIdResponsetDTO,
     })
     async getOrderById(@Param() params: getOrderByIdRequestDTO): Promise<GetOrderByIdResponsetDTO> {
-        return await this._orderService.getOrderById(params)
+        return await this._orderService.getOrderById(params.id)
     }
 }

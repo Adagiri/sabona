@@ -9,6 +9,14 @@ export class CreateLaundryServiceItemRequestDTO {
 
     @ApiProperty()
     @IsNumber()
+    platformPrice: number;
+
+    @ApiProperty()
+    @IsNumber()
+    vendorPrice: number;
+
+    @ApiProperty()
+    @IsNumber()
     price: number;
 
     @ApiProperty({ description: 'Category ID for this item', required: false })
