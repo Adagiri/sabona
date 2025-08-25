@@ -302,6 +302,10 @@ export default class AdminService {
             throw new BadRequestException('User not found');
         }
 
+        if (user.type === UserType.VENDOR && (!data.contactPhone || !data.address)) {
+            throw new BadRequestException('For vendor application, address and contact phone fields are required');
+        }
+
         if (user.status === UserStatus.ACTIVE) {
             throw new BadRequestException('Application is already approved');
         }
@@ -841,7 +845,7 @@ export default class AdminService {
                 access: true,
                 meta: true,
                 status: true,
-                updatedAt: true
+                updatedAt: true,
             },
         });
 
@@ -887,7 +891,7 @@ export default class AdminService {
                 url: await getViewableUrl(vatNumberDoc),
                 access: vatNumberDoc.access,
                 status: vatNumberDoc.status,
-                updatedAt: vatNumberDoc.updatedAt
+                updatedAt: vatNumberDoc.updatedAt,
             };
         }
 
@@ -917,7 +921,6 @@ export default class AdminService {
             throw new NotFoundException('Vendor not found');
         }
 
-      
         // Verify both documents exist
         const [vatDoc, businessDoc] = await Promise.all([
             this._dbService.media.findUnique({
@@ -985,5 +988,216 @@ export default class AdminService {
             message: 'Vendor documents uploaded successfully',
             vendorId: vendor.id,
         };
+    }
+
+    async uploadRiderDocument(userId: string, data: { driverLicenseDocId: string }) {
+        // Validate that the user is a rider
+        const rider = await this._dbService.user.findUnique({
+            where: {
+                id: userId,
+                type: 'RIDER',
+                deletedAt: null,
+            },
+            include: {
+                settings: true,
+            },
+        });
+
+        if (!rider) {
+            throw new BadRequestException('Rider not found or invalid user type');
+        }
+
+        // Validate that the media exists and is in ready status
+        const driverLicenseDoc = await this._dbService.media.findUnique({
+            where: { id: parseInt(data.driverLicenseDocId) },
+        });
+
+        if (!driverLicenseDoc) {
+            throw new BadRequestException('Driver license document not found');
+        }
+
+        if (driverLicenseDoc.status !== 'READY') {
+            throw new BadRequestException('Driver license document is not ready for use');
+        }
+
+        // Check if rider already has documents uploaded
+        const existingDocs = await this._dbService.media.findMany({
+            where: {
+                userId: rider.id,
+                meta: {
+                    path: ['uploadedFor'],
+                    equals: 'rider-verification',
+                },
+            },
+        });
+
+        if (existingDocs.length > 0) {
+            throw new BadRequestException('Rider documents already exist. Use update endpoint instead.');
+        }
+
+        // Use transaction to ensure consistency
+        await this._dbService.$transaction(async (tx) => {
+            // Define metadata for driver license document
+            const driverLicenseMeta = {
+                docType: 'DRIVER_LICENSE_DOC',
+                uploadedFor: 'rider-verification',
+                uploadedBy: 'ADMIN',
+                uploadedAt: new Date().toISOString(),
+            };
+
+            // Update driver license document
+            await tx.media.update({
+                where: { id: driverLicenseDoc.id },
+                data: {
+                    userId: rider.id,
+                    meta: driverLicenseMeta,
+                },
+            });
+
+            // Update or create user settings
+            await tx.userSettings.upsert({
+                where: { userId: rider.id },
+                create: {
+                    userId: rider.id,
+                    isDocumentsUploaded: true,
+                },
+                update: {
+                    isDocumentsUploaded: true,
+                },
+            });
+        });
+
+        return {
+            success: true,
+            message: 'Rider documents uploaded successfully',
+            riderId: rider.id,
+        };
+    }
+
+    async finalizeRiderDocument(userId: string, data: { documentType: string; uploadId: string }) {
+        // Validate that the user is a rider
+        const rider = await this._dbService.user.findUnique({
+            where: {
+                id: userId,
+                type: 'RIDER',
+                deletedAt: null,
+            },
+        });
+
+        if (!rider) {
+            throw new BadRequestException('Rider not found or invalid user type');
+        }
+
+        // Validate document type
+        const allowedDocTypes = ['DRIVER_LICENSE_DOC'];
+        if (!allowedDocTypes.includes(data.documentType)) {
+            throw new BadRequestException('Invalid document type for rider');
+        }
+
+        // Find the media by uploadId (assuming uploadId maps to media ID)
+        const media = await this._dbService.media.findUnique({
+            where: { id: parseInt(data.uploadId) },
+        });
+
+        if (!media) {
+            throw new BadRequestException('Document not found');
+        }
+
+        if (media.status !== 'READY') {
+            throw new BadRequestException('Document is not ready for finalization');
+        }
+
+        // Update media with finalization metadata
+        const updatedMedia = await this._dbService.media.update({
+            where: { id: media.id },
+            data: {
+                userId: rider.id,
+                meta: {
+                    ...((media.meta as object) || {}),
+                    docType: data.documentType,
+                    uploadedFor: 'rider-verification',
+                    finalizedAt: new Date().toISOString(),
+                    finalizedBy: 'ADMIN',
+                },
+            },
+        });
+
+        return {
+            success: true,
+            message: 'Rider document finalized successfully',
+            document: {
+                id: updatedMedia.id,
+                type: data.documentType,
+                status: updatedMedia.status,
+                path: updatedMedia.path,
+            },
+        };
+    }
+
+    async getRiderDocuments(userId: string) {
+        const documents = await this._dbService.media.findMany({
+            where: {
+                userId,
+                meta: {
+                    path: ['uploadedFor'],
+                    equals: 'rider-verification',
+                },
+            },
+            select: {
+                id: true,
+                name: true,
+                path: true,
+                location: true,
+                access: true,
+                meta: true,
+                status: true,
+                updatedAt: true,
+            },
+        });
+
+        function hasDocType(meta: any): meta is { docType: string } {
+            return meta && typeof meta === 'object' && typeof meta.docType === 'string';
+        }
+
+        // Helper function to get viewable URL
+        const getViewableUrl = async (doc: any) => {
+            if (doc.status !== 'READY') {
+                return null;
+            }
+
+            if (doc.access === 'PUBLIC') {
+                return doc.path;
+            } else {
+                try {
+                    const signedUrlResponse = await this._mediaService.GetSignedUrl(doc.location);
+                    return signedUrlResponse.message;
+                } catch (error) {
+                    console.error(`Failed to get signed URL for media ${doc.id}:`, error);
+                    return null;
+                }
+            }
+        };
+
+        // Find driver license document
+        const driverLicenseDoc = documents.find(
+            (doc) => hasDocType(doc.meta) && doc.meta.docType === 'DRIVER_LICENSE_DOC',
+        );
+
+        // Build response with viewable URLs
+        const response = {
+            driverLicense: driverLicenseDoc
+                ? {
+                      id: driverLicenseDoc.id,
+                      name: driverLicenseDoc.name,
+                      status: driverLicenseDoc.status,
+                      uploadedAt: driverLicenseDoc.updatedAt,
+                      viewUrl: await getViewableUrl(driverLicenseDoc),
+                  }
+                : null,
+            hasAllDocuments: !!driverLicenseDoc,
+            totalDocuments: documents.length,
+        };
+
+        return response;
     }
 }

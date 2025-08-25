@@ -1,5 +1,5 @@
 import { User, UserType } from '@prisma/client';
-import { ApiController, Authorized, CurrentUser, Delete, Get, Patch, Post } from '../../../core/decorators';
+import { ApiController, Authorized, CurrentUser, Delete, Get, Patch, Post, Put } from '../../../core/decorators';
 import { BadRequestException, Body, Param, Query } from '@nestjs/common';
 import AdminService from './admin.service';
 import { AllOrderListDto } from './dto/response/allorderlist.response.dto';
@@ -67,6 +67,8 @@ import { UploadReceiptResponseDTO } from './dto/response/uploadReceipt.response'
 import { GetAvailableDriversResponseDTO } from './dto/response/availableDrivers.response';
 import { GetCustomOrderDetailsResponseDTO } from './dto/response/customOrderDetails.response';
 import DatabaseService from 'src/database/database.service';
+import { FinalizeRiderDocumentResponseDTO, RiderDocumentsResponseDTO, UploadRiderDocumentResponseDTO } from './dto/response/riderDocument.response';
+import { FinalizeRiderDocumentRequestDTO, UploadRiderDocumentRequestDTO } from './dto/request/riderDocument.request';
 
 @ApiController({
     path: '/admin',
@@ -147,6 +149,42 @@ export default class AdminController {
     })
     async getApplicationDocuments(@Param('userId') userId: string): Promise<ApplicationDocumentsResponseDTO> {
         return this._adminService.getApplicationDocuments(userId);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Post({
+        path: '/rider/documents/:userId',
+        description: 'Upload driver license document for rider',
+        response: UploadRiderDocumentResponseDTO,
+    })
+    async uploadRiderDocument(
+        @Param('userId') userId: string,
+        @Body() data: UploadRiderDocumentRequestDTO,
+    ): Promise<UploadRiderDocumentResponseDTO> {
+        return this._adminService.uploadRiderDocument(userId, data);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Put({
+        path: '/rider/documents/:userId/finalize',
+        description: 'Finalize rider document upload',
+        response: FinalizeRiderDocumentResponseDTO,
+    })
+    async finalizeRiderDocument(
+        @Param('userId') userId: string,
+        @Body() data: FinalizeRiderDocumentRequestDTO,
+    ): Promise<FinalizeRiderDocumentResponseDTO> {
+        return this._adminService.finalizeRiderDocument(userId, data);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/rider/documents/:userId',
+        description: 'Get rider documents',
+        response: RiderDocumentsResponseDTO,
+    })
+    async getRiderDocuments(@Param('userId') userId: string): Promise<RiderDocumentsResponseDTO> {
+        return this._adminService.getRiderDocuments(userId);
     }
 
     @Authorized(UserType.ADMIN)
