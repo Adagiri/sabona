@@ -1,45 +1,70 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsOptional, ValidateNested } from 'class-validator';
+import { IconDTO } from '../../../icon/dto/response/icon.response';
+import { Type } from 'class-transformer';
 
-class IconMedia {
-    @ApiProperty()
-    id: number;
+export class LaundryItemCategoryDTO {
+    @IsString()
+    id: string;
 
-    @ApiProperty()
+    @IsString()
     name: string;
 
-    @ApiProperty()
-    path: string;
+    @IsOptional()
+    @IsString()
+    description?: string;
 
-    @ApiProperty()
-    extension: string;
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => IconDTO)
+    icon?: IconDTO;
+
+    @IsString()
+    createdAt: Date;
+
+    @IsString()
+    updatedAt: Date;
+
+    @IsOptional()
+    _count?: {
+        laundryServiceItems: number;
+    };
 }
 
 export class LaundryItemCategoryResponseDTO {
-    @ApiProperty()
+    @IsString()
     id: string;
 
-    @ApiProperty()
+    @IsString()
     name: string;
 
-    @ApiProperty()
+    @IsOptional()
+    @IsString()
     description?: string;
 
-    @ApiProperty({ type: IconMedia, required: false })
-    icon?: IconMedia;
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => IconDTO)
+    icon?: IconDTO;
 
-    @ApiProperty()
+    @IsString()
     createdAt: Date;
 
-    @ApiProperty()
+    @IsString()
     updatedAt: Date;
+
+    @IsOptional()
+    _count?: {
+        laundryServiceItem: number;
+    };
 }
 
 export class GetAllLaundryItemCategoriesResponseDTO {
-    @ApiProperty({ type: [LaundryItemCategoryResponseDTO] })
-    data: LaundryItemCategoryResponseDTO[];
+    @ValidateNested({ each: true })
+    @Type(() => LaundryItemCategoryDTO)
+    data: LaundryItemCategoryDTO[];
 }
 
 export class LaundryItemCategoryMessageResponseDTO {
-    @ApiProperty()
+    @IsString()
     message: string;
 }

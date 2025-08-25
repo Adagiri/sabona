@@ -289,8 +289,9 @@ model Icon {
   type        IconType @default(GENERAL)
 
   // Relations
-  services   LaundryService[]      @relation("ServiceIcon")
-  categories LaundryItemCategory[] @relation("CategoryIcon")
+  laundryServices   LaundryService[]      @relation("ServiceIcon")
+  
+  laundryCategories LaundryItemCategory[] @relation("CategoryIcon")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

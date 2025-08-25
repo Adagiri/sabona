@@ -26,6 +26,7 @@ import * as path from 'path';
 import CustomOrderModule from './modules/app/customOrder/customOrder.module';
 import PayTabsModule from './modules/app/paytabs/paytabs.module';
 import AdminCustomOrderModule from './modules/app/admin/adminCustomOrder.module';
+import IconModule from './modules/app/icon/icon.module';
 
 @Module({
     imports: [
@@ -57,6 +58,7 @@ import AdminCustomOrderModule from './modules/app/admin/adminCustomOrder.module'
         CustomOrderModule,
         PayTabsModule,
         AdminCustomOrderModule,
+        IconModule,
     ],
     controllers: [AppController],
     providers: [

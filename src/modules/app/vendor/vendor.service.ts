@@ -1,9 +1,9 @@
-import { OrderStatus,  User, UserType } from '@prisma/client';
+import { OrderStatus, User, UserType } from '@prisma/client';
 import DatabaseService from 'src/database/database.service';
 import UpdateStatusRequestDTO from './dto/request/updateStatus.request';
 import GetOrderRequestsResponseDTO from './dto/response/getOrderRequests.response';
 import UpdateStatusResponseDTO from './dto/response/updateStatus.response';
-import  { LaundryServiceDTO } from './dto/request/createLaundry.request';
+import { LaundryServiceDTO } from './dto/request/createLaundry.request';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
 import { Injectable } from '@nestjs/common';
 import EditLaundryRequestDTO from './dto/request/editLaundry.request';
@@ -18,7 +18,11 @@ import CancelOrderRequestDTO from './dto/request/cancelOrder.request';
 import { extractTokens } from 'src/helpers/util.helper';
 import NotificationService from '../notification/notification.service';
 import { EditLaundryItemCategoryRequestDTO } from './dto/request/editLaundryItemCategory.request';
-import { GetAllLaundryItemCategoriesResponseDTO, LaundryItemCategoryMessageResponseDTO, LaundryItemCategoryResponseDTO } from './dto/response/laundryItemCategory.response';
+import {
+    GetAllLaundryItemCategoriesResponseDTO,
+    LaundryItemCategoryMessageResponseDTO,
+    LaundryItemCategoryResponseDTO,
+} from './dto/response/laundryItemCategory.response';
 import { CreateLaundryItemCategoryRequestDTO } from './dto/request/createLaundryItemCategory.request';
 import EditLaundryServiceRequestDTO from './dto/request/laundryServiceEdit.request';
 @Injectable()
@@ -26,7 +30,6 @@ export default class VendorService {
     constructor(
         private _dbService: DatabaseService,
         private _notificationService: NotificationService,
-        
     ) {}
 
     async getOrderRequests(user: User, param: GetOrderRequestDTO): Promise<GetOrderRequestsResponseDTO> {
@@ -461,13 +464,19 @@ export default class VendorService {
                     where: {
                         deletedAt: null,
                     },
-                    include: {
+                    select: {
                         icon: {
                             select: {
                                 id: true,
                                 name: true,
-                                path: true,
-                                extension: true,
+                                type: true,
+                                media: {
+                                    select: {
+                                        id: true,
+                                        path: true,
+                                        name: true,
+                                    },
+                                },
                             },
                         },
                     },
@@ -482,7 +491,7 @@ export default class VendorService {
         const laundry = await this._dbService.laundry.findFirst({
             where: {
                 id: laundryId,
-                // vendorId: user.id,
+                deletedAt: null,
             },
             include: {
                 laundryService: {
@@ -497,8 +506,16 @@ export default class VendorService {
                             select: {
                                 id: true,
                                 name: true,
-                                path: true,
-                                extension: true,
+                                type: true,
+                                createdAt: true,
+                                updatedAt: true,
+                                media: {
+                                    select: {
+                                        id: true,
+                                        path: true,
+                                        name: true,
+                                    },
+                                },
                             },
                         },
                     },
@@ -609,8 +626,14 @@ export default class VendorService {
                     select: {
                         id: true,
                         name: true,
-                        path: true,
-                        extension: true,
+                        type: true,
+                        media: {
+                            select: {
+                                id: true,
+                                path: true,
+                                name: true,
+                            },
+                        },
                     },
                 },
             },
@@ -776,7 +799,6 @@ export default class VendorService {
         return { data: { message: 'Items Added Successfully' } };
     }
 
-    // Update getAllLaundryServiceItems method
     async getAllLaundryServiceItems(laundryId: string, serviceId: string): Promise<any> {
         const laundry = await this._dbService.laundry.findFirst({
             where: {
@@ -815,8 +837,15 @@ export default class VendorService {
                         icon: {
                             select: {
                                 id: true,
-                                path: true,
                                 name: true,
+                                type: true,
+                                media: {
+                                    select: {
+                                        id: true,
+                                        path: true,
+                                        name: true,
+                                    },
+                                },
                             },
                         },
                     },
@@ -1066,18 +1095,15 @@ export default class VendorService {
     async createLaundryItemCategory(
         data: CreateLaundryItemCategoryRequestDTO,
     ): Promise<LaundryItemCategoryResponseDTO> {
-        // Validate icon exists if provided
         if (data.iconId) {
-            const icon = await this._dbService.media.findFirst({
+            const icon = await this._dbService.icon.findFirst({
                 where: {
                     id: data.iconId,
-                    deletedAt: null,
-                    extension: 'svg',
                 },
             });
 
             if (!icon) {
-                throw new BadRequestException('SVG icon not found or invalid format');
+                throw new BadRequestException('Icon not found');
             }
         }
 
@@ -1092,8 +1118,16 @@ export default class VendorService {
                     select: {
                         id: true,
                         name: true,
-                        path: true,
-                        extension: true,
+                        type: true,
+                        createdAt: true,
+                        updatedAt: true,
+                        media: {
+                            select: {
+                                id: true,
+                                path: true,
+                                name: true,
+                            },
+                        },
                     },
                 },
             },
@@ -1112,8 +1146,23 @@ export default class VendorService {
                     select: {
                         id: true,
                         name: true,
-                        path: true,
-                        extension: true,
+                        createdAt: true,
+                        updatedAt: true,
+                        type: true,
+                        media: {
+                            select: {
+                                id: true,
+                                path: true,
+                                name: true,
+                            },
+                        },
+                    },
+                },
+                _count: {
+                    select: {
+                        laundryServiceItems: {
+                            where: { deletedAt: null },
+                        },
                     },
                 },
             },
@@ -1136,8 +1185,16 @@ export default class VendorService {
                     select: {
                         id: true,
                         name: true,
-                        path: true,
-                        extension: true,
+                        type: true,
+                        createdAt: true,
+                        updatedAt: true,
+                        media: {
+                            select: {
+                                id: true,
+                                path: true,
+                                name: true,
+                            },
+                        },
                     },
                 },
             },
