@@ -875,12 +875,14 @@ export default class AdminService {
             }
         };
 
-        // Find documents and get their viewable URLs
-        const vatNumberDoc = documents.find((doc) => hasDocType(doc.meta) && doc.meta.docType === 'VAT_NUMBER_DOC');
-        const businessCertDoc = documents.find(
-            (doc) => hasDocType(doc.meta) && doc.meta.docType === 'BUSINESS_CERT_DOC',
-        );
+        const getLatestDocumentByType = (documents: any[], docType: string) => {
+            return documents
+                .filter((doc) => hasDocType(doc.meta) && doc.meta.docType === docType)
+                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+        };
 
+        const vatNumberDoc = getLatestDocumentByType(documents, 'VAT_NUMBER_DOC');
+        const businessCertDoc = getLatestDocumentByType(documents, 'BUSINESS_CERT_DOC');
         // Build response with viewable URLs
         const response: any = {};
 
@@ -1178,10 +1180,15 @@ export default class AdminService {
             }
         };
 
-        // Find driver license document
-        const driverLicenseDoc = documents.find(
-            (doc) => hasDocType(doc.meta) && doc.meta.docType === 'DRIVER_LICENSE_DOC',
-        );
+        // Helper function to get latest document by type
+        const getLatestDocumentByType = (documents: any[], docType: string) => {
+            return documents
+                .filter((doc) => hasDocType(doc.meta) && doc.meta.docType === docType)
+                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0]; // Get the most recent one
+        };
+
+        // Find latest driver license document
+        const driverLicenseDoc = getLatestDocumentByType(documents, 'DRIVER_LICENSE_DOC');
 
         // Build response with viewable URLs
         const response = {
@@ -1196,6 +1203,10 @@ export default class AdminService {
                 : null,
             hasAllDocuments: !!driverLicenseDoc,
             totalDocuments: documents.length,
+            // Additional info about document versions
+            totalDriverLicenseVersions: documents.filter(
+                (doc) => hasDocType(doc.meta) && doc.meta.docType === 'DRIVER_LICENSE_DOC',
+            ).length,
         };
 
         return response;

@@ -280,27 +280,48 @@ model Token {
   user      User?       @relation(fields: [userId], references: [id])
 }
 
+model Icon {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  mediaId     Int      @unique
+  media       Media    @relation(fields: [mediaId], references: [id])
+  type        IconType @default(GENERAL)
+
+  // Relations
+  services   LaundryService[]      @relation("ServiceIcon")
+  categories LaundryItemCategory[] @relation("CategoryIcon")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum IconType {
+  SERVICE
+  CATEGORY
+  GENERAL
+}
+
 // Media model to store media files uploaded by users
 model Media {
-  id                    Int                   @id @default(autoincrement()) // Using Int for media ID
-  name                  String // Media name
-  extension             String // File extension (e.g., jpg, png)
-  type                  MediaType // Media type (image, video, etc.)
-  access                MediaAccess // Access level (public/private)
-  size                  Float?
-  location              String? // Optional location URL
-  path                  String // Path to the file
-  thumbPath             String? // Optional thumbnail path
-  status                MediaStatus           @default(UPLOADING) // Upload status
-  meta                  Json?                 @db.JsonB
-  userId                String?
-  createdAt             DateTime              @default(now()) @db.Timestamptz()
-  updatedAt             DateTime              @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt             DateTime?             @db.Timestamptz()
-  user                  User?                 @relation("MediaOwner", fields: [userId], references: [id])
-  users                 User[] // Users related to this media (for example, profile pictures)
-  laundryItemCategories LaundryItemCategory[]
-  laundryServices       LaundryService[]      @relation("LaundryServiceIcons")
+  id        Int         @id @default(autoincrement()) // Using Int for media ID
+  name      String // Media name
+  extension String // File extension (e.g., jpg, png)
+  type      MediaType // Media type (image, video, etc.)
+  access    MediaAccess // Access level (public/private)
+  size      Float?
+  location  String? // Optional location URL
+  path      String // Path to the file
+  thumbPath String? // Optional thumbnail path
+  status    MediaStatus @default(UPLOADING) // Upload status
+  meta      Json?       @db.JsonB
+  userId    String?
+  createdAt DateTime    @default(now()) @db.Timestamptz()
+  updatedAt DateTime    @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime?   @db.Timestamptz()
+  user      User?       @relation("MediaOwner", fields: [userId], references: [id])
+  users     User[] // Users related to this media (for example, profile pictures)
+  Icon      Icon?
 }
 
 model Reward {
@@ -418,8 +439,8 @@ model LaundryService {
   laundry             Laundry               @relation(fields: [laundryId], references: [id])
   name                String // Name of the service (e.g., "Wash & Fold")
   description         String? // Optional description of the service
-  iconId              Int? // Reference to Media for SVG icon
-  icon                Media?                @relation("LaundryServiceIcons", fields: [iconId], references: [id])
+  iconId              Int?
+  icon                Icon?                 @relation("ServiceIcon", fields: [iconId], references: [id])
   laundryServiceItems LaundryServiceItem[] // Relation to LaundryServiceItem model
   createdAt           DateTime              @default(now()) @db.Timestamptz()
   updatedAt           DateTime              @default(now()) @updatedAt @db.Timestamptz()
@@ -431,8 +452,8 @@ model LaundryItemCategory {
   id                  String               @id @default(uuid())
   name                String               @unique
   description         String?
-  iconId              Int? // Reference to Media for SVG icon
-  icon                Media?               @relation(fields: [iconId], references: [id])
+  iconId              Int?
+  icon                Icon?                @relation("CategoryIcon", fields: [iconId], references: [id])
   laundryServiceItems LaundryServiceItem[] // Relation to LaundryServiceItem
   createdAt           DateTime             @default(now()) @db.Timestamptz()
   updatedAt           DateTime             @default(now()) @updatedAt @db.Timestamptz()
