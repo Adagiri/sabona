@@ -16,6 +16,7 @@ export class CreateLaundryServiceItemRequestDTO {
     vendorPrice: number;
 
     @ApiProperty()
+    @IsOptional()
     @IsNumber()
     price: number;
 

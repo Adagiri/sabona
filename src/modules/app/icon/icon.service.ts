@@ -46,7 +46,7 @@ export default class IconService {
     async getAllIcons(type?: IconType): Promise<GetAllIconsResponseDTO> {
         const icons = await this._dbService.icon.findMany({
             where: {
-                ...(type && { type }),
+                ...(type && { type }), 
             },
             include: {
                 media: {

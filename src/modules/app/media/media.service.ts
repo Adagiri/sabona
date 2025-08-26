@@ -44,9 +44,8 @@ export default class MediaService {
         return fileName.slice(((fileName.lastIndexOf('.') - 1) >>> 0) + 2).toLowerCase();
     }
 
-    async UploadAdminInitiate(data: UploadInitiateAdminMediaRequestDTO): Promise<UploadInitiateMediaResponseDTO> {
+    async UploadAdminInitiate(data: UploadInitiateAdminMediaRequestDTO, adminId: string): Promise<UploadInitiateMediaResponseDTO> {
         const extension = this._getMediaExtension(data.name);
-        console.log(extension);
         if (!this._allowedMediaExtensions[data.type].includes(extension)) {
             throw new BadRequestException('media.not_supported');
         }
@@ -69,7 +68,7 @@ export default class MediaService {
                 type: data.type,
                 status: MediaStatus.UPLOADING,
                 access: data.public ? MediaAccess.PUBLIC : MediaAccess.PRIVATE,
-                userId: data.userId,
+                userId: data.userId === "admin" ? adminId : data.userId,
                 size: data.size,
             },
         });

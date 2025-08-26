@@ -7,11 +7,19 @@ export class EditLaundryServiceItemRequestDTO {
     @IsOptional()
     name?: string;
 
-    @ApiProperty({ required: false })
+    @ApiProperty()
     @IsNumber()
-    @IsOptional()
-    price?: number;
+    platformPrice: number;
 
+    @ApiProperty()
+    @IsNumber()
+    vendorPrice: number;
+
+    @ApiProperty()
+    @IsOptional()
+    @IsNumber()
+    price: number;
+    
     @ApiProperty({ description: 'Category ID for this item', required: false })
     @IsString()
     @IsOptional()

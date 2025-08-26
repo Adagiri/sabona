@@ -289,12 +289,13 @@ model Icon {
   type        IconType @default(GENERAL)
 
   // Relations
-  laundryServices   LaundryService[]      @relation("ServiceIcon")
-  
+  laundryServices LaundryService[] @relation("ServiceIcon")
+
   laundryCategories LaundryItemCategory[] @relation("CategoryIcon")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? @db.Timestamptz() // Optional deleted at timestamp
 }
 
 enum IconType {
@@ -471,7 +472,7 @@ model LaundryServiceItem {
 
   vendorPrice             Float // What vendor receives
   platformPrice           Float // What user pays (vendor price + platform markup)
-  price                   Float
+  price                   Float?
   createdAt               DateTime                  @default(now()) @db.Timestamptz()
   updatedAt               DateTime                  @default(now()) @updatedAt @db.Timestamptz()
   deletedAt               DateTime?                 @db.Timestamptz()
