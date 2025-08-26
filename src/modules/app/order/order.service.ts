@@ -1,28 +1,20 @@
 import { Injectable } from "@nestjs/common";
 import DatabaseService from "src/database/database.service";
-import getOrderByIdRequestDTO from "./dto/request/getOrderById.request";
-import GetOrderByIdResponseDTO from "./dto/response/getOrderById.response";
 import { BadRequestException } from "src/core/exceptions/response.exception";
 @Injectable()
 export default class OrderService {
-    constructor(private _dbService: DatabaseService) { }
-    async getOrderById(params: getOrderByIdRequestDTO): Promise<GetOrderByIdResponseDTO> {
+    constructor(private _dbService: DatabaseService) {}
+    async getOrderById(orderId: string): Promise<any> {
         const order = await this._dbService.order.findUnique({
-            where: {
-                id: params.id
-            },
-            select: {
-                id: true,
-                totalAmount: true,
-                status: true,
-                createdAt: true,
-                updatedAt: true,
-                laundryId: true,
-                deliveryType: true,
-                notes: true,
+            where: { id: orderId },
+            include: {
                 user: {
                     select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
                         phone: true,
+                        email: true,
                     },
                 },
                 laundry: {
@@ -30,113 +22,76 @@ export default class OrderService {
                         id: true,
                         name: true,
                         address: true,
+                        lat: true,
+                        long: true,
                         vendor: {
                             select: {
+                                firstName: true,
+                                lastName: true,
                                 phone: true,
-                            }
+                            },
                         },
-                        laundryService:{
-                            select:{
-                                id: true,
-                                name: true,
-                                description: true,
-                                laundryServiceItems:{
-                                    select:{
-                                        id: true,
-                                        name: true,
-                                        price: true,
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                riderOrders: {
-                    select: {
-                        riderId: true,
-                        assignedAt: true,
-                        id: true,
-                        type: true,
-                    },
-                },
-                vendorOrders:{
-                    select:{
-                        vendorId: true,
-                        id: true,
-                    }
-                },
-                statusHistory: {
-                    select: {
-                        status: true,
-                        timestamp: true,
-                    },
-                },
-                pickup: {
-                    select: {
-                        riderId: true,
-                        pickupAddress: true,
-                        pickupLat: true,
-                        pickupLong: true,
-                        status: true,
-                        pickupDate: true,
-                        pickupTime: true,
-                    },
-                },
-                delivery: {
-                    select: {
-                        riderId: true,
-                        deliveryAddress: true,
-                        deliveryLat: true,
-                        deliveryLong: true,
-                        status: true,
-                        deliveryDate: true,
-                        deliveryTime: true,
                     },
                 },
                 services: {
-                    select: {
-                        id: true,
-                        items:{
-                            select:{
+                    include: {
+                        laundryService: {
+                            select: {
                                 id: true,
-                                quantity: true,
-                                laundryServiceItem:{
-                                    select:{
-                                        id: true,
-                                        name: true,
-                                        price: true,
-                                    }
-                                },
-                                laundryServiceItemId: true,
-                            },
-                        },
-                        laundryServiceId: true,
-                        laundryService:{
-                            select:{
                                 name: true,
                                 description: true,
-                            }
-                        }
+                            },
+                        },
+                        items: {
+                            include: {
+                                laundryServiceItem: {
+                                    select: {
+                                        id: true,
+                                        name: true,
+                                        vendorPrice: true, // NEW: Use dual pricing
+                                        platformPrice: true, // NEW: Use dual pricing
+                                        price: true, // DEPRECATED: Keep for backward compatibility
+                                    },
+                                },
+                            },
+                        },
                     },
                 },
+                riderOrders: {
+                    where: { deletedAt: null },
+                    include: {
+                        rider: {
+                            select: {
+                                id: true,
+                                firstName: true,
+                                lastName: true,
+                                phone: true,
+                            },
+                        },
+                    },
+                },
+                pickup: true,
+                delivery: true,
+                statusHistory: {
+                    orderBy: { timestamp: 'desc' },
+                },
                 tip: {
-                    where:{
-                        paid: true,
+                    include: {
+                        rider: {
+                            select: {
+                                firstName: true,
+                                lastName: true,
+                            },
+                        },
                     },
-                    select: {
-                        amount: true,
-                        paid: true,
-                        riderId: true,
-                        type: true,
-                    },
-                }
-            }
-        })
-        if (!order) {
-            throw new BadRequestException("Order not found");
-        }
-        return order;
-    }
+                },
+            },
+        });
 
-   
+        if (!order) {
+            throw new BadRequestException('Order not found');
+        }
+
+        return { data: order };
+    }
 }

@@ -1,8 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { DeliveryType, PaymentType } from '@prisma/client';
+import { DeliveryType, PaymentType, OrderType } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsArray, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
-
+import { IsArray, IsEnum, IsNumber, IsOptional, IsString, ValidateIf } from 'class-validator';
 
 export class OrderServiceItemDTO {
     @ApiProperty()
@@ -26,82 +25,129 @@ export class OrderServiceDTO {
 }
 
 export default class CreateOrderRequestDTO {
-    @ApiProperty()
-    @IsString()
-    laundryId: string;
+    // NEW: Order type field
+    @ApiProperty({ enum: OrderType, description: 'Type of order - registered or custom laundry' })
+    @IsEnum(OrderType)
+    orderType: OrderType;
 
+    // UPDATED: Make laundryId conditional based on order type
+    @ApiProperty({ required: false, description: 'Required for REGISTERED_LAUNDRY orders' })
+    @ValidateIf((o) => o.orderType === OrderType.REGISTERED_LAUNDRY)
+    @IsString()
+    laundryId?: string;
+
+    // UPDATED: Make services conditional based on order type
+    @ApiProperty({ type: [OrderServiceDTO], required: false, description: 'Required for REGISTERED_LAUNDRY orders' })
+    @ValidateIf((o) => o.orderType === OrderType.REGISTERED_LAUNDRY)
+    @Type(() => OrderServiceDTO)
+    @IsArray()
+    services?: OrderServiceDTO[];
+
+    // NEW: Custom laundry fields
+    @ApiProperty({ required: false, description: 'Required for CUSTOM_LAUNDRY orders' })
+    @ValidateIf((o) => o.orderType === OrderType.CUSTOM_LAUNDRY)
+    @IsString()
+    customLaundryName?: string;
+
+    @ApiProperty({
+        required: false,
+        description: 'Required for CUSTOM_LAUNDRY orders - detailed description of items/needs',
+    })
+    @ValidateIf((o) => o.orderType === OrderType.CUSTOM_LAUNDRY)
+    @IsString()
+    customLaundryDescription?: string;
+
+    @ApiProperty({ required: false, description: 'Required for CUSTOM_LAUNDRY orders - vendor latitude' })
+    @ValidateIf((o) => o.orderType === OrderType.CUSTOM_LAUNDRY)
+    @IsNumber()
+    customLaundryLat?: number;
+
+    @ApiProperty({ required: false, description: 'Required for CUSTOM_LAUNDRY orders - vendor longitude' })
+    @ValidateIf((o) => o.orderType === OrderType.CUSTOM_LAUNDRY)
+    @IsNumber()
+    customLaundryLong?: number;
+
+    @ApiProperty({ required: false, description: 'Optional for CUSTOM_LAUNDRY orders - vendor address' })
+    @ValidateIf((o) => o.orderType === OrderType.CUSTOM_LAUNDRY)
+    @IsString()
+    @IsOptional()
+    customLaundryAddress?: string;
+
+    @ApiProperty({ required: false, description: 'Admin-set service charge for custom orders' })
+    @ValidateIf((o) => o.orderType === OrderType.CUSTOM_LAUNDRY)
+    @IsNumber()
+    @IsOptional()
+    adminServiceCharge?: number;
+
+    // Existing fields
     @ApiProperty()
     @IsNumber()
     totalAmount: number;
 
-    @ApiProperty()
+    @ApiProperty({ required: false })
     @IsOptional()
-    baseAmount: number;
+    @IsNumber()
+    baseAmount?: number;
 
-    @ApiProperty()
+    @ApiProperty({ required: false })
     @IsOptional()
-    discountAmount: number;
+    @IsNumber()
+    discountAmount?: number;
 
-    @ApiProperty()
+    @ApiProperty({ required: false })
     @IsOptional()
-    couponId: string;
+    @IsString()
+    couponId?: string;
 
-    @ApiProperty()
+    @ApiProperty({ enum: PaymentType })
     @IsEnum(PaymentType)
-    paymentType: PaymentType
+    paymentType: PaymentType;
 
-    @ApiProperty({ type: [OrderServiceDTO] })
-    @Type(() => OrderServiceDTO)
-    @IsArray()
-    services: OrderServiceDTO[];
-
-    @ApiProperty()
+    // Pickup details (required for all orders)
+    @ApiProperty({ description: 'Customer pickup address' })
     @IsString()
     pickupAddress: string;
 
-    @ApiProperty()
+    @ApiProperty({ description: 'Customer pickup latitude' })
     @IsNumber()
     pickupLat: number;
 
-    @ApiProperty()
+    @ApiProperty({ description: 'Customer pickup longitude' })
     @IsNumber()
     pickupLong: number;
 
-    @ApiProperty()
+    @ApiProperty({ description: 'Pickup time' })
     @IsString()
     pickupTime: string;
 
-    @ApiProperty()
+    @ApiProperty({ description: 'Pickup date' })
     @IsString()
     pickupDate: string;
 
-    @ApiProperty()
+    // Delivery details (required for all orders)
+    @ApiProperty({ description: 'Customer delivery address' })
     @IsString()
     deliveryAddress: string;
 
-    @ApiProperty()
+    @ApiProperty({ description: 'Customer delivery latitude' })
     @IsNumber()
     deliveryLat: number;
 
-    @ApiProperty()
+    @ApiProperty({ description: 'Customer delivery longitude' })
     @IsNumber()
     deliveryLong: number;
 
-    // @ApiProperty()
-    // @IsString()
-    // deliveryTime: string;
-    
-    @ApiProperty()
+    @ApiProperty({ required: false, description: 'Delivery date' })
     @IsString()
     @IsOptional()
-    deliveryDate: string;
+    deliveryDate?: string;
 
-    @ApiProperty()
+    @ApiProperty({ enum: DeliveryType })
     @IsEnum(DeliveryType)
     deliveryType: DeliveryType;
 
-    @ApiProperty()
+    @ApiProperty({ required: false, description: 'Additional notes' })
     @IsOptional()
+    @IsString()
     note?: string;
-
 }

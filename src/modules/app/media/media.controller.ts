@@ -33,10 +33,12 @@ export default class MediaController {
         description: 'Upload public media application',
         response: UploadInitiateMediaResponseDTO,
     })
-    UploadAdminInitiate(@Body() data: UploadInitiateAdminMediaRequestDTO): Promise<UploadInitiateMediaResponseDTO> {
-        console.log(data);
+    UploadAdminInitiate(
+        @Body() data: UploadInitiateAdminMediaRequestDTO,
+        @CurrentUser() user: User, 
+    ): Promise<UploadInitiateMediaResponseDTO> {
 
-        return this._mediaService.UploadAdminInitiate(data);
+        return this._mediaService.UploadAdminInitiate(data, user.id);
     }
 
     @Post({

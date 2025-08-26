@@ -23,6 +23,10 @@ import { FirebaseModule } from './modules/firebase/firebase.module';
 import PaymentsModule from './modules/app/payments/payments.module';
 import { I18nModule, HeaderResolver } from 'nestjs-i18n';
 import * as path from 'path';
+import CustomOrderModule from './modules/app/customOrder/customOrder.module';
+import PayTabsModule from './modules/app/paytabs/paytabs.module';
+import AdminCustomOrderModule from './modules/app/admin/adminCustomOrder.module';
+import IconModule from './modules/app/icon/icon.module';
 
 @Module({
     imports: [
@@ -51,6 +55,10 @@ import * as path from 'path';
         NotificationModule,
         FirebaseModule,
         PaymentsModule,
+        CustomOrderModule,
+        PayTabsModule,
+        AdminCustomOrderModule,
+        IconModule,
     ],
     controllers: [AppController],
     providers: [

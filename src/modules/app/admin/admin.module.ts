@@ -7,10 +7,12 @@ import { NotificationModule } from '../notification/notification.module';
 import MediaModule from '../media/media.module';
 import S3Service from '../media/s3.service';
 import VendorModule from '../vendor/vendor.module';
+import CustomOrderModule from '../customOrder/customOrder.module';
+import AdminCustomOrderModule from './adminCustomOrder.module';
 
 
 @Module({
-    imports: [DatabaseModule, OrderModule, NotificationModule, MediaModule, VendorModule],
+    imports: [DatabaseModule, OrderModule, NotificationModule, MediaModule, VendorModule, CustomOrderModule, AdminCustomOrderModule],
     exports: [AdminService],
     providers: [AdminService, S3Service],
     controllers: [AdminController],

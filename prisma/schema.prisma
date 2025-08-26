@@ -83,6 +83,18 @@ enum NotificationStatus {
   READ
 }
 
+enum OrderType {
+  REGISTERED_LAUNDRY
+  CUSTOM_LAUNDRY
+}
+
+// enum RiderOrderType {
+//   RIDER_PICKUP           // Regular: customer → vendor
+//   RIDER_DELIVERY         // Regular: vendor → customer  
+//   CUSTOM_PICKUP          // Custom: customer → custom vendor + driver pays vendor
+//   CUSTOM_DELIVERY        // Custom: custom vendor → customer (after processing)
+// }
+
 // TokenReason enum to specify different reasons for token generation (e.g., password reset)
 enum TokenReason {
   FORGOT_PASSWORD
@@ -167,6 +179,18 @@ model User {
 
   vendorRelationAsMain   VendorRelation[] @relation("MainVendor")
   vendorRelationAsBranch VendorRelation?  @relation("BranchVendor")
+  location               UserLocation?
+}
+
+model UserLocation {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  lat       Float // Current latitude
+  long      Float // Current longitude
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  @@index([lat, long]) // For efficient distance queries
 }
 
 model VendorRelation {
@@ -256,27 +280,50 @@ model Token {
   user      User?       @relation(fields: [userId], references: [id])
 }
 
+model Icon {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  mediaId     Int      @unique
+  media       Media    @relation(fields: [mediaId], references: [id])
+  type        IconType @default(GENERAL)
+
+  // Relations
+  laundryServices LaundryService[] @relation("ServiceIcon")
+
+  laundryCategories LaundryItemCategory[] @relation("CategoryIcon")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? @db.Timestamptz() // Optional deleted at timestamp
+}
+
+enum IconType {
+  SERVICE
+  CATEGORY
+  GENERAL
+}
+
 // Media model to store media files uploaded by users
 model Media {
-  id                    Int                   @id @default(autoincrement()) // Using Int for media ID
-  name                  String // Media name
-  extension             String // File extension (e.g., jpg, png)
-  type                  MediaType // Media type (image, video, etc.)
-  access                MediaAccess // Access level (public/private)
-  size                  Float?
-  location              String? // Optional location URL
-  path                  String // Path to the file
-  thumbPath             String? // Optional thumbnail path
-  status                MediaStatus           @default(UPLOADING) // Upload status
-  meta                  Json?                 @db.JsonB
-  userId                String?
-  createdAt             DateTime              @default(now()) @db.Timestamptz()
-  updatedAt             DateTime              @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt             DateTime?             @db.Timestamptz()
-  user                  User?                 @relation("MediaOwner", fields: [userId], references: [id])
-  users                 User[] // Users related to this media (for example, profile pictures)
-  laundryItemCategories LaundryItemCategory[]
-  laundryServices       LaundryService[]      @relation("LaundryServiceIcons") 
+  id        Int         @id @default(autoincrement()) // Using Int for media ID
+  name      String // Media name
+  extension String // File extension (e.g., jpg, png)
+  type      MediaType // Media type (image, video, etc.)
+  access    MediaAccess // Access level (public/private)
+  size      Float?
+  location  String? // Optional location URL
+  path      String // Path to the file
+  thumbPath String? // Optional thumbnail path
+  status    MediaStatus @default(UPLOADING) // Upload status
+  meta      Json?       @db.JsonB
+  userId    String?
+  createdAt DateTime    @default(now()) @db.Timestamptz()
+  updatedAt DateTime    @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime?   @db.Timestamptz()
+  user      User?       @relation("MediaOwner", fields: [userId], references: [id])
+  users     User[] // Users related to this media (for example, profile pictures)
+  Icon      Icon?
 }
 
 model Reward {
@@ -394,9 +441,9 @@ model LaundryService {
   laundry             Laundry               @relation(fields: [laundryId], references: [id])
   name                String // Name of the service (e.g., "Wash & Fold")
   description         String? // Optional description of the service
-  iconId              Int? // Reference to Media for SVG icon
-  icon                Media? @relation("LaundryServiceIcons", fields: [iconId], references: [id])
-  laundryServiceItems LaundryServiceItem[]  // Relation to LaundryServiceItem model
+  iconId              Int?
+  icon                Icon?                 @relation("ServiceIcon", fields: [iconId], references: [id])
+  laundryServiceItems LaundryServiceItem[] // Relation to LaundryServiceItem model
   createdAt           DateTime              @default(now()) @db.Timestamptz()
   updatedAt           DateTime              @default(now()) @updatedAt @db.Timestamptz()
   deletedAt           DateTime?             @db.Timestamptz()
@@ -407,8 +454,8 @@ model LaundryItemCategory {
   id                  String               @id @default(uuid())
   name                String               @unique
   description         String?
-  iconId              Int? // Reference to Media for SVG icon
-  icon                Media?               @relation(fields: [iconId], references: [id])
+  iconId              Int?
+  icon                Icon?                @relation("CategoryIcon", fields: [iconId], references: [id])
   laundryServiceItems LaundryServiceItem[] // Relation to LaundryServiceItem
   createdAt           DateTime             @default(now()) @db.Timestamptz()
   updatedAt           DateTime             @default(now()) @updatedAt @db.Timestamptz()
@@ -416,13 +463,16 @@ model LaundryItemCategory {
 }
 
 model LaundryServiceItem {
-  id                      String                    @id @default(uuid())
-  laundryServiceId        String // Foreign key to LaundryService model
-  laundryService          LaundryService            @relation(fields: [laundryServiceId], references: [id])
-  categoryId              String? // Foreign key to LaundryItemCategory
-  category                LaundryItemCategory?      @relation(fields: [categoryId], references: [id])
-  name                    String // Name of the item (e.g., "T-shirt")
-  price                   Float // Price of the item (keep existing field)
+  id               String               @id @default(uuid())
+  laundryServiceId String // Foreign key to LaundryService model
+  laundryService   LaundryService       @relation(fields: [laundryServiceId], references: [id])
+  categoryId       String? // Foreign key to LaundryItemCategory
+  category         LaundryItemCategory? @relation(fields: [categoryId], references: [id])
+  name             String // Name of the item (e.g., "T-shirt")
+
+  vendorPrice             Float // What vendor receives
+  platformPrice           Float // What user pays (vendor price + platform markup)
+  price                   Float?
   createdAt               DateTime                  @default(now()) @db.Timestamptz()
   updatedAt               DateTime                  @default(now()) @updatedAt @db.Timestamptz()
   deletedAt               DateTime?                 @db.Timestamptz()
@@ -458,12 +508,35 @@ model OrderLaundryServiceItem {
 // Update the Order model to include pickup and delivery addresses
 // Order model to represent a user's order
 model Order {
-  id             String                @id @default(uuid()) // UUID for order ID
-  orderNumber    Int?                  @default(autoincrement()) // Auto-incrementing order number
-  userId         String // User who placed the order
-  user           User                  @relation(fields: [userId], references: [id])
-  laundryId      String // Foreign key to the Laundry model
-  laundry        Laundry               @relation(fields: [laundryId], references: [id])
+  id          String    @id @default(uuid()) // UUID for order ID
+  orderType   OrderType @default(REGISTERED_LAUNDRY)
+  orderNumber Int?      @default(autoincrement()) // Auto-incrementing order number
+  userId      String // User who placed the order
+  user        User      @relation(fields: [userId], references: [id])
+  laundryId   String? // Foreign key to the Laundry model
+  laundry     Laundry?  @relation(fields: [laundryId], references: [id])
+
+  // Custom laundry fields (NEW)
+  customLaundryName        String? // For custom orders
+  customLaundryDescription String? // User's detailed description/needs
+  customLaundryLat         Float? // Custom vendor location (user-pinned)
+  customLaundryLong        Float? // Custom vendor location (user-pinned)
+  customLaundryAddress     String? // Custom vendor address
+
+  // Custom order - Driver payment to vendor (NEW)
+  customVendorReceipt String? // Receipt image path (admin uploads)
+  customVendorPaid    Float? // Amount driver paid to custom vendor
+  customVendorName    String? // Vendor name from receipt
+  customPaymentMethod String? // How driver paid vendor (CASH/CARD)
+  adminServiceCharge  Float? // Admin-set service charge for custom orders
+
+  // Custom order - PayTabs customer payment (NEW)
+  payTabsInvoiceId      String? // PayTabs invoice ID
+  payTabsInvoiceUrl     String? // Invoice link admin sends to customer
+  customerPaid          Boolean?  @default(false) // Customer payment status via PayTabs
+  customerPaymentDate   DateTime? // When customer paid the invoice
+  payTabsTransactionRef String? // PayTabs transaction reference
+
   status         OrderStatus           @default(PENDING) // High-level status of the order
   baseAmount     Float? // Base amount before discounts
   discountAmount Float? // Amount discounted due to the coupon
@@ -505,7 +578,9 @@ model RiderOrder {
   type       RiderOrderType? // Optional field to specify the type of assignment
   feedbacks  Feedback[]
 
-  @@index([riderId, orderId]) // Optional: Index for efficient querying on riderId and orderId
+  // Only prevent duplicates for ACTIVE (non-deleted) assignments
+  @@index([riderId, orderId])
+  @@index([orderId, type, deletedAt])
 }
 
 // VendorOrder model to manage assignments between vendors and orders

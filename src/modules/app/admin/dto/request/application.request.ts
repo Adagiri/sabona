@@ -21,12 +21,12 @@ export class ApproveApplicationRequestDTO {
     mainVendorId: string;
 
     @ApiProperty({ required: true })
-    @IsNotEmpty()
+    @IsOptional()
     @IsString()
     address: string;
 
     @ApiProperty({ required: true })
-    @IsNotEmpty()
+    @IsOptional()
     @IsString()
     contactPhone: string;
 }

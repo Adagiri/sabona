@@ -1,15 +1,14 @@
-import { OrderStatus,  User, UserType } from '@prisma/client';
+import { OrderStatus, User, UserType } from '@prisma/client';
 import DatabaseService from 'src/database/database.service';
 import UpdateStatusRequestDTO from './dto/request/updateStatus.request';
 import GetOrderRequestsResponseDTO from './dto/response/getOrderRequests.response';
 import UpdateStatusResponseDTO from './dto/response/updateStatus.response';
-import  { LaundryServiceDTO } from './dto/request/createLaundry.request';
+import { LaundryServiceDTO } from './dto/request/createLaundry.request';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
 import { Injectable } from '@nestjs/common';
 import EditLaundryRequestDTO from './dto/request/editLaundry.request';
 import { CreateLaundryServiceItemsArrayDTO } from './dto/request/createLaundryServiceItem.request';
 import { EditLaundryServiceItemRequestDTO } from './dto/request/editlaundryServiceItem.request';
-import { GetAllLaundriesResponseDTO } from './dto/response/getAllLaundry.response';
 import { GetLaundryByIdResponseDTO } from './dto/response/getLaundryById.response';
 import LaundryMessageResponseDTO from './dto/response/laundryMessage';
 import LaundryServiceMessageResponseDTO from './dto/response/laundryServiceMessage.response';
@@ -18,7 +17,11 @@ import CancelOrderRequestDTO from './dto/request/cancelOrder.request';
 import { extractTokens } from 'src/helpers/util.helper';
 import NotificationService from '../notification/notification.service';
 import { EditLaundryItemCategoryRequestDTO } from './dto/request/editLaundryItemCategory.request';
-import { GetAllLaundryItemCategoriesResponseDTO, LaundryItemCategoryMessageResponseDTO, LaundryItemCategoryResponseDTO } from './dto/response/laundryItemCategory.response';
+import {
+    GetAllLaundryItemCategoriesResponseDTO,
+    LaundryItemCategoryMessageResponseDTO,
+    LaundryItemCategoryResponseDTO,
+} from './dto/response/laundryItemCategory.response';
 import { CreateLaundryItemCategoryRequestDTO } from './dto/request/createLaundryItemCategory.request';
 import EditLaundryServiceRequestDTO from './dto/request/laundryServiceEdit.request';
 @Injectable()
@@ -26,7 +29,6 @@ export default class VendorService {
     constructor(
         private _dbService: DatabaseService,
         private _notificationService: NotificationService,
-        
     ) {}
 
     async getOrderRequests(user: User, param: GetOrderRequestDTO): Promise<GetOrderRequestsResponseDTO> {
@@ -451,23 +453,17 @@ export default class VendorService {
 
     //     return { data: laundry };
     // }
-    async getAllLaundries(): Promise<GetAllLaundriesResponseDTO> {
+    async getAllLaundries(): Promise<any> {
         const laundries = await this._dbService.laundry.findMany({
             where: {
                 deletedAt: null,
             },
             include: {
-                laundryService: {
-                    where: {
-                        deletedAt: null,
-                    },
-                    include: {
-                        icon: {
-                            select: {
-                                id: true,
-                                name: true,
-                                path: true,
-                                extension: true,
+                _count: {
+                    select: {
+                        laundryService: {
+                            where: {
+                                deletedAt: null,
                             },
                         },
                     },
@@ -482,7 +478,7 @@ export default class VendorService {
         const laundry = await this._dbService.laundry.findFirst({
             where: {
                 id: laundryId,
-                // vendorId: user.id,
+                deletedAt: null,
             },
             include: {
                 laundryService: {
@@ -497,8 +493,16 @@ export default class VendorService {
                             select: {
                                 id: true,
                                 name: true,
-                                path: true,
-                                extension: true,
+                                type: true,
+                                createdAt: true,
+                                updatedAt: true,
+                                media: {
+                                    select: {
+                                        id: true,
+                                        path: true,
+                                        name: true,
+                                    },
+                                },
                             },
                         },
                     },
@@ -513,11 +517,10 @@ export default class VendorService {
         return { data: laundry };
     }
 
-    async editLaundry(laundryId: string, data: EditLaundryRequestDTO, user: User): Promise<LaundryMessageResponseDTO> {
+    async editLaundry(laundryId: string, data: EditLaundryRequestDTO): Promise<LaundryMessageResponseDTO> {
         const laundry = await this._dbService.laundry.findFirst({
             where: {
                 id: laundryId,
-                vendorId: user.id,
             },
         });
 
@@ -542,11 +545,10 @@ export default class VendorService {
         return { message: 'Laundry Updated Successfully' };
     }
 
-    async deleteLaundry(laundryId: string, user: User): Promise<LaundryMessageResponseDTO> {
+    async deleteLaundry(laundryId: string): Promise<LaundryMessageResponseDTO> {
         const laundry = await this._dbService.laundry.findFirst({
             where: {
                 id: laundryId,
-                vendorId: user.id,
             },
         });
 
@@ -570,11 +572,10 @@ export default class VendorService {
         return { message: 'Laundry Deleted Successfully' };
     }
 
-    async addLaundryService(laundryId: string, data: LaundryServiceDTO, user: User): Promise<any> {
+    async addLaundryService(laundryId: string, data: LaundryServiceDTO): Promise<any> {
         const laundry = await this._dbService.laundry.findFirst({
             where: {
                 id: laundryId,
-                vendorId: user.id,
             },
         });
 
@@ -588,7 +589,7 @@ export default class VendorService {
                 where: {
                     id: data.iconId,
                     deletedAt: null,
-                    extension: 'svg',
+                    // extension: 'svg',
                 },
             });
 
@@ -609,8 +610,14 @@ export default class VendorService {
                     select: {
                         id: true,
                         name: true,
-                        path: true,
-                        extension: true,
+                        type: true,
+                        media: {
+                            select: {
+                                id: true,
+                                path: true,
+                                name: true,
+                            },
+                        },
                     },
                 },
             },
@@ -623,12 +630,10 @@ export default class VendorService {
         laundryId: string,
         serviceId: string,
         data: EditLaundryServiceRequestDTO,
-        user: User,
     ): Promise<LaundryServiceMessageResponseDTO> {
         const laundry = await this._dbService.laundry.findFirst({
             where: {
                 id: laundryId,
-                vendorId: user.id,
             },
         });
 
@@ -653,7 +658,7 @@ export default class VendorService {
                 where: {
                     id: data.iconId,
                     deletedAt: null,
-                    extension: 'svg',
+                    // extension: 'svg',
                 },
             });
 
@@ -676,15 +681,10 @@ export default class VendorService {
         return { message: 'Service Updated Successfully' };
     }
 
-    async deleteLaundryService(
-        laundryId: string,
-        serviceId: string,
-        user: User,
-    ): Promise<LaundryServiceMessageResponseDTO> {
+    async deleteLaundryService(laundryId: string, serviceId: string): Promise<LaundryServiceMessageResponseDTO> {
         const laundry = await this._dbService.laundry.findFirst({
             where: {
                 id: laundryId,
-                vendorId: user.id,
             },
         });
 
@@ -716,12 +716,10 @@ export default class VendorService {
         laundryId: string,
         serviceId: string,
         data: CreateLaundryServiceItemsArrayDTO,
-        user: User,
     ): Promise<any> {
         const laundry = await this._dbService.laundry.findFirst({
             where: {
                 id: laundryId,
-                vendorId: user.id,
             },
         });
 
@@ -758,7 +756,8 @@ export default class VendorService {
 
         const items = data.items.map((item) => ({
             name: item.name,
-            price: item.price,
+            vendorPrice: item.vendorPrice,
+            platformPrice: item.platformPrice,
             categoryId: item.categoryId,
             laundryServiceId: serviceId,
         }));
@@ -774,69 +773,16 @@ export default class VendorService {
         return { data: { message: 'Items Added Successfully' } };
     }
 
-    // Update getAllLaundryServiceItems method
-    async getAllLaundryServiceItems(laundryId: string, serviceId: string): Promise<any> {
-        const laundry = await this._dbService.laundry.findFirst({
-            where: {
-                id: laundryId,
-            },
-        });
-
-        if (!laundry) {
-            throw new BadRequestException('Laundry does not exist');
-        }
-
-        const service = await this._dbService.laundryService.findFirst({
-            where: {
-                id: serviceId,
-                laundryId: laundryId,
-            },
-        });
-
-        if (!service) {
-            throw new BadRequestException('Service does not exist');
-        }
-
-        const items = await this._dbService.laundryServiceItem.findMany({
-            where: {
-                laundryServiceId: serviceId,
-                deletedAt: null,
-            },
-            select: {
-                id: true,
-                name: true,
-                price: true,
-                category: {
-                    select: {
-                        id: true,
-                        name: true,
-                        icon: {
-                            select: {
-                                id: true,
-                                path: true,
-                                name: true,
-                            },
-                        },
-                    },
-                },
-            },
-        });
-
-        return { data: items };
-    }
-
     // Update editLaundryServiceItem method
     async editLaundryServiceItem(
         laundryId: string,
         serviceId: string,
         itemId: string,
         data: EditLaundryServiceItemRequestDTO,
-        user: User,
     ): Promise<any> {
         const laundry = await this._dbService.laundry.findFirst({
             where: {
                 id: laundryId,
-                vendorId: user.id,
             },
         });
 
@@ -885,8 +831,12 @@ export default class VendorService {
         if (data.name !== undefined) {
             updateData.name = data.name;
         }
-        if (data.price !== undefined) {
-            updateData.price = data.price;
+        if (data.vendorPrice !== undefined) {
+            updateData.vendorPrice = data.vendorPrice;
+        }
+
+        if (data.platformPrice !== undefined) {
+            updateData.platformPrice = data.platformPrice;
         }
         if (data.categoryId !== undefined) {
             updateData.categoryId = data.categoryId;
@@ -906,11 +856,10 @@ export default class VendorService {
         return { data: { message: 'Item Updated Successfully' } };
     }
 
-    async deleteLaundryServiceItem(laundryId: string, serviceId: string, itemId: string, user: User): Promise<any> {
+    async deleteLaundryServiceItem(laundryId: string, serviceId: string, itemId: string): Promise<any> {
         const laundry = await this._dbService.laundry.findFirst({
             where: {
                 id: laundryId,
-                vendorId: user.id,
             },
         });
 
@@ -947,6 +896,65 @@ export default class VendorService {
         });
 
         return { data: { message: 'Item Deleted Successfully' } };
+    }
+
+    async getAllLaundryServiceItems(laundryId: string, serviceId: string): Promise<any> {
+        const laundry = await this._dbService.laundry.findFirst({
+            where: {
+                id: laundryId,
+            },
+        });
+
+        if (!laundry) {
+            throw new BadRequestException('Laundry does not exist');
+        }
+
+        const service = await this._dbService.laundryService.findFirst({
+            where: {
+                id: serviceId,
+                laundryId: laundryId,
+            },
+        });
+
+        if (!service) {
+            throw new BadRequestException('Service does not exist');
+        }
+
+        const items = await this._dbService.laundryServiceItem.findMany({
+            where: {
+                laundryServiceId: serviceId,
+                deletedAt: null,
+            },
+            select: {
+                id: true,
+                name: true,
+                createdAt: true,
+                vendorPrice: true,
+                platformPrice: true,
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                        icon: {
+                            select: {
+                                id: true,
+                                name: true,
+                                type: true,
+                                media: {
+                                    select: {
+                                        id: true,
+                                        path: true,
+                                        name: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        return { data: items };
     }
 
     async cancelOrder(params: CancelOrderRequestDTO, user: User): Promise<UpdateStatusResponseDTO> {
@@ -1064,18 +1072,15 @@ export default class VendorService {
     async createLaundryItemCategory(
         data: CreateLaundryItemCategoryRequestDTO,
     ): Promise<LaundryItemCategoryResponseDTO> {
-        // Validate icon exists if provided
         if (data.iconId) {
-            const icon = await this._dbService.media.findFirst({
+            const icon = await this._dbService.icon.findFirst({
                 where: {
                     id: data.iconId,
-                    deletedAt: null,
-                    extension: 'svg',
                 },
             });
 
             if (!icon) {
-                throw new BadRequestException('SVG icon not found or invalid format');
+                throw new BadRequestException('Icon not found');
             }
         }
 
@@ -1090,8 +1095,16 @@ export default class VendorService {
                     select: {
                         id: true,
                         name: true,
-                        path: true,
-                        extension: true,
+                        type: true,
+                        createdAt: true,
+                        updatedAt: true,
+                        media: {
+                            select: {
+                                id: true,
+                                path: true,
+                                name: true,
+                            },
+                        },
                     },
                 },
             },
@@ -1110,8 +1123,23 @@ export default class VendorService {
                     select: {
                         id: true,
                         name: true,
-                        path: true,
-                        extension: true,
+                        createdAt: true,
+                        updatedAt: true,
+                        type: true,
+                        media: {
+                            select: {
+                                id: true,
+                                path: true,
+                                name: true,
+                            },
+                        },
+                    },
+                },
+                _count: {
+                    select: {
+                        laundryServiceItems: {
+                            where: { deletedAt: null },
+                        },
                     },
                 },
             },
@@ -1134,8 +1162,16 @@ export default class VendorService {
                     select: {
                         id: true,
                         name: true,
-                        path: true,
-                        extension: true,
+                        type: true,
+                        createdAt: true,
+                        updatedAt: true,
+                        media: {
+                            select: {
+                                id: true,
+                                path: true,
+                                name: true,
+                            },
+                        },
                     },
                 },
             },
@@ -1169,7 +1205,7 @@ export default class VendorService {
                 where: {
                     id: data.iconId,
                     deletedAt: null,
-                    extension: 'svg',
+                    // extension: 'svg',
                 },
             });
 
@@ -1254,6 +1290,20 @@ export default class VendorService {
                     deletedAt: null,
                 },
                 include: {
+                    icon: {
+                        select: {
+                            id: true,
+                            name: true,
+                            type: true,
+                            media: {
+                                select: {
+                                    id: true,
+                                    path: true,
+                                    name: true,
+                                },
+                            },
+                        },
+                    },
                     _count: {
                         select: {
                             laundryServiceItems: {

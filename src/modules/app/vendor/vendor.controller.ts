@@ -138,9 +138,8 @@ export default class VendorController {
     async editLaundry(
         @Param('laundryId') laundryId: string,
         @Body() data: EditLaundryRequestDTO,
-        @CurrentUser() user: User,
     ): Promise<LaundryMessageResponseDTO> {
-        return await this._vendorService.editLaundry(laundryId, data, user);
+        return await this._vendorService.editLaundry(laundryId, data);
     }
 
     @Authorized(UserType.ADMIN)
@@ -149,11 +148,8 @@ export default class VendorController {
         description: 'Delete laundry',
         response: LaundryMessageResponseDTO,
     })
-    async deleteLaundry(
-        @Param('laundryId') laundryId: string,
-        @CurrentUser() user: User,
-    ): Promise<LaundryMessageResponseDTO> {
-        return await this._vendorService.deleteLaundry(laundryId, user);
+    async deleteLaundry(@Param('laundryId') laundryId: string): Promise<LaundryMessageResponseDTO> {
+        return await this._vendorService.deleteLaundry(laundryId);
     }
 
     @Authorized(UserType.ADMIN)
@@ -162,12 +158,9 @@ export default class VendorController {
         description: 'Add laundry service',
         response: {},
     })
-    async addLaundryService(
-        @Param('laundryId') laundryId: string,
-        @Body() data: LaundryServiceDTO,
-        @CurrentUser() user: User,
-    ): Promise<any> {
-        return await this._vendorService.addLaundryService(laundryId, data, user);
+    async addLaundryService(@Param('laundryId') laundryId: string, @Body() data: LaundryServiceDTO): Promise<any> {
+        console.log(laundryId);
+        return await this._vendorService.addLaundryService(laundryId, data);
     }
 
     @Authorized(UserType.ADMIN)
@@ -180,9 +173,8 @@ export default class VendorController {
         @Param('laundryId') laundryId: string,
         @Param('serviceId') serviceId: string,
         @Body() data: EditLaundryServiceRequestDTO,
-        @CurrentUser() user: User,
     ): Promise<LaundryServiceMessageResponseDTO> {
-        return await this._vendorService.editLaundryService(laundryId, serviceId, data, user);
+        return await this._vendorService.editLaundryService(laundryId, serviceId, data);
     }
 
     @Authorized(UserType.ADMIN)
@@ -194,9 +186,8 @@ export default class VendorController {
     async deleteLaundryService(
         @Param('laundryId') laundryId: string,
         @Param('serviceId') serviceId: string,
-        @CurrentUser() user: User,
     ): Promise<LaundryServiceMessageResponseDTO> {
-        return await this._vendorService.deleteLaundryService(laundryId, serviceId, user);
+        return await this._vendorService.deleteLaundryService(laundryId, serviceId);
     }
 
     @Authorized(UserType.ADMIN)
@@ -209,9 +200,8 @@ export default class VendorController {
         @Param('laundryId') laundryId: string,
         @Param('serviceId') serviceId: string,
         @Body() data: CreateLaundryServiceItemsArrayDTO,
-        @CurrentUser() user: User,
     ): Promise<any> {
-        return await this._vendorService.addLaundryServiceItem(laundryId, serviceId, data, user);
+        return await this._vendorService.addLaundryServiceItem(laundryId, serviceId, data);
     }
 
     @Get({
@@ -237,9 +227,8 @@ export default class VendorController {
         @Param('serviceId') serviceId: string,
         @Param('itemId') itemId: string,
         @Body() data: EditLaundryServiceItemRequestDTO,
-        @CurrentUser() user: User,
     ): Promise<any> {
-        return await this._vendorService.editLaundryServiceItem(laundryId, serviceId, itemId, data, user);
+        return await this._vendorService.editLaundryServiceItem(laundryId, serviceId, itemId, data);
     }
 
     @Authorized(UserType.ADMIN)
@@ -252,9 +241,8 @@ export default class VendorController {
         @Param('laundryId') laundryId: string,
         @Param('serviceId') serviceId: string,
         @Param('itemId') itemId: string,
-        @CurrentUser() user: User,
     ): Promise<any> {
-        return await this._vendorService.deleteLaundryServiceItem(laundryId, serviceId, itemId, user);
+        return await this._vendorService.deleteLaundryServiceItem(laundryId, serviceId, itemId);
     }
 
     @Authorized(UserType.ADMIN)
