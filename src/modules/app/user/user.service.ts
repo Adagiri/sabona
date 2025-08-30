@@ -693,7 +693,7 @@ console.log(data.isDefault)
         console.log('I ran....');
         const addresses = await this._dbService.userAddress.findMany({
             where: {
-                userId: '13d9ad00-c7ed-4c7e-a408-42555585de6f',
+                userId: user.id,
             },
             select: {
                 id: true,
