@@ -40,6 +40,7 @@ import { VendorLoginVerifyCodeRequestDTO } from './dto/request/vendorLoginVerify
 import { VendorLoginSendCodeResponseDTO } from './dto/response/vendorLoginSendCode.response';
 import { VendorLoginVerifyCodeResponseDTO } from './dto/response/vendorLoginVerifyCode.response';
 import { HashPassword, ComparePassword } from '../../../helpers/util.helper';
+import { UpdateLocationResponseDTO } from './dto/response/update_location.response.dto';
 
 @Injectable()
 export default class UserService {
@@ -594,7 +595,7 @@ export default class UserService {
         }
 
         // Check if user is active
-        if (user.status !== UserStatus.ACTIVE &&['+201221925690', '+201221825444'].indexOf(data.phone) !== -1) {
+        if (user.status !== UserStatus.ACTIVE && ['+201221925690', '+201221825444'].indexOf(data.phone) !== -1) {
             throw new BadRequestException('Account is not active. Please contact support.');
         }
 
@@ -671,6 +672,7 @@ export default class UserService {
     }
 
     async GetAllAddresses(user: User): Promise<getAllAddressesResponseDTO> {
+        console.log('I ran....');
         const addresses = await this._dbService.userAddress.findMany({
             where: {
                 userId: user.id,
@@ -686,6 +688,8 @@ export default class UserService {
                 updatedAt: true,
             },
         });
+
+        console.log('addresses: ', addresses);
 
         return { data: addresses };
     }
@@ -776,5 +780,26 @@ export default class UserService {
             return { isExist: true };
         }
         return { isExist: false };
+    }
+
+    async UpdateLocation(userId: string, lat: number, long: number): Promise<UpdateLocationResponseDTO> {
+        await this._dbService.userLocation.upsert({
+            where: { userId },
+            update: {
+                lat,
+                long,
+                updatedAt: new Date(),
+            },
+            create: {
+                userId,
+                lat,
+                long,
+            },
+        });
+
+        return {
+            success: true,
+            message: 'Location updated successfully',
+        };
     }
 }

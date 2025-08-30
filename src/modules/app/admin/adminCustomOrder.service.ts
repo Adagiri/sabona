@@ -249,7 +249,7 @@ export default class AdminCustomOrderService {
     ): Promise<PayTabsInvoiceResponse> {
         // Mock PayTabs integration - replace with actual PayTabs API
         const totalAmount = vendorAmount + adminServiceCharge;
-
+        console.log(totalAmount);
         // This would be actual PayTabs API call
         const mockPayTabsResponse = {
             invoiceId: `PT_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,

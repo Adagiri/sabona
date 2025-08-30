@@ -14,6 +14,8 @@ import editAddressRequestDTO from './dto/request/editAddress.request';
 import editAddressParamRequestDTO from './dto/request/editAddressParam.request';
 import EditAddressResponseDTO from './dto/response/editAddress.response';
 import addCustomerAddressRequestDTO from './dto/request/addAddress.request';
+import { UpdateLocationResponseDTO } from './dto/response/update_location.response.dto';
+import { UpdateLocationRequestDTO } from './dto/request/update_location.request.dto';
 
 @ApiController({ version: '1', tag: 'user' })
 export default class UserController {
@@ -96,5 +98,18 @@ export default class UserController {
         @CurrentUser() user: User,
     ): Promise<EditAddressResponseDTO> {
         return await this._userService.EditAddress(data, param, user);
+    }
+
+    @Authorized()
+    @Patch({
+        path: '/user/location',
+        description: 'Update user location coordinates',
+        response: UpdateLocationResponseDTO,
+    })
+    async UpdateLocation(
+        @Body() data: UpdateLocationRequestDTO,
+        @CurrentUser() user: User,
+    ): Promise<UpdateLocationResponseDTO> {
+        return this._userService.UpdateLocation(user.id, data.lat, data.long);
     }
 }
