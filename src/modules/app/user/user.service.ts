@@ -467,6 +467,7 @@ export default class UserService {
             where: { id },
             select: { id: true },
         });
+        console.log(id, "I ran here")
         if (!basicUser) {
             throw new NotFoundException('user.not_found');
         }
@@ -661,21 +662,38 @@ export default class UserService {
     }
 
     async AddAddress(data: addCustomerAddressRequestDTO, user: User): Promise<addCustomerAddressResponseDTO> {
+        // Check if user has any existing addresses
+        const existingAddressCount = await this._dbService.userAddress.count({
+            where: { userId: user.id.toString() },
+        });
+
+        // If no existing addresses, make this the default
+        const isDefault = existingAddressCount === 0 || data.isDefault === true;
+console.log(data.isDefault)
+        // If setting as default, unset other defaults first
+        if (isDefault && existingAddressCount > 0) {
+            await this._dbService.userAddress.updateMany({
+                where: { userId: user.id.toString() },
+                data: { isDefault: false },
+            });
+        }
+
         const address = await this._dbService.userAddress.create({
             data: {
                 userId: user.id.toString(),
                 ...data,
+                isDefault,
             },
         });
 
-        return address;
+        return address; 
     }
 
     async GetAllAddresses(user: User): Promise<getAllAddressesResponseDTO> {
         console.log('I ran....');
         const addresses = await this._dbService.userAddress.findMany({
             where: {
-                userId: user.id,
+                userId: '13d9ad00-c7ed-4c7e-a408-42555585de6f',
             },
             select: {
                 id: true,

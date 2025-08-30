@@ -2,7 +2,6 @@ import { ApiProperty } from "@nestjs/swagger";
 import { IsNumber, IsOptional, IsString } from "class-validator";
 
 export default class addCustomerAddressRequestDTO {
-
     @ApiProperty()
     @IsString()
     address: string;
@@ -20,5 +19,6 @@ export default class addCustomerAddressRequestDTO {
     label?: string;
 
     @ApiProperty()
+    @IsOptional()
     isDefault?: boolean;
 }
