@@ -205,69 +205,55 @@ export default class CustomerService {
             },
         });
 
-        // AUTO-ASSIGN closest driver
-        await this._dbService.riderOrder.create({
+        await this._dbService.vendorOrder.create({
             data: {
                 orderId: order.id,
-                riderId: closestDriver.riderId,
-                type: 'RIDER_PICKUP',
+                vendorId: laundry.vendorId,
             },
-        });
-
-        // Update pickup with assigned rider
-        await this._dbService.pickup.update({
-            where: { orderId: order.id },
-            data: { riderId: closestDriver.riderId },
         });
 
         // Extract tokens
         const customerTokens = extractTokens(customerDeviceTokens);
         const vendorTokens = extractTokens(vendorDeviceTokens);
 
-        // Get driver device tokens
-        const driverDeviceTokens = await this._dbService.deviceToken.findMany({
-            where: { userId: closestDriver.riderId, deletedAt: null },
-            select: { token: true },
-        });
-        const driverTokens = extractTokens(driverDeviceTokens);
 
-        // Send targeted notification to assigned driver only
-        if (driverTokens?.length) {
-            const driverNotificationData = {
-                tokens: driverTokens,
-                title: 'New Pickup Assignment!',
-                body: `Pickup order #${order.orderNumber} - ${closestDriver.distance}km away from ${laundry.name}`,
+        if (vendorTokens?.length) {
+            const vendorNotificationData = {
+                tokens: vendorTokens,
+                title: 'New Order!',
+                body: `New order #${order.orderNumber} - Please accept or reject`,
                 notificationData: {
                     orderId: order.id,
-                    key: 'FETCH_ASSIGNED_ORDERS',
-                    route: 'AssignedRides',
+                    key: 'FETCH_ORDER_REQUESTS',
+                    route: 'Home',
                 },
             };
 
-            await this._notificationService.SendNotificationToMultipleTokens(driverNotificationData);
+            await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
 
             await this._dbService.notification.create({
                 data: {
-                    userId: closestDriver.riderId,
+                    userId: laundry.vendorId,
                     orderId: order.id,
-                    message: `New pickup assignment - ${closestDriver.distance}km away`,
+                    message: 'You have received a new order. Please accept or reject.',
                     status: 'UNREAD',
                     data: {
                         orderId: order.id,
-                        key: 'FETCH_ASSIGNED_ORDERS',
-                        route: 'AssignedRides',
+                        key: 'FETCH_ORDER_REQUESTS',
+                        route: 'Home',
                     },
                     type: 'ORDER_PLACED',
                 },
             });
         }
 
+
         // Notify customer
         if (customerTokens?.length) {
             const customerNotificationData = {
                 tokens: customerTokens,
-                title: 'Order Placed & Driver Assigned!',
-                body: `Your order has been placed and assigned to a driver ${closestDriver.distance}km away`,
+                title: 'Order Placed',
+                body: `Your order has been placed`,
                 notificationData: {
                     orderId: order.id,
                     key: 'FETCH_ORDERS',

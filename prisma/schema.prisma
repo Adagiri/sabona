@@ -623,7 +623,7 @@ model VendorOrder {
   vendor     User       @relation(fields: [vendorId], references: [id])
   orderId    String     @unique // Using UUID for orderId field
   order      Order      @relation(fields: [orderId], references: [id])
-  acceptedAt DateTime   @default(now()) @db.Timestamptz() // When the vendor accepted the order
+  acceptedAt DateTime?   @default(now()) @db.Timestamptz() // When the vendor accepted the order
   deletedAt  DateTime?  @db.Timestamptz()
   feedbacks  Feedback[] // Feedback related to the order
 }
