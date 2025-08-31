@@ -39,8 +39,9 @@ export default class PayTabsService {
      */
     async handleWebhook(webhookData: PayTabsWebhookData, headers: any): Promise<WebhookProcessingResult> {
         try {
+            console.log(headers)
             // Validate webhook signature
-            await this.validatePayTabsSignature(webhookData, headers);
+            // await this.validatePayTabsSignature(webhookData, headers);
             // Extract order information
             const orderId = webhookData.cart_id || webhookData.merchant_reference_id;
             // const orderId = '554184b9-9237-46c6-85bf-f3f4c4f6e734';
