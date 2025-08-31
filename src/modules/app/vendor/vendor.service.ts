@@ -121,6 +121,7 @@ export default class VendorService {
             throw new BadRequestException('Order does not exist');
         }
 
+
         const customer = await this._dbService.order.findFirst({
             where: {
                 id: params.orderId,

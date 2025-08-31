@@ -218,6 +218,9 @@ model UserLocation {
   long      Float // Current longitude
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
 
+  deletedAt    DateTime? @db.Timestamptz() // Optional deleted at timestamp
+
+
   @@index([lat, long]) // For efficient distance queries
 }
 
