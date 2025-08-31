@@ -1,5 +1,5 @@
 import { User, UserType } from '@prisma/client';
-import { ApiController, Authorized, CurrentUser, Get, Patch, Post } from '../../../core/decorators';
+import { ApiController, Authorized, CurrentUser, Delete, Get, Patch, Post } from '../../../core/decorators';
 import CustomerService from './customer.service';
 import { BadRequestException, Body, Param, Query } from '@nestjs/common';
 import CreateOrderResponseDTO from './dto/response/createOrder.response';
@@ -25,6 +25,7 @@ import { CreateCustomOrderResponseDTO } from '../customOrder/dto/response/create
 import { CreateCustomOrderRequestDTO } from '../customOrder/dto/request/createCustomOrder.request';
 import { CalculateFeesResponseDTO } from './dto/response/calculateFees.response';
 import { CalculateFeesRequestDTO } from './dto/request/calculateFees.request';
+import { BooleanResponseDTO } from 'src/core/response/response.schema';
 
 @ApiController({
     path: '/customer',
@@ -175,5 +176,15 @@ export default class CustomerController {
     })
     async calculateFees(@Body() data: CalculateFeesRequestDTO): Promise<CalculateFeesResponseDTO> {
         return this._customerService.calculateOrderFees(data);
+    }
+
+    @Authorized()
+    @Delete({
+        path: '/account/delete',
+        description: 'Delete user account',
+        response: BooleanResponseDTO,
+    })
+    async deleteMyAccount(@CurrentUser() user: User): Promise<BooleanResponseDTO> {
+        return await this._customerService.deleteMyAccount(user);
     }
 }

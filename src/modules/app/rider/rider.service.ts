@@ -10,6 +10,7 @@ import { BadRequestException } from 'src/core/exceptions/response.exception';
 import { extractTokens } from 'src/helpers/util.helper';
 import NotificationService from '../notification/notification.service';
 import LocationService from '../location/location.service';
+import { BooleanResponseDTO } from 'src/core/response/response.schema';
 
 @Injectable()
 export default class RiderService {
@@ -509,7 +510,7 @@ export default class RiderService {
         return { data: orders };
     }
 
-    async getLastOrder(user: User): Promise<{data: any}> {
+    async getLastOrder(user: User): Promise<{ data: any }> {
         const order = await this._dbService.riderOrder.findFirst({
             where: {
                 riderId: user.id,
@@ -524,5 +525,30 @@ export default class RiderService {
         }
 
         return { data: order };
+    }
+
+    async deleteMyAccount(user: User): Promise<BooleanResponseDTO> {
+        const activeAssignments = await this._dbService.riderOrder.count({
+            where: {
+                riderId: user.id,
+                deletedAt: null,
+                order: {
+                    status: {
+                        in: ['ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
+                    },
+                },
+            },
+        });
+
+        if (activeAssignments > 0) {
+            throw new BadRequestException('Cannot delete account with active delivery assignments');
+        }
+
+        // Soft delete using existing middleware
+        await this._dbService.user.delete({
+            where: { id: user.id },
+        });
+
+        return { data: true };
     }
 }

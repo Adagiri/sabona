@@ -32,6 +32,7 @@ import LocationService from '../location/location.service';
 import { DELIVERY_CHARGES } from 'src/constants';
 import { CalculateFeesRequestDTO } from './dto/request/calculateFees.request';
 import { CalculateFeesResponseDTO } from './dto/response/calculateFees.response';
+import { BooleanResponseDTO } from 'src/core/response/response.schema';
 
 export interface FeeCalculationInput {
     orderType: OrderType;
@@ -1014,9 +1015,11 @@ export default class CustomerService {
     private async getAdminSettings() {
         try {
             console.log(110);
-            let settings = await this._dbService.adminSettings.findFirst(  {where: {
-                deletedAt: null  // Explicitly filter non-deleted records
-            }});
+            let settings = await this._dbService.adminSettings.findFirst({
+                where: {
+                    deletedAt: null, // Explicitly filter non-deleted records
+                },
+            });
             console.log(111);
 
             if (!settings) {
@@ -1042,5 +1045,28 @@ export default class CustomerService {
             console.error('Error in getAdminSettings:', error);
             throw new BadRequestException('Failed to retrieve or create admin settings');
         }
+    }
+
+    async deleteMyAccount(user: User): Promise<BooleanResponseDTO> {
+        // Check for active orders
+        const activeOrders = await this._dbService.order.count({
+            where: {
+                userId: user.id,
+                status: {
+                    in: ['PENDING', 'PENDING_PAYMENT', 'ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
+                },
+            },
+        });
+
+        if (activeOrders > 0) {
+            throw new BadRequestException('Cannot delete account with active orders');
+        }
+
+        // Soft delete using existing middleware
+        await this._dbService.user.delete({
+            where: { id: user.id },
+        });
+
+        return { data: true };
     }
 }

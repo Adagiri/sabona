@@ -23,6 +23,7 @@ import {
     GetAllLaundryItemCategoriesResponseDTO,
     LaundryItemCategoryMessageResponseDTO,
 } from './dto/response/laundryItemCategory.response';
+import { BooleanResponseDTO } from 'src/core/response/response.schema';
 
 @ApiController({
     path: '/vendor',
@@ -298,5 +299,15 @@ export default class VendorController {
         @Param('categoryId') categoryId: string,
     ): Promise<LaundryItemCategoryMessageResponseDTO> {
         return await this._vendorService.deleteLaundryItemCategory(categoryId);
+    }
+
+    @Authorized()
+    @Delete({
+        path: '/account/delete',
+        description: 'Delete vendor account',
+        response: BooleanResponseDTO,
+    })
+    async deleteMyAccount(@CurrentUser() user: User): Promise<BooleanResponseDTO> {
+        return await this._vendorService.deleteMyAccount(user);
     }
 }

@@ -25,6 +25,7 @@ import {
 import { CreateLaundryItemCategoryRequestDTO } from './dto/request/createLaundryItemCategory.request';
 import EditLaundryServiceRequestDTO from './dto/request/laundryServiceEdit.request';
 import LocationService from '../location/location.service';
+import { BooleanResponseDTO } from 'src/core/response/response.schema';
 @Injectable()
 export default class VendorService {
     constructor(
@@ -202,12 +203,12 @@ export default class VendorService {
                         orderId: params.orderId,
                     },
                     update: {
-                        acceptedAt: new Date(), 
+                        acceptedAt: new Date(),
                     },
                     create: {
                         orderId: params.orderId,
                         vendorId: user.id,
-                        acceptedAt: new Date(), 
+                        acceptedAt: new Date(),
                     },
                 });
 
@@ -1424,5 +1425,43 @@ export default class VendorService {
         } catch (error) {
             throw error;
         }
+    }
+
+    async deleteMyAccount(user: User): Promise<BooleanResponseDTO> {
+        // Check for active vendor orders
+        const activeOrders = await this._dbService.vendorOrder.count({
+            where: {
+                vendorId: user.id,
+                deletedAt: null,
+                order: {
+                    status: {
+                        in: ['ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
+                    },
+                },
+            },
+        });
+
+        if (activeOrders > 0) {
+            throw new BadRequestException('Cannot delete account with active orders to process');
+        }
+
+        // Check for active laundries
+        const activeLaundries = await this._dbService.laundry.count({
+            where: {
+                vendorId: user.id,
+                deletedAt: null,
+            },
+        });
+
+        if (activeLaundries > 0) {
+            throw new BadRequestException('Cannot delete account with active laundries. Please delete laundries first');
+        }
+
+        // Soft delete using existing middleware
+        await this._dbService.user.delete({
+            where: { id: user.id },
+        });
+
+        return { data: true };
     }
 }
