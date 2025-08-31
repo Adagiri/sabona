@@ -76,6 +76,7 @@ export class SecretLoaderService {
             `${pathPrefix}twilio`,
             `${pathPrefix}firebase`,
             `${pathPrefix}oauth`,
+            `${pathPrefix}paytabs`,
         ];
 
         for (const secretName of commonSecrets) {
@@ -187,7 +188,7 @@ export class SecretLoaderService {
             this.validateRequiredSecrets();
             const duration = Date.now() - startTime;
             console.log(`✅ Loaded ${this.loadedCount} secrets in ${duration}ms\n`);
-            console.log('APP_DATABASE_URL: ', process.env.APP_DATABASE_URL);
+            // console.log('APP_DATABASE_URL: ', process.env.APP_DATABASE_URL);
         } catch (error) {
             console.error('❌ Failed to load secrets:', error.message);
 

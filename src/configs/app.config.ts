@@ -82,6 +82,17 @@ const AppConfig = {
             return process.env.APP_FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
         },
     },
+    PAYTABS: {
+        get PROFILE_ID() {
+            return process.env.APP_PAYTABS_PROFILE_ID;
+        },
+        get SERVER_KEY() {
+            return process.env.APP_PAYTABS_SERVER_KEY;
+        },
+        get BASE_URL() {
+            return process.env.APP_PAYTABS_BASE_URL;
+        },
+    },
 };
 
 export default AppConfig;

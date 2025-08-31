@@ -69,6 +69,7 @@ enum OrderStatus {
 // NotificationType enum to define the different types of notificationsnotification
 enum NotificationType {
   ORDER_PLACED
+  ORDER_PAID
   ORDER_ACCEPTED
   ORDER_PROCESSING
   ORDER_REJECTED

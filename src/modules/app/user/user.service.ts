@@ -669,7 +669,6 @@ export default class UserService {
 
         // If no existing addresses, make this the default
         const isDefault = existingAddressCount === 0 || data.isDefault === true;
-console.log(data.isDefault)
         // If setting as default, unset other defaults first
         if (isDefault && existingAddressCount > 0) {
             await this._dbService.userAddress.updateMany({
