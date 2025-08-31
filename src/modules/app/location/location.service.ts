@@ -84,9 +84,9 @@ export default class LocationService {
 
         for (const rider of availableRiders) {
             // Skip if driver is currently busy
-            if (rider.RiderOrder.length > 0) {
-                continue;
-            }
+            // if (rider.RiderOrder.length > 0) {
+            //     continue;
+            // }
 
             const distance = this.calculateDistance(pickupLat, pickupLong, rider.location!.lat, rider.location!.long);
 

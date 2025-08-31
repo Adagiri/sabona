@@ -1128,6 +1128,8 @@ export default class VendorService {
     }
 
     async getOrders(user: User) {
+        console.log("I ran")
+        console.log(user.id)
         const orders = await this._dbService.order.findMany({
             where: {
                 vendorOrders: {

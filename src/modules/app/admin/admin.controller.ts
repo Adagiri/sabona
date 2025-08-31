@@ -834,6 +834,7 @@ export default class AdminController {
         description: 'Get admin settings',
     })
     async getAdminSettings(): Promise<GetAdminSettingsResponseDTO> {
+        console.log("I ran")
         return this._adminService.getAdminSettings();
     }
 
@@ -843,6 +844,7 @@ export default class AdminController {
         description: 'Update admin settings',
     })
     async updateAdminSettings(@Body() data: UpdateAdminSettingsRequestDTO): Promise<BooleanResponseDTO> {
+        console.log(data)
         return this._adminService.updateAdminSettings(data);
     }
 }
