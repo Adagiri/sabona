@@ -66,6 +66,7 @@ export default class VendorService {
                 totalAmount: true,
                 deliveryType: true,
                 orderNumber: true,
+                status: true,
                 services: {
                     select: {
                         laundryServiceId: true,
