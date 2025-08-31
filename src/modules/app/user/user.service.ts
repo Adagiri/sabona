@@ -596,7 +596,10 @@ export default class UserService {
         }
 
         // Check if user is active
-        if (user.status !== UserStatus.ACTIVE && ['+201221925690', '+201221825444'].indexOf(data.phone) !== -1) {
+        if (
+            user.status !== UserStatus.ACTIVE &&
+            ['+201221925690', '+201221825444', '+201221925330'].indexOf(data.phone) === -1
+        ) {
             throw new BadRequestException('Account is not active. Please contact support.');
         }
 
