@@ -94,6 +94,7 @@ export default class CustomerService {
      * Custom orders handled by CustomOrderService
      */
     async CreateOrder(data: CreateOrderRequestDTO, user: User): Promise<any> {
+        console.log(data, 'data');
         // Only handle registered laundry orders
         if (data.orderType !== OrderType.REGISTERED_LAUNDRY) {
             throw new BadRequestException(
@@ -122,7 +123,7 @@ export default class CustomerService {
             data.pickupLong,
             50, // 50km max radius
         );
-
+        console.log(1);
         if (!closestDriver) {
             throw new BadRequestException('No available drivers in your area at the moment. Please try again later.');
         }
@@ -131,6 +132,7 @@ export default class CustomerService {
         if (data.couponId) {
             await this.validateCoupon(data, user);
         }
+        console.log(2);
 
         // Get device tokens for notifications
         const [customerDeviceTokens, vendorDeviceTokens] = await Promise.all([
@@ -143,6 +145,7 @@ export default class CustomerService {
                 select: { token: true },
             }),
         ]);
+        console.log(3);
 
         const feeCalculation = await this.calculateOrderFeez({
             orderType: data.orderType,
@@ -154,6 +157,7 @@ export default class CustomerService {
             deliveryLong: data.deliveryLong,
             customServiceCharge: data.adminServiceCharge,
         });
+        console.log(4);
 
         // Create order
         const order = await this._dbService.order.create({
@@ -216,6 +220,7 @@ export default class CustomerService {
         const customerTokens = extractTokens(customerDeviceTokens);
         const vendorTokens = extractTokens(vendorDeviceTokens);
 
+        console.log(5);
 
         if (vendorTokens?.length) {
             const vendorNotificationData = {
@@ -246,7 +251,6 @@ export default class CustomerService {
                 },
             });
         }
-
 
         // Notify customer
         if (customerTokens?.length) {
@@ -920,7 +924,9 @@ export default class CustomerService {
     }
 
     private async calculateOrderFeez(input: FeeCalculationInput): Promise<FeeCalculationResult> {
+        console.log(11);
         const settings = await this.getAdminSettings();
+        console.log(12);
 
         // Calculate distance
         const distance = this._locationService['calculateDistance'](
@@ -929,6 +935,7 @@ export default class CustomerService {
             input.deliveryLat,
             input.deliveryLong,
         );
+        console.log(13);
 
         if (distance > settings.maxDeliveryDistance) {
             throw new Error(
@@ -1004,28 +1011,36 @@ export default class CustomerService {
 
         return Math.round(deliveryFee * 100) / 100;
     }
-
     private async getAdminSettings() {
-        let settings = await this._dbService.adminSettings.findFirst();
+        try {
+            console.log(110);
+            let settings = await this._dbService.adminSettings.findFirst(  {where: {
+                deletedAt: null  // Explicitly filter non-deleted records
+            }});
+            console.log(111);
 
-        if (!settings) {
-            // Create default settings if none exist
-            settings = await this._dbService.adminSettings.create({
-                data: {
-                    vatRate: 0.15,
-                    vatEnabled: true,
-                    serviceChargeType: 'PERCENTAGE',
-                    serviceChargeRate: 7.0,
-                    customOrderServiceChargeRate: 10.0,
-                    deliveryBaseRate: 5.0,
-                    deliveryPerKmRate: 2.0,
-                    freeDeliveryThreshold: 100.0,
-                    expressMultiplier: 2.0,
-                    maxDeliveryDistance: 50.0,
-                },
-            });
+            if (!settings) {
+                // Create default settings if none exist
+                settings = await this._dbService.adminSettings.create({
+                    data: {
+                        vatRate: 0.15,
+                        vatEnabled: true,
+                        serviceChargeType: 'PERCENTAGE',
+                        serviceChargeRate: 7.0,
+                        customOrderServiceChargeRate: 10.0,
+                        deliveryBaseRate: 5.0,
+                        deliveryPerKmRate: 2.0,
+                        freeDeliveryThreshold: 100.0,
+                        expressMultiplier: 2.0,
+                        maxDeliveryDistance: 50.0,
+                    },
+                });
+            }
+
+            return settings;
+        } catch (error) {
+            console.error('Error in getAdminSettings:', error);
+            throw new BadRequestException('Failed to retrieve or create admin settings');
         }
-
-        return settings;
     }
 }

@@ -137,7 +137,6 @@ enum PaymentType {
   CARD
 }
 
-// Add to your existing schema.prisma
 model AdminSettings {
   id String @id @default(uuid())
 
@@ -161,6 +160,8 @@ model AdminSettings {
 
   createdAt DateTime @default(now()) @db.Timestamptz()
   updatedAt DateTime @updatedAt @db.Timestamptz()
+  deletedAt    DateTime? @db.Timestamptz() // Optional deleted at timestamp
+
 }
 
 // User model to store user-related information
