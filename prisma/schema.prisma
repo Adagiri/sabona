@@ -137,6 +137,32 @@ enum PaymentType {
   CARD
 }
 
+// Add to your existing schema.prisma
+model AdminSettings {
+  id String @id @default(uuid())
+
+  // VAT Configuration
+  vatRate    Float   @default(0.15) // 15% VAT for Saudi Arabia
+  vatEnabled Boolean @default(true)
+
+  // Service Charge Configuration  
+  serviceChargeType            String @default("PERCENTAGE") // "PERCENTAGE" or "FIXED"
+  serviceChargeRate            Float  @default(7.0) // 7% or 7 SAR fixed
+  customOrderServiceChargeRate Float  @default(10.0) // Higher rate for custom orders
+
+  // Delivery Fee Configuration
+  deliveryBaseRate      Float @default(5.0) // Base delivery fee in SAR
+  deliveryPerKmRate     Float @default(2.0) // Per kilometer rate in SAR
+  freeDeliveryThreshold Float @default(100.0) // Free delivery above this amount
+  expressMultiplier     Float @default(2.0) // Express delivery multiplier
+
+  // Maximum distance for delivery
+  maxDeliveryDistance Float @default(50.0) // Maximum delivery distance in km
+
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @updatedAt @db.Timestamptz()
+}
+
 // User model to store user-related information
 model User {
   id               String     @id @default(uuid()) // Now using UUID for user ID
@@ -517,26 +543,32 @@ model Order {
   laundryId   String? // Foreign key to the Laundry model
   laundry     Laundry?  @relation(fields: [laundryId], references: [id])
 
-  // Custom laundry fields (NEW)
+  // Custom laundry fields
   customLaundryName        String? // For custom orders
   customLaundryDescription String? // User's detailed description/needs
   customLaundryLat         Float? // Custom vendor location (user-pinned)
   customLaundryLong        Float? // Custom vendor location (user-pinned)
   customLaundryAddress     String? // Custom vendor address
 
-  // Custom order - Driver payment to vendor (NEW)
+  // Custom order - Driver payment to vendor
   customVendorReceipt String? // Receipt image path (admin uploads)
   customVendorPaid    Float? // Amount driver paid to custom vendor
   customVendorName    String? // Vendor name from receipt
   customPaymentMethod String? // How driver paid vendor (CASH/CARD)
   adminServiceCharge  Float? // Admin-set service charge for custom orders
 
-  // Custom order - PayTabs customer payment (NEW)
+  // Custom order - PayTabs customer payment
   payTabsInvoiceId      String? // PayTabs invoice ID
   payTabsInvoiceUrl     String? // Invoice link admin sends to customer
   customerPaid          Boolean?  @default(false) // Customer payment status via PayTabs
   customerPaymentDate   DateTime? // When customer paid the invoice
   payTabsTransactionRef String? // PayTabs transaction reference
+
+  // Fee breakdown fields
+  serviceCharge Float? // Calculated service charge
+  deliveryFee   Float? // Calculated delivery fee  
+  vatAmount     Float? // VAT amount
+  distanceKm    Float? // Distance for delivery fee calculation
 
   status         OrderStatus           @default(PENDING) // High-level status of the order
   baseAmount     Float? // Base amount before discounts

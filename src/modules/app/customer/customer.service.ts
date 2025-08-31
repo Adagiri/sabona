@@ -1,6 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
-import { OrderStatus, PaymentType, User, FeedbackType, CouponType, TipType, OrderType, DeliveryType } from '@prisma/client';
+import {
+    OrderStatus,
+    PaymentType,
+    User,
+    FeedbackType,
+    CouponType,
+    TipType,
+    OrderType,
+    DeliveryType,
+} from '@prisma/client';
 import CreateOrderRequestDTO from './dto/request/createOrder.request';
 import AcceptOrderRequestDTO from '../vendor/dto/request/acceptOrder.request';
 import CancelOrderResponseDTO from './dto/response/cancelOrder.response';
@@ -21,6 +30,35 @@ import { HasTippedResponseDTO } from './dto/response/hasTipped.response';
 import { AddTipResponseDto } from './dto/response/addTip.response';
 import LocationService from '../location/location.service';
 import { DELIVERY_CHARGES } from 'src/constants';
+import { CalculateFeesRequestDTO } from './dto/request/calculateFees.request';
+import { CalculateFeesResponseDTO } from './dto/response/calculateFees.response';
+
+export interface FeeCalculationInput {
+    orderType: OrderType;
+    subtotal: number;
+    deliveryType: DeliveryType;
+    pickupLat: number;
+    pickupLong: number;
+    deliveryLat: number;
+    deliveryLong: number;
+    customServiceCharge?: number;
+}
+
+export interface FeeCalculationResult {
+    subtotal: number;
+    serviceCharge: number;
+    deliveryFee: number;
+    vatAmount: number;
+    total: number;
+    distance: number;
+    breakdown: {
+        baseDeliveryFee: number;
+        distanceDeliveryFee: number;
+        expressMultiplier?: number;
+        serviceChargeRate: number;
+        vatRate: number;
+    };
+}
 
 @Injectable()
 export default class CustomerService {
@@ -29,6 +67,27 @@ export default class CustomerService {
         private _notificationService: NotificationService,
         private _locationService: LocationService,
     ) {}
+
+    async calculateOrderFees(data: CalculateFeesRequestDTO): Promise<CalculateFeesResponseDTO> {
+        try {
+            const result = await this.calculateOrderFeez({
+                orderType: data.orderType,
+                subtotal: data.subtotal,
+                deliveryType: data.deliveryType,
+                pickupLat: data.pickupLat,
+                pickupLong: data.pickupLong,
+                deliveryLat: data.deliveryLat,
+                deliveryLong: data.deliveryLong,
+                customServiceCharge: data.customServiceCharge,
+            });
+
+            return {
+                data: result,
+            };
+        } catch (error) {
+            throw new BadRequestException(error.message);
+        }
+    }
 
     /**
      * Create regular order (REGISTERED_LAUNDRY only)
@@ -85,14 +144,25 @@ export default class CustomerService {
             }),
         ]);
 
+        const feeCalculation = await this.calculateOrderFeez({
+            orderType: data.orderType,
+            subtotal: data.baseAmount || data.totalAmount,
+            deliveryType: data.deliveryType,
+            pickupLat: data.pickupLat,
+            pickupLong: data.pickupLong,
+            deliveryLat: data.deliveryLat,
+            deliveryLong: data.deliveryLong,
+            customServiceCharge: data.adminServiceCharge,
+        });
+
         // Create order
         const order = await this._dbService.order.create({
             data: {
                 userId: user.id,
                 orderType: OrderType.REGISTERED_LAUNDRY,
                 laundryId: data.laundryId,
-                totalAmount: data.totalAmount,
                 baseAmount: data.baseAmount || data.totalAmount,
+                totalAmount: feeCalculation.total,
                 discountAmount: data.discountAmount || 0,
                 couponId: data.couponId,
                 paymentType: data.paymentType,
@@ -127,6 +197,11 @@ export default class CustomerService {
                         },
                     })),
                 },
+                serviceCharge: feeCalculation.serviceCharge,
+                deliveryFee: feeCalculation.deliveryFee,
+                vatAmount: feeCalculation.vatAmount,
+
+                distanceKm: feeCalculation.distance,
             },
         });
 
@@ -856,5 +931,115 @@ export default class CustomerService {
         } else {
             return { hasTipped: false };
         }
+    }
+
+    private async calculateOrderFeez(input: FeeCalculationInput): Promise<FeeCalculationResult> {
+        const settings = await this.getAdminSettings();
+
+        // Calculate distance
+        const distance = this._locationService['calculateDistance'](
+            input.pickupLat,
+            input.pickupLong,
+            input.deliveryLat,
+            input.deliveryLong,
+        );
+
+        if (distance > settings.maxDeliveryDistance) {
+            throw new Error(
+                `Delivery distance (${distance}km) exceeds maximum allowed distance (${settings.maxDeliveryDistance}km)`,
+            );
+        }
+
+        // Calculate service charge
+        const serviceCharge = this.calculateServiceCharge(input, settings);
+
+        // Calculate delivery fee
+        const deliveryFee = this.calculateDeliveryFee(input, distance, settings);
+
+        // Calculate subtotal after service charge and delivery
+        const subtotalWithFees = input.subtotal + serviceCharge + deliveryFee;
+
+        // Calculate VAT on total (including service charge and delivery)
+        const vatAmount = settings.vatEnabled ? Math.round(subtotalWithFees * settings.vatRate * 100) / 100 : 0;
+
+        const total = subtotalWithFees + vatAmount;
+
+        return {
+            subtotal: input.subtotal,
+            serviceCharge,
+            deliveryFee,
+            vatAmount,
+            total,
+            distance,
+            breakdown: {
+                baseDeliveryFee: settings.deliveryBaseRate,
+                distanceDeliveryFee: distance * settings.deliveryPerKmRate,
+                expressMultiplier: input.deliveryType === 'EXPRESS' ? settings.expressMultiplier : undefined,
+                serviceChargeRate:
+                    settings.serviceChargeType === 'PERCENTAGE'
+                        ? settings.serviceChargeRate
+                        : settings.serviceChargeRate,
+                vatRate: settings.vatRate,
+            },
+        };
+    }
+
+    private calculateServiceCharge(input: FeeCalculationInput, settings: any): number {
+        // Custom orders use admin-set service charge if provided
+        if (input.orderType === OrderType.CUSTOM_LAUNDRY && input.customServiceCharge) {
+            return input.customServiceCharge;
+        }
+
+        // Regular service charge calculation
+        const rate =
+            input.orderType === OrderType.CUSTOM_LAUNDRY
+                ? settings.customOrderServiceChargeRate
+                : settings.serviceChargeRate;
+
+        if (settings.serviceChargeType === 'PERCENTAGE') {
+            return Math.round(input.subtotal * (rate / 100) * 100) / 100;
+        } else {
+            return rate; // Fixed amount
+        }
+    }
+
+    private calculateDeliveryFee(input: FeeCalculationInput, distance: number, settings: any): number {
+        // Check if order qualifies for free delivery
+        if (input.subtotal >= settings.freeDeliveryThreshold) {
+            return 0;
+        }
+
+        let deliveryFee = settings.deliveryBaseRate + distance * settings.deliveryPerKmRate;
+
+        // Apply express multiplier if needed
+        if (input.deliveryType === 'EXPRESS') {
+            deliveryFee *= settings.expressMultiplier;
+        }
+
+        return Math.round(deliveryFee * 100) / 100;
+    }
+
+    private async getAdminSettings() {
+        let settings = await this._dbService.adminSettings.findFirst();
+
+        if (!settings) {
+            // Create default settings if none exist
+            settings = await this._dbService.adminSettings.create({
+                data: {
+                    vatRate: 0.15,
+                    vatEnabled: true,
+                    serviceChargeType: 'PERCENTAGE',
+                    serviceChargeRate: 7.0,
+                    customOrderServiceChargeRate: 10.0,
+                    deliveryBaseRate: 5.0,
+                    deliveryPerKmRate: 2.0,
+                    freeDeliveryThreshold: 100.0,
+                    expressMultiplier: 2.0,
+                    maxDeliveryDistance: 50.0,
+                },
+            });
+        }
+
+        return settings;
     }
 }

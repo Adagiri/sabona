@@ -74,7 +74,7 @@ export default class RiderController {
         description: 'Get last order',
         response: {}
     })
-    async getLastOrder(@CurrentUser() user: User): Promise<{}> {
+    async getLastOrder(@CurrentUser() user: User): Promise<any> {
         return await this._riderService.getLastOrder(user);
     }
     

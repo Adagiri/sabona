@@ -23,6 +23,8 @@ import { ValidateCustomLocationResponseDTO } from '../customOrder/dto/response/v
 import { ValidateCustomLocationRequestDTO } from '../customOrder/dto/request/validateCustomLocation.request';
 import { CreateCustomOrderResponseDTO } from '../customOrder/dto/response/createCustomOrder.response';
 import { CreateCustomOrderRequestDTO } from '../customOrder/dto/request/createCustomOrder.request';
+import { CalculateFeesResponseDTO } from './dto/response/calculateFees.response';
+import { CalculateFeesRequestDTO } from './dto/request/calculateFees.request';
 
 @ApiController({
     path: '/customer',
@@ -164,5 +166,14 @@ export default class CustomerController {
     })
     async HasTipped(@CurrentUser() user: User, @Param() params: HasFeedBackRequestDTO): Promise<HasTippedResponseDTO> {
         return await this._customerService.HasTipped(params, user);
+    }
+
+    @Post({
+        path: '/calculate-fees',
+        response: CalculateFeesResponseDTO,
+        description: 'Calculate order fees before order creation',
+    })
+    async calculateFees(@Body() data: CalculateFeesRequestDTO): Promise<CalculateFeesResponseDTO> {
+        return this._customerService.calculateOrderFees(data);
     }
 }

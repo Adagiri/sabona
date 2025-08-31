@@ -73,6 +73,9 @@ import {
     UploadRiderDocumentResponseDTO,
 } from './dto/response/riderDocument.response';
 import { FinalizeRiderDocumentRequestDTO, UploadRiderDocumentRequestDTO } from './dto/request/riderDocument.request';
+import { BooleanResponseDTO } from 'src/core/response/response.schema';
+import { GetAdminSettingsResponseDTO } from './dto/response/adminSettings.response';
+import { UpdateAdminSettingsRequestDTO } from './dto/request/updateAdminSettings.request';
 
 @ApiController({
     path: '/admin',
@@ -360,7 +363,7 @@ export default class AdminController {
         response: {},
     })
     async addLaundryService(@Param('laundryId') laundryId: string, @Body() data: LaundryServiceDTO): Promise<any> {
-        console.log(laundryId)
+        console.log(laundryId);
         return await this._vendorService.addLaundryService(laundryId, data);
     }
 
@@ -823,5 +826,23 @@ export default class AdminController {
                 },
             },
         };
+    }
+
+    @Get({
+        path: '/settings',
+        response: GetAdminSettingsResponseDTO,
+        description: 'Get admin settings',
+    })
+    async getAdminSettings(): Promise<GetAdminSettingsResponseDTO> {
+        return this._adminService.getAdminSettings();
+    }
+
+    @Patch({
+        path: '/settings',
+        response: BooleanResponseDTO,
+        description: 'Update admin settings',
+    })
+    async updateAdminSettings(@Body() data: UpdateAdminSettingsRequestDTO): Promise<BooleanResponseDTO> {
+        return this._adminService.updateAdminSettings(data);
     }
 }
