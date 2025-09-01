@@ -1,4 +1,4 @@
-import { OrderStatus, User } from '@prisma/client';
+import { OrderStatus, RiderOrderType, User } from '@prisma/client';
 import DatabaseService from 'src/database/database.service';
 import UpdateStatusRequestDTO from './dto/request/updateStatus.request';
 import GetOrderRequestsResponseDTO from './dto/response/getOrderRequests.response';
@@ -395,7 +395,7 @@ export default class VendorService {
                 const assignedRider = await this._dbService.riderOrder.findFirst({
                     where: {
                         orderId: params.orderId,
-                        type: 'RIDER_PICKUP',
+                        type: RiderOrderType.RIDER_DELIVERY,
                         deletedAt: null,
                     },
                     select: {
