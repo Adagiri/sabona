@@ -132,15 +132,18 @@ export default class RiderService {
      */
     async updateOrderStatus(params: UpdateStatusRequestDTO, user: User): Promise<UpdateOrderStatusResponseDTO> {
         // Verify rider is assigned to this order
-        const riderAssignment = await this._dbService.riderOrder.findFirst({
+        const latestRiderAssignment = await this._dbService.riderOrder.findFirst({
             where: {
                 orderId: params.orderId,
                 riderId: user.id,
                 deletedAt: null,
             },
+            orderBy: {
+                assignedAt: 'desc',
+            },
         });
 
-        if (!riderAssignment) {
+        if (!latestRiderAssignment) {
             throw new BadRequestException('You are not assigned to this order');
         }
 
@@ -316,7 +319,7 @@ export default class RiderService {
 
             case 'DROPPED_OFF':
                 // Handle drop-off at vendor or customer
-                if (riderAssignment.type === 'RIDER_PICKUP') {
+                if (latestRiderAssignment.type === 'RIDER_PICKUP') {
                     // Dropping off at vendor
                     await this._dbService.pickup.update({
                         where: { orderId: params.orderId },
@@ -330,7 +333,7 @@ export default class RiderService {
                             data: { status: OrderStatus.IN_PROGRESS },
                         });
                     }
-                } else if (riderAssignment.type === 'RIDER_DELIVERY') {
+                } else if (latestRiderAssignment.type === 'RIDER_DELIVERY') {
                     // Final delivery to customer
                     await this._dbService.delivery.update({
                         where: { orderId: params.orderId },
