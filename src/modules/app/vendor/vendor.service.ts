@@ -121,7 +121,6 @@ export default class VendorService {
             throw new BadRequestException('Order does not exist');
         }
 
-
         const customer = await this._dbService.order.findFirst({
             where: {
                 id: params.orderId,
@@ -392,16 +391,25 @@ export default class VendorService {
                 }
 
                 // Get the assigned driver for this order
-                const assignedRider = await this._dbService.riderOrder.findFirst({
-                    where: {
+                const closestDeliveryDriver = await this._locationService.findClosestAvailableDriver(
+                    order.laundry.lat,
+                    order.laundry.long,
+                );
+
+                if (!closestDeliveryDriver) {
+                    throw new BadRequestException('No available drivers found for delivery');
+                }
+
+                // Create delivery assignment
+                await this._dbService.riderOrder.create({
+                    data: {
                         orderId: params.orderId,
+                        riderId: closestDeliveryDriver.riderId,
                         type: RiderOrderType.RIDER_DELIVERY,
-                        deletedAt: null,
-                    },
-                    select: {
-                        riderId: true,
                     },
                 });
+
+                const assignedRider = { riderId: closestDeliveryDriver.riderId };
 
                 // Notify customer
                 if (customerTokens?.length) {
@@ -1130,8 +1138,8 @@ export default class VendorService {
     }
 
     async getOrders(user: User) {
-        console.log("I ran")
-        console.log(user.id)
+        console.log('I ran');
+        console.log(user.id);
         const orders = await this._dbService.order.findMany({
             where: {
                 vendorOrders: {
