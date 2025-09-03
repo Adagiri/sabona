@@ -1,6 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
-import { OrderStatus, PaymentType, User, FeedbackType, CouponType, TipType, OrderType, DeliveryType } from '@prisma/client';
+import {
+    OrderStatus,
+    PaymentType,
+    User,
+    FeedbackType,
+    CouponType,
+    TipType,
+    OrderType,
+    DeliveryType,
+} from '@prisma/client';
 import CreateOrderRequestDTO from './dto/request/createOrder.request';
 import AcceptOrderRequestDTO from '../vendor/dto/request/acceptOrder.request';
 import CancelOrderResponseDTO from './dto/response/cancelOrder.response';
@@ -21,6 +30,36 @@ import { HasTippedResponseDTO } from './dto/response/hasTipped.response';
 import { AddTipResponseDto } from './dto/response/addTip.response';
 import LocationService from '../location/location.service';
 import { DELIVERY_CHARGES } from 'src/constants';
+import { CalculateFeesRequestDTO } from './dto/request/calculateFees.request';
+import { CalculateFeesResponseDTO } from './dto/response/calculateFees.response';
+import { BooleanResponseDTO } from 'src/core/response/response.schema';
+
+export interface FeeCalculationInput {
+    orderType: OrderType;
+    subtotal: number;
+    deliveryType: DeliveryType;
+    pickupLat: number;
+    pickupLong: number;
+    deliveryLat: number;
+    deliveryLong: number;
+    customServiceCharge?: number;
+}
+
+export interface FeeCalculationResult {
+    subtotal: number;
+    serviceCharge: number;
+    deliveryFee: number;
+    vatAmount: number;
+    total: number;
+    distance: number;
+    breakdown: {
+        baseDeliveryFee: number;
+        distanceDeliveryFee: number;
+        expressMultiplier?: number;
+        serviceChargeRate: number;
+        vatRate: number;
+    };
+}
 
 @Injectable()
 export default class CustomerService {
@@ -29,6 +68,27 @@ export default class CustomerService {
         private _notificationService: NotificationService,
         private _locationService: LocationService,
     ) {}
+
+    async calculateOrderFees(data: CalculateFeesRequestDTO): Promise<CalculateFeesResponseDTO> {
+        try {
+            const result = await this.calculateOrderFeez({
+                orderType: data.orderType,
+                subtotal: data.subtotal,
+                deliveryType: data.deliveryType,
+                pickupLat: data.pickupLat,
+                pickupLong: data.pickupLong,
+                deliveryLat: data.deliveryLat,
+                deliveryLong: data.deliveryLong,
+                customServiceCharge: data.customServiceCharge,
+            });
+
+            return {
+                data: result,
+            };
+        } catch (error) {
+            throw new BadRequestException(error.message);
+        }
+    }
 
     /**
      * Create regular order (REGISTERED_LAUNDRY only)
@@ -63,7 +123,6 @@ export default class CustomerService {
             data.pickupLong,
             50, // 50km max radius
         );
-
         if (!closestDriver) {
             throw new BadRequestException('No available drivers in your area at the moment. Please try again later.');
         }
@@ -85,14 +144,25 @@ export default class CustomerService {
             }),
         ]);
 
+        const feeCalculation = await this.calculateOrderFeez({
+            orderType: data.orderType,
+            subtotal: data.baseAmount || data.totalAmount,
+            deliveryType: data.deliveryType,
+            pickupLat: data.pickupLat,
+            pickupLong: data.pickupLong,
+            deliveryLat: data.deliveryLat,
+            deliveryLong: data.deliveryLong,
+            customServiceCharge: data.adminServiceCharge,
+        });
+
         // Create order
         const order = await this._dbService.order.create({
             data: {
                 userId: user.id,
                 orderType: OrderType.REGISTERED_LAUNDRY,
                 laundryId: data.laundryId,
-                totalAmount: data.totalAmount,
                 baseAmount: data.baseAmount || data.totalAmount,
+                totalAmount: feeCalculation.total,
                 discountAmount: data.discountAmount || 0,
                 couponId: data.couponId,
                 paymentType: data.paymentType,
@@ -127,60 +197,51 @@ export default class CustomerService {
                         },
                     })),
                 },
+                serviceCharge: feeCalculation.serviceCharge,
+                deliveryFee: feeCalculation.deliveryFee,
+                vatAmount: feeCalculation.vatAmount,
+
+                distanceKm: feeCalculation.distance,
             },
         });
 
-        // AUTO-ASSIGN closest driver
-        await this._dbService.riderOrder.create({
+        await this._dbService.vendorOrder.create({
             data: {
                 orderId: order.id,
-                riderId: closestDriver.riderId,
-                type: 'RIDER_PICKUP',
+                vendorId: laundry.vendorId,
             },
         });
 
-        // Update pickup with assigned rider
-        await this._dbService.pickup.update({
-            where: { orderId: order.id },
-            data: { riderId: closestDriver.riderId },
-        });
 
         // Extract tokens
         const customerTokens = extractTokens(customerDeviceTokens);
         const vendorTokens = extractTokens(vendorDeviceTokens);
 
-        // Get driver device tokens
-        const driverDeviceTokens = await this._dbService.deviceToken.findMany({
-            where: { userId: closestDriver.riderId, deletedAt: null },
-            select: { token: true },
-        });
-        const driverTokens = extractTokens(driverDeviceTokens);
 
-        // Send targeted notification to assigned driver only
-        if (driverTokens?.length) {
-            const driverNotificationData = {
-                tokens: driverTokens,
-                title: 'New Pickup Assignment!',
-                body: `Pickup order #${order.orderNumber} - ${closestDriver.distance}km away from ${laundry.name}`,
+        if (vendorTokens?.length) {
+            const vendorNotificationData = {
+                tokens: vendorTokens,
+                title: 'New Order!',
+                body: `New order #${order.orderNumber} - Please accept or reject`,
                 notificationData: {
                     orderId: order.id,
-                    key: 'FETCH_ASSIGNED_ORDERS',
-                    route: 'AssignedRides',
+                    key: 'FETCH_ORDER_REQUESTS',
+                    route: 'Home',
                 },
             };
 
-            await this._notificationService.SendNotificationToMultipleTokens(driverNotificationData);
+            await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
 
             await this._dbService.notification.create({
                 data: {
-                    userId: closestDriver.riderId,
+                    userId: laundry.vendorId,
                     orderId: order.id,
-                    message: `New pickup assignment - ${closestDriver.distance}km away`,
+                    message: 'You have received a new order. Please accept or reject.',
                     status: 'UNREAD',
                     data: {
                         orderId: order.id,
-                        key: 'FETCH_ASSIGNED_ORDERS',
-                        route: 'AssignedRides',
+                        key: 'FETCH_ORDER_REQUESTS',
+                        route: 'Home',
                     },
                     type: 'ORDER_PLACED',
                 },
@@ -191,8 +252,8 @@ export default class CustomerService {
         if (customerTokens?.length) {
             const customerNotificationData = {
                 tokens: customerTokens,
-                title: 'Order Placed & Driver Assigned!',
-                body: `Your order has been placed and assigned to a driver ${closestDriver.distance}km away`,
+                title: 'Order Placed',
+                body: `Your order has been placed`,
                 notificationData: {
                     orderId: order.id,
                     key: 'FETCH_ORDERS',
@@ -856,5 +917,146 @@ export default class CustomerService {
         } else {
             return { hasTipped: false };
         }
+    }
+
+    private async calculateOrderFeez(input: FeeCalculationInput): Promise<FeeCalculationResult> {
+        const settings = await this.getAdminSettings();
+
+        // Calculate distance
+        const distance = this._locationService['calculateDistance'](
+            input.pickupLat,
+            input.pickupLong,
+            input.deliveryLat,
+            input.deliveryLong,
+        );
+
+        if (distance > settings.maxDeliveryDistance) {
+            throw new Error(
+                `Delivery distance (${distance}km) exceeds maximum allowed distance (${settings.maxDeliveryDistance}km)`,
+            );
+        }
+
+        // Calculate service charge
+        const serviceCharge = this.calculateServiceCharge(input, settings);
+
+        // Calculate delivery fee
+        const deliveryFee = this.calculateDeliveryFee(input, distance, settings);
+
+        // Calculate subtotal after service charge and delivery
+        const subtotalWithFees = input.subtotal + serviceCharge + deliveryFee;
+
+        // Calculate VAT on total (including service charge and delivery)
+        const vatAmount = settings.vatEnabled ? Math.round(subtotalWithFees * settings.vatRate * 100) / 100 : 0;
+
+        const total = subtotalWithFees + vatAmount;
+
+        return {
+            subtotal: input.subtotal,
+            serviceCharge,
+            deliveryFee,
+            vatAmount,
+            total,
+            distance,
+            breakdown: {
+                baseDeliveryFee: settings.deliveryBaseRate,
+                distanceDeliveryFee: distance * settings.deliveryPerKmRate,
+                expressMultiplier: input.deliveryType === 'EXPRESS' ? settings.expressMultiplier : undefined,
+                serviceChargeRate:
+                    settings.serviceChargeType === 'PERCENTAGE'
+                        ? settings.serviceChargeRate
+                        : settings.serviceChargeRate,
+                vatRate: settings.vatRate,
+            },
+        };
+    }
+
+    private calculateServiceCharge(input: FeeCalculationInput, settings: any): number {
+        // Custom orders use admin-set service charge if provided
+        if (input.orderType === OrderType.CUSTOM_LAUNDRY && input.customServiceCharge) {
+            return input.customServiceCharge;
+        }
+
+        // Regular service charge calculation
+        const rate =
+            input.orderType === OrderType.CUSTOM_LAUNDRY
+                ? settings.customOrderServiceChargeRate
+                : settings.serviceChargeRate;
+
+        if (settings.serviceChargeType === 'PERCENTAGE') {
+            return Math.round(input.subtotal * (rate / 100) * 100) / 100;
+        } else {
+            return rate; // Fixed amount
+        }
+    }
+
+    private calculateDeliveryFee(input: FeeCalculationInput, distance: number, settings: any): number {
+        // Check if order qualifies for free delivery
+        if (input.subtotal >= settings.freeDeliveryThreshold) {
+            return 0;
+        }
+
+        let deliveryFee = settings.deliveryBaseRate + distance * settings.deliveryPerKmRate;
+
+        // Apply express multiplier if needed
+        if (input.deliveryType === 'EXPRESS') {
+            deliveryFee *= settings.expressMultiplier;
+        }
+
+        return Math.round(deliveryFee * 100) / 100;
+    }
+    private async getAdminSettings() {
+        try {
+            let settings = await this._dbService.adminSettings.findFirst({
+                where: {
+                    deletedAt: null, 
+                },
+            });
+
+            if (!settings) {
+                // Create default settings if none exist
+                settings = await this._dbService.adminSettings.create({
+                    data: {
+                        vatRate: 0.15,
+                        vatEnabled: true,
+                        serviceChargeType: 'PERCENTAGE',
+                        serviceChargeRate: 7.0,
+                        customOrderServiceChargeRate: 10.0,
+                        deliveryBaseRate: 5.0,
+                        deliveryPerKmRate: 2.0,
+                        freeDeliveryThreshold: 100.0,
+                        expressMultiplier: 2.0,
+                        maxDeliveryDistance: 50.0,
+                    },
+                });
+            }
+
+            return settings;
+        } catch (error) {
+            console.error('Error in getAdminSettings:', error);
+            throw new BadRequestException('Failed to retrieve or create admin settings');
+        }
+    }
+
+    async deleteMyAccount(user: User): Promise<BooleanResponseDTO> {
+        // Check for active orders
+        const activeOrders = await this._dbService.order.count({
+            where: {
+                userId: user.id,
+                status: {
+                    in: ['PENDING', 'PENDING_PAYMENT', 'ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
+                },
+            },
+        });
+
+        if (activeOrders > 0) {
+            throw new BadRequestException('Cannot delete account with active orders');
+        }
+
+        // Soft delete using existing middleware
+        await this._dbService.user.delete({
+            where: { id: user.id },
+        });
+
+        return { data: true };
     }
 }

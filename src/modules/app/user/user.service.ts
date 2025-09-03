@@ -40,6 +40,7 @@ import { VendorLoginVerifyCodeRequestDTO } from './dto/request/vendorLoginVerify
 import { VendorLoginSendCodeResponseDTO } from './dto/response/vendorLoginSendCode.response';
 import { VendorLoginVerifyCodeResponseDTO } from './dto/response/vendorLoginVerifyCode.response';
 import { HashPassword, ComparePassword } from '../../../helpers/util.helper';
+import { UpdateLocationResponseDTO } from './dto/response/update_location.response.dto';
 
 @Injectable()
 export default class UserService {
@@ -466,6 +467,7 @@ export default class UserService {
             where: { id },
             select: { id: true },
         });
+        console.log(id, "I ran here")
         if (!basicUser) {
             throw new NotFoundException('user.not_found');
         }
@@ -594,7 +596,10 @@ export default class UserService {
         }
 
         // Check if user is active
-        if (user.status !== UserStatus.ACTIVE &&['+201221925690', '+201221825444'].indexOf(data.phone) !== -1) {
+        if (
+            user.status !== UserStatus.ACTIVE &&
+            ['+201221925690', '+201221825444', '+201221925330'].indexOf(data.phone) === -1
+        ) {
             throw new BadRequestException('Account is not active. Please contact support.');
         }
 
@@ -660,17 +665,34 @@ export default class UserService {
     }
 
     async AddAddress(data: addCustomerAddressRequestDTO, user: User): Promise<addCustomerAddressResponseDTO> {
+        // Check if user has any existing addresses
+        const existingAddressCount = await this._dbService.userAddress.count({
+            where: { userId: user.id.toString() },
+        });
+
+        // If no existing addresses, make this the default
+        const isDefault = existingAddressCount === 0 || data.isDefault === true;
+        // If setting as default, unset other defaults first
+        if (isDefault && existingAddressCount > 0) {
+            await this._dbService.userAddress.updateMany({
+                where: { userId: user.id.toString() },
+                data: { isDefault: false },
+            });
+        }
+
         const address = await this._dbService.userAddress.create({
             data: {
                 userId: user.id.toString(),
                 ...data,
+                isDefault,
             },
         });
 
-        return address;
+        return address; 
     }
 
     async GetAllAddresses(user: User): Promise<getAllAddressesResponseDTO> {
+        console.log('I ran....');
         const addresses = await this._dbService.userAddress.findMany({
             where: {
                 userId: user.id,
@@ -686,6 +708,8 @@ export default class UserService {
                 updatedAt: true,
             },
         });
+
+        console.log('addresses: ', addresses);
 
         return { data: addresses };
     }
@@ -776,5 +800,26 @@ export default class UserService {
             return { isExist: true };
         }
         return { isExist: false };
+    }
+
+    async UpdateLocation(userId: string, lat: number, long: number): Promise<UpdateLocationResponseDTO> {
+        await this._dbService.userLocation.upsert({
+            where: { userId },
+            update: {
+                lat,
+                long,
+                updatedAt: new Date(),
+            },
+            create: {
+                userId,
+                lat,
+                long,
+            },
+        });
+
+        return {
+            success: true,
+            message: 'Location updated successfully',
+        };
     }
 }

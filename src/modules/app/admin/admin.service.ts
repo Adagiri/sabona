@@ -36,6 +36,9 @@ import {
 } from './dto/response/application.response';
 import { MainVendorSearchResultDTO } from './dto/response/vendor.response';
 import MediaService from '../media/media.service';
+import { UpdateAdminSettingsRequestDTO } from './dto/request/updateAdminSettings.request';
+import { BooleanResponseDTO } from 'src/core/response/response.schema';
+import { GetAdminSettingsResponseDTO } from './dto/response/adminSettings.response';
 
 @Injectable()
 export default class AdminService {
@@ -1210,5 +1213,65 @@ export default class AdminService {
         };
 
         return response;
+    }
+
+    async getAdminSettings(): Promise<GetAdminSettingsResponseDTO> {
+        let settings = await this._dbService.adminSettings.findFirst({where: {deletedAt: null}});
+
+        if (!settings) {
+            settings = await this._dbService.adminSettings.create({
+                data: {
+                    vatRate: 0.15,
+                    vatEnabled: true,
+                    serviceChargeType: 'PERCENTAGE',
+                    serviceChargeRate: 7.0,
+                    customOrderServiceChargeRate: 10.0,
+                    deliveryBaseRate: 5.0,
+                    deliveryPerKmRate: 2.0,
+                    freeDeliveryThreshold: 100.0,
+                    expressMultiplier: 2.0,
+                    maxDeliveryDistance: 50.0,
+                },
+            });
+        }
+
+        return {
+            message: 'Admin settings retrieved successfully',
+            data: settings,
+        };
+    }
+
+    async updateAdminSettings(data: UpdateAdminSettingsRequestDTO): Promise<BooleanResponseDTO> {
+        const settings = await this._dbService.adminSettings.findFirst({where: {deletedAt: null}});
+
+        if (settings) {
+            await this._dbService.adminSettings.update({
+                where: { id: settings.id },
+                data: {
+                    ...data,
+                    updatedAt: new Date(),
+                },
+            });
+        } else {
+            await this._dbService.adminSettings.create({
+                data: {
+                    vatRate: 0.15,
+                    vatEnabled: true,
+                    serviceChargeType: 'PERCENTAGE',
+                    serviceChargeRate: 7.0,
+                    customOrderServiceChargeRate: 10.0,
+                    deliveryBaseRate: 5.0,
+                    deliveryPerKmRate: 2.0,
+                    freeDeliveryThreshold: 100.0,
+                    expressMultiplier: 2.0,
+                    maxDeliveryDistance: 50.0,
+                    ...data,
+                },
+            });
+        }
+
+        return {
+            data: true,
+        };
     }
 }

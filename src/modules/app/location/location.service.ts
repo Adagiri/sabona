@@ -53,7 +53,7 @@ export default class LocationService {
     async findClosestAvailableDriver(
         pickupLat: number,
         pickupLong: number,
-        maxDistanceKm: number = 50,
+        maxDistanceKm: number = 500,
     ): Promise<DriverWithDistance | null> {
         // Get all active riders with their current locations
         const availableRiders = await this._dbService.user.findMany({
@@ -84,9 +84,9 @@ export default class LocationService {
 
         for (const rider of availableRiders) {
             // Skip if driver is currently busy
-            if (rider.RiderOrder.length > 0) {
-                continue;
-            }
+            // if (rider.RiderOrder.length > 0) {
+            //     continue;
+            // }
 
             const distance = this.calculateDistance(pickupLat, pickupLong, rider.location!.lat, rider.location!.long);
 

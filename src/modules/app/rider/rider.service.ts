@@ -10,6 +10,7 @@ import { BadRequestException } from 'src/core/exceptions/response.exception';
 import { extractTokens } from 'src/helpers/util.helper';
 import NotificationService from '../notification/notification.service';
 import LocationService from '../location/location.service';
+import { BooleanResponseDTO } from 'src/core/response/response.schema';
 
 @Injectable()
 export default class RiderService {
@@ -131,15 +132,18 @@ export default class RiderService {
      */
     async updateOrderStatus(params: UpdateStatusRequestDTO, user: User): Promise<UpdateOrderStatusResponseDTO> {
         // Verify rider is assigned to this order
-        const riderAssignment = await this._dbService.riderOrder.findFirst({
+        const latestRiderAssignment = await this._dbService.riderOrder.findFirst({
             where: {
                 orderId: params.orderId,
                 riderId: user.id,
                 deletedAt: null,
             },
+            orderBy: {
+                assignedAt: 'desc',
+            },
         });
 
-        if (!riderAssignment) {
+        if (!latestRiderAssignment) {
             throw new BadRequestException('You are not assigned to this order');
         }
 
@@ -315,7 +319,7 @@ export default class RiderService {
 
             case 'DROPPED_OFF':
                 // Handle drop-off at vendor or customer
-                if (riderAssignment.type === 'RIDER_PICKUP') {
+                if (latestRiderAssignment.type === 'RIDER_PICKUP') {
                     // Dropping off at vendor
                     await this._dbService.pickup.update({
                         where: { orderId: params.orderId },
@@ -329,7 +333,7 @@ export default class RiderService {
                             data: { status: OrderStatus.IN_PROGRESS },
                         });
                     }
-                } else if (riderAssignment.type === 'RIDER_DELIVERY') {
+                } else if (latestRiderAssignment.type === 'RIDER_DELIVERY') {
                     // Final delivery to customer
                     await this._dbService.delivery.update({
                         where: { orderId: params.orderId },
@@ -509,7 +513,7 @@ export default class RiderService {
         return { data: orders };
     }
 
-    async getLastOrder(user: User): Promise<{data: any}> {
+    async getLastOrder(user: User): Promise<{ data: any }> {
         const order = await this._dbService.riderOrder.findFirst({
             where: {
                 riderId: user.id,
@@ -524,5 +528,30 @@ export default class RiderService {
         }
 
         return { data: order };
+    }
+
+    async deleteMyAccount(user: User): Promise<BooleanResponseDTO> {
+        const activeAssignments = await this._dbService.riderOrder.count({
+            where: {
+                riderId: user.id,
+                deletedAt: null,
+                order: {
+                    status: {
+                        in: ['ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
+                    },
+                },
+            },
+        });
+
+        if (activeAssignments > 0) {
+            throw new BadRequestException('Cannot delete account with active delivery assignments');
+        }
+
+        // Soft delete using existing middleware
+        await this._dbService.user.delete({
+            where: { id: user.id },
+        });
+
+        return { data: true };
     }
 }

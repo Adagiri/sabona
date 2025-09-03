@@ -14,6 +14,8 @@ import editAddressRequestDTO from './dto/request/editAddress.request';
 import editAddressParamRequestDTO from './dto/request/editAddressParam.request';
 import EditAddressResponseDTO from './dto/response/editAddress.response';
 import addCustomerAddressRequestDTO from './dto/request/addAddress.request';
+import { UpdateLocationResponseDTO } from './dto/response/update_location.response.dto';
+import { UpdateLocationRequestDTO } from './dto/request/update_location.request.dto';
 
 @ApiController({ version: '1', tag: 'user' })
 export default class UserController {
@@ -39,15 +41,6 @@ export default class UserController {
         return this._userService.Find(data);
     }
 
-    @Get({
-        path: '/user/:id',
-        description: 'Get user by id',
-        response: GetUserByIdResponseDTO,
-    })
-    Get(@Param('id') id: string): Promise<GetUserByIdResponseDTO> {
-        return this._userService.Get(id);
-    }
-
     @Authorized()
     @Patch({
         path: '/user/update',
@@ -63,7 +56,7 @@ export default class UserController {
 
     @Authorized()
     @Post({
-        path: 'user/address',
+        path: '/user/address',
         description: 'Add an address',
         response: addCustomerAddressResponseDTO,
     })
@@ -71,16 +64,19 @@ export default class UserController {
         @Body() data: addCustomerAddressRequestDTO,
         @CurrentUser() user: User,
     ): Promise<addCustomerAddressResponseDTO> {
+        console.log(data);
         return await this._userService.AddAddress(data, user);
     }
 
     @Authorized()
     @Get({
-        path: 'user/address',
+        path: '/user/address',
         description: 'Get all user addresses',
         response: getAllAddressesResponseDTO,
     })
     async GetAllAddresses(@CurrentUser() user: User): Promise<getAllAddressesResponseDTO> {
+        console.log('i raan');
+        console.log(user);
         return await this._userService.GetAllAddresses(user);
     }
 
@@ -96,5 +92,27 @@ export default class UserController {
         @CurrentUser() user: User,
     ): Promise<EditAddressResponseDTO> {
         return await this._userService.EditAddress(data, param, user);
+    }
+
+    @Authorized()
+    @Patch({
+        path: '/user/location',
+        description: 'Update user location coordinates',
+        response: UpdateLocationResponseDTO,
+    })
+    async UpdateLocation(
+        @Body() data: UpdateLocationRequestDTO,
+        @CurrentUser() user: User,
+    ): Promise<UpdateLocationResponseDTO> {
+        return this._userService.UpdateLocation(user.id, data.lat, data.long);
+    }
+
+    @Get({
+        path: '/user/:id',
+        description: 'Get user by id',
+        response: GetUserByIdResponseDTO,
+    })
+    Get(@Param('id') id: string): Promise<GetUserByIdResponseDTO> {
+        return this._userService.Get(id);
     }
 }

@@ -1,4 +1,4 @@
-import { ApiController, Authorized, Get, Post } from "src/core/decorators";
+import { ApiController, Post } from "src/core/decorators";
 import PaymentsService from "./payments.service";
 import { Body } from "@nestjs/common";
 import CreatePaymentRequestDTO from "./dto/request/createPayment.request";

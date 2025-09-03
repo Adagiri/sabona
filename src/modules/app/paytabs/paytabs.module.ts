@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
-import PayTabsController from './paytabs.controller';
 import DatabaseModule from '../../../database/database.module';
-import AdminCustomOrderModule from '../admin/adminCustomOrder.module';
 import { NotificationModule } from '../notification/notification.module';
+import PayTabsService from './paytabs.service';
+import PayTabsController from './paytabs.controller';
 
 @Module({
-    imports: [DatabaseModule, AdminCustomOrderModule, NotificationModule],
+    imports: [DatabaseModule, NotificationModule],
+    exports: [PayTabsService],
+    providers: [PayTabsService],
     controllers: [PayTabsController],
 })
 export default class PayTabsModule {}
