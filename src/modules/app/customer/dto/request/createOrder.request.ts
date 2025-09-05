@@ -97,7 +97,7 @@ export default class CreateOrderRequestDTO {
     @ApiProperty({ required: false })
     @IsOptional()
     @IsString()
-    couponId?: string;
+    couponCode?: string;
 
     @ApiProperty({ enum: PaymentType })
     @IsEnum(PaymentType)

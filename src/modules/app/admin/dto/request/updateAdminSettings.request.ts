@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { ServiceChargeType } from '@prisma/client';
 import { IsBoolean, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class UpdateAdminSettingsRequestDTO {
@@ -15,7 +16,7 @@ export class UpdateAdminSettingsRequestDTO {
     @ApiProperty({ required: false })
     @IsOptional()
     @IsString()
-    serviceChargeType?: string;
+    serviceChargeType?: ServiceChargeType;
 
     @ApiProperty({ required: false })
     @IsOptional()

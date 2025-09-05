@@ -513,6 +513,8 @@ export default class UserService {
                 where: { phone: data.phone, type: data?.type },
                 select: { id: true },
             });
+console.log(data.type)
+            console.log(existingUser, 'EXISTING USER')
             if (existingUser) {
                 const token = await this.Login(data);
                 return { token };

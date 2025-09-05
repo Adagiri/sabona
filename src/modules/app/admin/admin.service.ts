@@ -3,7 +3,7 @@ import DatabaseService from '../../../database/database.service';
 import { AllOrderListDto } from './dto/response/allorderlist.response.dto';
 import FindUsersRequestDTO from '../user/dto/request/find.request';
 import FindUsersResponseDTO from '../user/dto/response/find.response';
-import { CouponType, Prisma, UserStatus, UserType } from '@prisma/client';
+import { CouponType, Prisma, ServiceChargeType, UserStatus, UserType } from '@prisma/client';
 import {
     extractTokens,
     GetDateFilterOptions,
@@ -1257,7 +1257,7 @@ export default class AdminService {
                 data: {
                     vatRate: 0.15,
                     vatEnabled: true,
-                    serviceChargeType: 'PERCENTAGE',
+                    serviceChargeType: ServiceChargeType.PERCENTAGE,
                     serviceChargeRate: 7.0,
                     customOrderServiceChargeRate: 10.0,
                     deliveryBaseRate: 5.0,

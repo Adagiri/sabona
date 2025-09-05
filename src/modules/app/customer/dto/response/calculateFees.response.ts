@@ -1,9 +1,13 @@
-import { ApiProperty } from '@nestjs/swagger';
-// Remove the ResponseSchema import since it doesn't exist
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ServiceChargeType } from '@prisma/client';
+import { IsOptional } from 'class-validator';
 
 export class FeeBreakdownDTO {
     @ApiProperty()
     baseDeliveryFee: number;
+
+    @ApiProperty()
+    distance: number;
 
     @ApiProperty()
     distanceDeliveryFee: number;
@@ -13,6 +17,9 @@ export class FeeBreakdownDTO {
 
     @ApiProperty()
     serviceChargeRate: number;
+
+    @ApiProperty()
+    serviceChargeType: ServiceChargeType;
 
     @ApiProperty()
     vatRate: number;
@@ -29,13 +36,26 @@ export class CalculateFeesDataDTO {
     deliveryFee: number;
 
     @ApiProperty()
-    vatAmount: number;
+    vatFee: number;
 
     @ApiProperty()
-    total: number;
+    vatPercentage: number;
+
+    @ApiPropertyOptional()
+    @IsOptional()
+    couponCode: string;
 
     @ApiProperty()
-    distance: number;
+    discountAmount: number;
+
+    @ApiProperty()
+    preDiscountAmount: number;
+
+    @ApiProperty()
+    postDiscountAmount: number;
+
+    @ApiProperty()
+    finalAmount: number;
 
     @ApiProperty()
     breakdown: FeeBreakdownDTO;
