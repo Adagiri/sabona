@@ -467,7 +467,7 @@ export default class UserService {
             where: { id },
             select: { id: true },
         });
-        console.log(id, "I ran here")
+        console.log(id, 'I ran here');
         if (!basicUser) {
             throw new NotFoundException('user.not_found');
         }
@@ -513,8 +513,8 @@ export default class UserService {
                 where: { phone: data.phone, type: data?.type },
                 select: { id: true },
             });
-console.log(data.type)
-            console.log(existingUser, 'EXISTING USER')
+            console.log(data.type);
+            console.log(existingUser, 'EXISTING USER');
             if (existingUser) {
                 const token = await this.Login(data);
                 return { token };
@@ -617,45 +617,41 @@ console.log(data.type)
             },
         });
 
-        const isUserExist = await this._dbService.user.findFirst({
-            where: {
-                OR: [{ phone: data.phone }, { email: data.email }],
-            },
-        });
         if (!userDetails) {
             throw new BadRequestException('User not found');
         }
 
-        if (isUserExist) {
-            if (data?.email) {
-                throw new BadRequestException('User with this email already exists');
-            } else if (data?.phone) {
-                throw new BadRequestException('User with this phone number already exists');
-            }
-        }
+        // Filter out undefined/null values before updating
+        const filteredUserData = Object.fromEntries(
+            Object.entries({
+                email: data.email,
+                name: data.name,
+                firstName: data.firstName,
+                lastName: data.lastName,
+            }).filter(([, value]) => value != null && value !== ''),
+        );
 
-        await this._dbService.user.update({
-            where: {
-                id: userDetails.id,
-            },
-            data: {
-                email: data.email && data.email,
-                firstName: data.firstName && data.firstName,
-                lastName: data.lastName && data.lastName,
-                phone: data.phone && data.phone,
-            },
-        });
-
-        await this._dbService.userSettings.update({
-            where: {
-                userId: userDetails.id,
-            },
-            data: {
+        const filteredSettingsData = Object.fromEntries(
+            Object.entries({
                 city: data.city,
                 state: data.state,
                 postalCode: data.postalCode,
-            },
-        });
+            }).filter(([, value]) => value != null && value !== ''),
+        );
+
+        if (Object.keys(filteredUserData).length > 0) {
+            await this._dbService.user.update({
+                where: { id: userDetails.id },
+                data: filteredUserData,
+            });
+        }
+
+        if (Object.keys(filteredSettingsData).length > 0) {
+            await this._dbService.userSettings.update({
+                where: { userId: userDetails.id },
+                data: filteredSettingsData,
+            });
+        }
 
         const updatedUser = await this._dbService.user.findFirst({
             where: {
@@ -690,7 +686,7 @@ console.log(data.type)
             },
         });
 
-        return address; 
+        return address;
     }
 
     async GetAllAddresses(user: User): Promise<getAllAddressesResponseDTO> {

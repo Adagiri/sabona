@@ -172,6 +172,7 @@ model AdminSettings {
 model User {
   id               String     @id @default(uuid()) // Now using UUID for user ID
   email            String? // Optional email field
+  name             String? // Optional name
   firstName        String? // Optional first name
   lastName         String? // Optional last name
   password         String? // Optional password field
