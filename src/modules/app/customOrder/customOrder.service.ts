@@ -53,7 +53,6 @@ export default class CustomOrderService {
                 paymentType: data.paymentType,
                 status: OrderStatus.PENDING, // Awaiting admin review
                 deliveryType: data.deliveryType,
-                notes: data.note,
 
                 // Customer addresses (same as regular orders)
                 pickup: {
@@ -98,7 +97,6 @@ export default class CustomOrderService {
         }
 
         const required = [
-            'customLaundryName',
             'customLaundryDescription',
             'customLaundryLat',
             'customLaundryLong',

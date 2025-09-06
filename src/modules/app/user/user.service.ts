@@ -546,7 +546,10 @@ export default class UserService {
     }
 
     async socialVerification(data: SocialVerificationRequestDTO): Promise<VerifyOtpResponseDTO> {
+        console.log(1)
         const decodedToken = await this._firebaseService.verifyToken(data.token);
+        console.log(2);
+        console.log(decodedToken)
 
         if (decodedToken) {
             const existingUser = await this._dbService.user.findFirst({

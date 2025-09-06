@@ -315,7 +315,6 @@ export default class CustomerService {
                 paymentType: data.paymentType,
                 status: data.paymentType === PaymentType.CASH ? OrderStatus.PENDING : OrderStatus.PENDING_PAYMENT,
                 deliveryType: data.deliveryType,
-                notes: data.note,
 
                 // Create related records
                 pickup: {

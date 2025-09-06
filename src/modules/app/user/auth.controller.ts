@@ -118,7 +118,7 @@ export default class AuthController {
         response: VerifyOtpResponseDTO,
     })
     SocialVerification(@Body() data: SocialVerificationRequestDTO): Promise<VerifyOtpResponseDTO> {
-        console.log(data)
+        console.log(data, 'data ---')
         return this._userService.socialVerification(data);
     }
 }
