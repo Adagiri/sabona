@@ -5,6 +5,7 @@ import { IsEnum, IsNumber, IsOptional, IsString, Length, Max, Min } from 'class-
 export class CreateCustomOrderRequestDTO {
     @ApiProperty({ description: 'Name of the custom laundry vendor' })
     @IsString()
+    @IsOptional()
     @Length(2, 100, { message: 'Laundry name must be between 2 and 100 characters' })
     customLaundryName: string;
 
@@ -47,10 +48,12 @@ export class CreateCustomOrderRequestDTO {
     pickupLong: number;
 
     @ApiProperty({ description: 'Pickup time' })
+    @IsOptional()
     @IsString()
     pickupTime: string;
 
     @ApiProperty({ description: 'Pickup date' })
+    @IsOptional()
     @IsString()
     pickupDate: string;
 
@@ -76,18 +79,14 @@ export class CreateCustomOrderRequestDTO {
     deliveryDate?: string;
 
     @ApiProperty({ enum: DeliveryType, description: 'Delivery type (NORMAL or EXPRESS)' })
+    @IsOptional()
     @IsEnum(DeliveryType)
     deliveryType: DeliveryType;
 
     @ApiProperty({ enum: PaymentType, description: 'Payment method' })
+    @IsOptional()
     @IsEnum(PaymentType)
     paymentType: PaymentType;
-
-    @ApiProperty({ required: false, description: 'Additional notes' })
-    @IsOptional()
-    @IsString()
-    @Length(0, 500)
-    note?: string;
 
     @ApiProperty({ required: false, description: 'Estimated total amount (optional, system can calculate)' })
     @IsOptional()
