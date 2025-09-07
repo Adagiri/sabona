@@ -4,8 +4,8 @@ import { IsEnum, IsNumber, IsOptional, IsString, Length, Max, Min } from 'class-
 
 export class CreateCustomOrderRequestDTO {
     @ApiProperty({ description: 'Name of the custom laundry vendor' })
-    @IsString()
     @IsOptional()
+    @IsString()
     @Length(2, 100, { message: 'Laundry name must be between 2 and 100 characters' })
     customLaundryName: string;
 

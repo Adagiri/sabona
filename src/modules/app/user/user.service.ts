@@ -642,6 +642,9 @@ export default class UserService {
             }).filter(([, value]) => value != null && value !== ''),
         );
 
+        console.log(filteredUserData);
+        console.log(filteredSettingsData);
+
         if (Object.keys(filteredUserData).length > 0) {
             await this._dbService.user.update({
                 where: { id: userDetails.id },

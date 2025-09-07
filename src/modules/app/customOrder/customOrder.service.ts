@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
-import { OrderType, OrderStatus, User, UserType } from '@prisma/client';
+import { OrderType, OrderStatus, User, UserType, DeliveryType } from '@prisma/client';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
 import CreateOrderRequestDTO from '../customer/dto/request/createOrder.request';
 import NotificationService from '../notification/notification.service';
@@ -47,12 +47,12 @@ export default class CustomOrderService {
                 customLaundryAddress: data.customLaundryAddress,
 
                 // Pricing (preliminary)
-                totalAmount: data.totalAmount || estimate.estimatedCost || 0,
+                totalAmount: estimate.estimatedCost,
 
                 // Payment info
                 paymentType: data.paymentType,
-                status: OrderStatus.PENDING, // Awaiting admin review
-                deliveryType: data.deliveryType,
+                status: OrderStatus.PENDING,
+                deliveryType: DeliveryType.NORMAL,
 
                 // Customer addresses (same as regular orders)
                 pickup: {

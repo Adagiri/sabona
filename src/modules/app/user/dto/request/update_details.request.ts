@@ -3,6 +3,7 @@ import { IsEmail, IsOptional, IsString,  } from 'class-validator';
 
 export default class UpdateUserDetailsRequestDTO {
     @ApiProperty()
+    @IsString()
     name: string;
 
     @ApiProperty()

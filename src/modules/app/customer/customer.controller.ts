@@ -61,6 +61,7 @@ export default class CustomerController {
         @Body() data: CreateCustomOrderRequestDTO,
         @CurrentUser() user: User,
     ): Promise<CreateCustomOrderResponseDTO> {
+        console.log(data)
         return await this._customOrderService.createCustomOrder(data as any, user);
     }
 
