@@ -1,3 +1,4 @@
+import { PaymentStatus } from './../../../../node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma/client/index.d';
 import { Injectable, BadRequestException } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
 import NotificationService from '../notification/notification.service';
@@ -39,7 +40,7 @@ export default class PayTabsService {
      */
     async handleWebhook(webhookData: PayTabsWebhookData, headers: any): Promise<WebhookProcessingResult> {
         try {
-            console.log(typeof headers)
+            console.log(typeof headers);
             // Validate webhook signature
             // await this.validatePayTabsSignature(webhookData, headers);
             // Extract order information
@@ -148,7 +149,8 @@ export default class PayTabsService {
                     where: { id: order.id },
                     data: {
                         paid: true,
-                        status: 'PENDING',
+                        status: OrderStatus.PENDING,
+                        paymentStatus: PaymentStatus.COMPLETED,
                     },
                 });
 
@@ -178,7 +180,7 @@ export default class PayTabsService {
                 await tx.orderStatusHistory.create({
                     data: {
                         orderId: order.id,
-                        status: 'PENDING',
+                        status: OrderStatus.PENDING,
                         timestamp: new Date(),
                     },
                 });
@@ -204,6 +206,7 @@ export default class PayTabsService {
                     data: {
                         customerPaid: true,
                         customerPaymentDate: new Date(),
+                        paymentStatus: PaymentStatus.COMPLETED,
                         payTabsTransactionRef: webhookData.transactionRef,
                     },
                 });
@@ -259,9 +262,34 @@ export default class PayTabsService {
      */
     private async handleRegularOrderFailure(order: any): Promise<void> {
         try {
-            await this._dbService.order.update({
-                where: { id: order.id },
-                data: { paid: false },
+            await this._dbService.$transaction(async (tx) => {
+                // Update order payment status
+                await tx.order.update({
+                    where: { id: order.id },
+                    data: {
+                        paid: false,
+                        paymentStatus: PaymentStatus.FAILED,
+                    },
+                });
+
+                // CREATE: Payment record for failed payment
+                await tx.payment.upsert({
+                    where: { orderId: order.id },
+                    update: {
+                        status: 'FAILED',
+                        type: 'Sale',
+                    },
+                    create: {
+                        orderId: order.id,
+                        transactionRef: `FAILED-${Date.now()}`, // Generate unique ref for failed payments
+                        amount: order.totalAmount || 0,
+                        paymentMethod: 'ONLINE',
+                        status: 'FAILED',
+                        paymentType: PaymentTransactionType.ORDER,
+                        tipTransactionId: null,
+                        type: 'Sale',
+                    },
+                });
             });
 
             await this.sendPaymentFailureNotifications(order, 'Please try again to complete your payment.');
@@ -276,9 +304,34 @@ export default class PayTabsService {
      */
     private async handleCustomOrderFailure(order: any): Promise<void> {
         try {
-            await this._dbService.order.update({
-                where: { id: order.id },
-                data: { customerPaid: false },
+            await this._dbService.$transaction(async (tx) => {
+                // Update order payment status
+                await tx.order.update({
+                    where: { id: order.id },
+                    data: {
+                        customerPaid: false,
+                        paymentStatus: PaymentStatus.FAILED,
+                    },
+                });
+
+                // CREATE: Payment record for failed payment
+                await tx.payment.upsert({
+                    where: { orderId: order.id },
+                    update: {
+                        status: 'FAILED',
+                        type: 'Sale',
+                    },
+                    create: {
+                        orderId: order.id,
+                        transactionRef: `FAILED-${Date.now()}`,
+                        amount: order.totalAmount || 0,
+                        paymentMethod: 'ONLINE',
+                        status: 'FAILED',
+                        paymentType: PaymentTransactionType.ORDER,
+                        tipTransactionId: null,
+                        type: 'Sale',
+                    },
+                });
             });
 
             await this.sendPaymentFailureNotifications(order, 'Please complete the reimbursement payment.');

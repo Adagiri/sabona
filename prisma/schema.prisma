@@ -21,6 +21,13 @@ datasource db {
   url      = env("APP_DATABASE_URL")
 }
 
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
 // UserType enum to classify different types of users in the system
 enum UserType {
   USER // Regular customer/user
@@ -582,6 +589,7 @@ model Order {
   vatAmount          Float? // VAT amount
   distanceKm         Float? // Distance for delivery fee calculation
 
+  paymentStatus  PaymentStatus?         @default(PENDING)
   status         OrderStatus           @default(PENDING) // High-level status of the order
   baseAmount     Float? // Base amount before discounts
   discountAmount Float? // Amount discounted due to the coupon
