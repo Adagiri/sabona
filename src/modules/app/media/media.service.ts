@@ -25,7 +25,7 @@ export default class MediaService {
     ) {}
 
     private _allowedMediaExtensions = {
-        [MediaType.IMAGE]: ['png', 'jpg', 'bmp', 'jpeg', 'gif', 'svg'], 
+        [MediaType.IMAGE]: ['png', 'jpg', 'bmp', 'jpeg', 'gif', 'svg'],
         [MediaType.VIDEO]: ['mov', 'wav', 'mp4', 'avi', 'flv', 'wav', 'mov'],
         [MediaType.DOCUMENT]: ['pdf', 'doc', 'docx', 'xls', 'xlsx'],
         [MediaType.ARCHIVE]: ['zip', 'gzip'],
@@ -44,7 +44,10 @@ export default class MediaService {
         return fileName.slice(((fileName.lastIndexOf('.') - 1) >>> 0) + 2).toLowerCase();
     }
 
-    async UploadAdminInitiate(data: UploadInitiateAdminMediaRequestDTO, adminId: string): Promise<UploadInitiateMediaResponseDTO> {
+    async UploadAdminInitiate(
+        data: UploadInitiateAdminMediaRequestDTO,
+        adminId: string,
+    ): Promise<UploadInitiateMediaResponseDTO> {
         const extension = this._getMediaExtension(data.name);
         if (!this._allowedMediaExtensions[data.type].includes(extension)) {
             throw new BadRequestException('media.not_supported');
@@ -68,7 +71,7 @@ export default class MediaService {
                 type: data.type,
                 status: MediaStatus.UPLOADING,
                 access: data.public ? MediaAccess.PUBLIC : MediaAccess.PRIVATE,
-                userId: data.userId === "admin" ? adminId : data.userId,
+                userId: data.userId === 'admin' ? adminId : data.userId,
                 size: data.size,
             },
         });
@@ -87,56 +90,60 @@ export default class MediaService {
     }
 
     async UploadAdminFinalize(data: UploadFinalizeAdminMediaRequestDTO): Promise<UploadFinalizeMediaResponseDTO> {
-        const media = await this._dbService.media.findFirst({
-            where: { id: data.id },
-        });
-
-        if (!media) {
-            throw new NotFoundException('media.not_found');
-        }
-
-        if (media.access === MediaAccess.PRIVATE && (!data || data?.userId !== media.userId)) {
-            throw new ForbiddenException('media.not_allowed');
-        }
-
-        const s3Object = await this._s3Service.GetObjectHead(media.location);
-        if (!s3Object) {
-            throw new NotFoundException('media.not_found');
-        }
-
-        const sizeAllowed = s3Object.contentLength <= this._allowedMediaSize[media.type];
-        if (!sizeAllowed) {
-            await this._dbService.media.update({
-                where: { id: media.id },
-                data: { status: MediaStatus.STALE },
+        try {
+            const media = await this._dbService.media.findFirst({
+                where: { id: data.id },
             });
 
-            await this._s3Service.UpdateObjectStaleTag(media.location);
-            throw new BadRequestException('media.too_large');
-        }
-
-        if (media.access === MediaAccess.PUBLIC) {
-            try {
-                await this._s3Service.UpdateObjectAccess(media.location, 'public-read');
-            } catch (e) {
-                console.log('SADASDASD', e);
+            if (!media) {
+                throw new NotFoundException('media.not_found');
             }
-        }
 
-        await this._dbService.media.update({
-            where: { id: media.id },
-            data: {
-                status: MediaStatus.READY,
-                meta: {
-                    ...(!!s3Object.duration && { duration: s3Object.duration }),
+            if (media.access === MediaAccess.PRIVATE && (!data || data?.userId !== media.userId)) {
+                throw new ForbiddenException('media.not_allowed');
+            }
+
+            const s3Object = await this._s3Service.GetObjectHead(media.location);
+            if (!s3Object) {
+                throw new NotFoundException('media.not_found');
+            }
+
+            const sizeAllowed = s3Object.contentLength <= this._allowedMediaSize[media.type];
+            if (!sizeAllowed) {
+                await this._dbService.media.update({
+                    where: { id: media.id },
+                    data: { status: MediaStatus.STALE },
+                });
+
+                await this._s3Service.UpdateObjectStaleTag(media.location);
+                throw new BadRequestException('media.too_large');
+            }
+
+            if (media.access === MediaAccess.PUBLIC) {
+                try {
+                    await this._s3Service.UpdateObjectAccess(media.location, 'public-read');
+                } catch (e) {
+                    console.log('SADASDASD', e);
+                }
+            }
+
+            await this._dbService.media.update({
+                where: { id: media.id },
+                data: {
+                    status: MediaStatus.READY,
+                    meta: {
+                        ...(!!s3Object.duration && { duration: s3Object.duration }),
+                    },
                 },
-            },
-        });
-        media.status = MediaStatus.READY;
+            });
+            media.status = MediaStatus.READY;
 
-        await this._s3Service.UpdateObjectIdTag(media.location, media.id);
+            await this._s3Service.UpdateObjectIdTag(media.location, media.id);
 
-        return media;
+            return media;
+        } catch (error) {
+            console.log(error, 'error');
+        }
     }
 
     async UploadInitiate(data: UploadInitiateMediaRequestDTO, user?: User): Promise<UploadInitiateMediaResponseDTO> {
