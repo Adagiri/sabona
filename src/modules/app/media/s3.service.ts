@@ -67,9 +67,11 @@ export default class S3Service {
                     Action: [
                         's3:PutObject',
                         's3:AbortMultipartUpload',
-                         's3:CompleteMultipartUpload',
+                        's3:CreateMultipartUpload',
+                        's3:CompleteMultipartUpload',
                         's3:PutObjectAcl',
                         's3:GetObject',
+                        's3:PutObjectTagging',
                         's3:ListMultipartUploadParts',
                     ],
                     Resource: this._generateS3ResourceARN(resource),
@@ -95,6 +97,11 @@ export default class S3Service {
         try {
             const { Credentials } = await this._stsClient.send(command);
 
+            console.log('Role assumption successful:', {
+                roleArn: AppConfig.AWS.STS_ROLE_ARN,
+                sessionName: this._generateUniqueRoleSessionName(mediaId),
+                policy: this._generateSTSPolicy(path),
+            });
             return {
                 accessKeyId: Credentials.AccessKeyId,
                 secretAccessKey: Credentials.SecretAccessKey,
