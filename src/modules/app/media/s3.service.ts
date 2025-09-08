@@ -67,6 +67,7 @@ export default class S3Service {
                     Action: [
                         's3:PutObject',
                         's3:AbortMultipartUpload',
+                         's3:CompleteMultipartUpload',
                         's3:PutObjectAcl',
                         's3:GetObject',
                         's3:ListMultipartUploadParts',
