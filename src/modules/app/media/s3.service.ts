@@ -108,7 +108,6 @@ export default class S3Service {
              console.log('Bucket:', AppConfig.AWS.BUCKET);
              console.log('Generated ARN:', this._generateS3ResourceARN(path));
              console.log('Complete STS Policy:');
-             console.log(JSON.stringify(policy, null, 2));
              console.log('===================');
             return {
                 accessKeyId: Credentials.AccessKeyId,
