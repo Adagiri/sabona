@@ -1,10 +1,9 @@
-import { PaymentStatus } from './../../../../node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma/client/index.d';
 import { Injectable, BadRequestException } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
 import NotificationService from '../notification/notification.service';
 import { extractTokens } from 'src/helpers/util.helper';
 import * as crypto from 'crypto';
-import { Order, OrderStatus, OrderType, PaymentTransactionType } from '@prisma/client';
+import { Order, OrderStatus, OrderType, PaymentStatus, PaymentTransactionType } from '@prisma/client';
 import AppConfig from 'src/configs/app.config';
 
 export interface PayTabsWebhookData {
