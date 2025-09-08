@@ -12,7 +12,6 @@ import { Injectable } from '@nestjs/common';
 import { MediaType } from '@prisma/client';
 import AppConfig from '../../../configs/app.config';
 import { GenerateUUID } from '../../../helpers/util.helper';
-import { APP_ENV } from 'src/constants';
 
 type UploadObjectToS3Args = {
     data: any;
@@ -89,7 +88,7 @@ export default class S3Service {
         const command = new AssumeRoleCommand({
             RoleArn: AppConfig.AWS.STS_ROLE_ARN,
             RoleSessionName: this._generateUniqueRoleSessionName(mediaId),
-            DurationSeconds: AppConfig.APP.ENV === APP_ENV.PROD ? 3600 : 28800,
+            DurationSeconds: 2400,
             Policy: JSON.stringify(this._generateSTSPolicy(path)),
         });
         try {
