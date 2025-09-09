@@ -44,7 +44,6 @@ export default class CustomOrderController {
             deliveryDate: data.deliveryDate,
             deliveryType: data.deliveryType,
             paymentType: data.paymentType,
-            note: data.note,
             totalAmount: data.totalAmount,
         };
 

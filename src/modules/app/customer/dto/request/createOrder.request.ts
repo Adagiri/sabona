@@ -44,7 +44,7 @@ export default class CreateOrderRequestDTO {
     services?: OrderServiceDTO[];
 
     // NEW: Custom laundry fields
-    @ApiProperty({ required: false, description: 'Required for CUSTOM_LAUNDRY orders' })
+    @ApiProperty({ required: false, description: 'Optional for CUSTOM_LAUNDRY orders' })
     @ValidateIf((o) => o.orderType === OrderType.CUSTOM_LAUNDRY)
     @IsString()
     customLaundryName?: string;
@@ -97,7 +97,7 @@ export default class CreateOrderRequestDTO {
     @ApiProperty({ required: false })
     @IsOptional()
     @IsString()
-    couponId?: string;
+    couponCode?: string;
 
     @ApiProperty({ enum: PaymentType })
     @IsEnum(PaymentType)
@@ -145,9 +145,4 @@ export default class CreateOrderRequestDTO {
     @ApiProperty({ enum: DeliveryType })
     @IsEnum(DeliveryType)
     deliveryType: DeliveryType;
-
-    @ApiProperty({ required: false, description: 'Additional notes' })
-    @IsOptional()
-    @IsString()
-    note?: string;
 }

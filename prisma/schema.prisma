@@ -21,12 +21,24 @@ datasource db {
   url      = env("APP_DATABASE_URL")
 }
 
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
 // UserType enum to classify different types of users in the system
 enum UserType {
   USER // Regular customer/user
   VENDOR // Vendor providing services
   RIDER // Rider for order delivery
   ADMIN // Administrator of the system
+}
+
+enum ServiceChargeType {
+  PERCENTAGE
+  FIXED
 }
 
 // UserStatus enum to track whether a user is active or inactive
@@ -145,9 +157,9 @@ model AdminSettings {
   vatEnabled Boolean @default(true)
 
   // Service Charge Configuration  
-  serviceChargeType            String @default("PERCENTAGE") // "PERCENTAGE" or "FIXED"
-  serviceChargeRate            Float  @default(7.0) // 7% or 7 SAR fixed
-  customOrderServiceChargeRate Float  @default(10.0) // Higher rate for custom orders
+  serviceChargeType            ServiceChargeType @default(PERCENTAGE) // "PERCENTAGE" or "FIXED"
+  serviceChargeRate            Float             @default(7.0) // 7% or 7 SAR fixed
+  customOrderServiceChargeRate Float             @default(10.0) // Higher rate for custom orders
 
   // Delivery Fee Configuration
   deliveryBaseRate      Float @default(5.0) // Base delivery fee in SAR
@@ -158,16 +170,16 @@ model AdminSettings {
   // Maximum distance for delivery
   maxDeliveryDistance Float @default(50.0) // Maximum delivery distance in km
 
-  createdAt DateTime @default(now()) @db.Timestamptz()
-  updatedAt DateTime @updatedAt @db.Timestamptz()
-  deletedAt    DateTime? @db.Timestamptz() // Optional deleted at timestamp
-
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime  @updatedAt @db.Timestamptz()
+  deletedAt DateTime? @db.Timestamptz() // Optional deleted at timestamp
 }
 
 // User model to store user-related information
 model User {
   id               String     @id @default(uuid()) // Now using UUID for user ID
   email            String? // Optional email field
+  name             String? // Optional name
   firstName        String? // Optional first name
   lastName         String? // Optional last name
   password         String? // Optional password field
@@ -218,8 +230,7 @@ model UserLocation {
   long      Float // Current longitude
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
 
-  deletedAt    DateTime? @db.Timestamptz() // Optional deleted at timestamp
-
+  deletedAt DateTime? @db.Timestamptz() // Optional deleted at timestamp
 
   @@index([lat, long]) // For efficient distance queries
 }
@@ -569,11 +580,16 @@ model Order {
   payTabsTransactionRef String? // PayTabs transaction reference
 
   // Fee breakdown fields
-  serviceCharge Float? // Calculated service charge
-  deliveryFee   Float? // Calculated delivery fee  
-  vatAmount     Float? // VAT amount
-  distanceKm    Float? // Distance for delivery fee calculation
+  subtotalAmount     Float? // Total of all service items only
+  preDiscountAmount  Float? // Subtotal + service + delivery (before coupon)
+  postDiscountAmount Float? // Amount after discount (before VAT)
+  vatPercentage      Float? // VAT percentage applied (stored as decimal)
+  serviceCharge      Float? // Calculated service charge
+  deliveryFee        Float? // Calculated delivery fee  
+  vatAmount          Float? // VAT amount
+  distanceKm         Float? // Distance for delivery fee calculation
 
+  paymentStatus  PaymentStatus?         @default(PENDING)
   status         OrderStatus           @default(PENDING) // High-level status of the order
   baseAmount     Float? // Base amount before discounts
   discountAmount Float? // Amount discounted due to the coupon
@@ -627,7 +643,7 @@ model VendorOrder {
   vendor     User       @relation(fields: [vendorId], references: [id])
   orderId    String     @unique // Using UUID for orderId field
   order      Order      @relation(fields: [orderId], references: [id])
-  acceptedAt DateTime?   @db.Timestamptz() // When the vendor accepted the order
+  acceptedAt DateTime?  @db.Timestamptz() // When the vendor accepted the order
   deletedAt  DateTime?  @db.Timestamptz()
   feedbacks  Feedback[] // Feedback related to the order
 }

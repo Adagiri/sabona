@@ -1,22 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import DatabaseService from '../../database/database.service';
-import { LEVEL, UserType, OrderStatus, PaymentType } from '@prisma/client';
+import { LEVEL, UserType, OrderStatus, PaymentType, OrderType, PaymentStatus } from '@prisma/client';
 import * as moment from 'moment-timezone';
 import { chunk } from 'lodash';
 
 @Injectable()
 export default class CronService {
-    constructor(private _dbService: DatabaseService) { }
+    constructor(private _dbService: DatabaseService) {}
 
     @Cron(CronExpression.EVERY_HOUR, { name: 'test' })
     HandleTestMessage() {
-        console.log("'===> Generated from test cron <===', '[CRON]'")
+        console.log("'===> Generated from test cron <===', '[CRON]'");
     }
 
     @Cron(CronExpression.EVERY_DAY_AT_1AM, { name: 'user-level-allocation' })
     async HandleCustomerLevelMessage() {
-        console.log("+++++++++++++++++++++++++++++++++ Cron to update user level +++++++++++++++++++++++++++++++++");
+        console.log('+++++++++++++++++++++++++++++++++ Cron to update user level +++++++++++++++++++++++++++++++++');
 
         // Fetch users to process
         const users = await this._dbService.user.findMany({
@@ -73,7 +73,7 @@ export default class CronService {
                     });
                 } else {
                     console.log(
-                        `No update required for user: ${user.id}. Current Level: ${user.level}, Determined Level: ${newLevel}`
+                        `No update required for user: ${user.id}. Current Level: ${user.level}, Determined Level: ${newLevel}`,
                     );
                 }
             });
@@ -82,12 +82,12 @@ export default class CronService {
             await Promise.all(updatePromises);
         }
 
-        console.log("+++++++++++++++++++++++++++++++++ Updated user levels +++++++++++++++++++++++++++++++++");
+        console.log('+++++++++++++++++++++++++++++++++ Updated user levels +++++++++++++++++++++++++++++++++');
     }
 
     @Cron(CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT, { name: 'reset-user-levels' })
     async HandleResetCustomerLevel() {
-        console.log("++++++++++ Cron Job: Reset User Levels Started ++++++++++");
+        console.log('++++++++++ Cron Job: Reset User Levels Started ++++++++++');
 
         try {
             // Fetch only the users who need to be reset
@@ -106,26 +106,26 @@ export default class CronService {
             const userChunks = chunk(usersToReset, 50); // Process 50 users at a time
 
             for (const chunkedUsers of userChunks) {
-                const resetPromises = chunkedUsers.map(user =>
+                const resetPromises = chunkedUsers.map((user) =>
                     this._dbService.user.update({
                         where: { id: user.id },
                         data: { level: LEVEL.BASIC },
-                    })
+                    }),
                 );
                 await Promise.all(resetPromises); // Run updates concurrently
 
                 console.log(`${chunkedUsers.length} users' levels have been reset to BASIC.`);
             }
         } catch (error) {
-            console.error("Error during the reset user levels cron job:", error);
+            console.error('Error during the reset user levels cron job:', error);
         }
 
-        console.log("++++++++++ Cron Job: Reset User Levels Finished ++++++++++");
+        console.log('++++++++++ Cron Job: Reset User Levels Finished ++++++++++');
     }
 
     @Cron(CronExpression.EVERY_YEAR, { name: 'reset-user-levels-yearly' })
     async HandleResetCustomerLevelYearly() {
-        console.log("++++++++++ Cron Job: Yearly Reset of User Levels Started ++++++++++");
+        console.log('++++++++++ Cron Job: Yearly Reset of User Levels Started ++++++++++');
 
         try {
             // Fetch all users of type USER to reset
@@ -139,63 +139,66 @@ export default class CronService {
             const userChunks = chunk(usersToReset, 50); // Process 50 users at a time
 
             for (const chunkedUsers of userChunks) {
-                const resetPromises = chunkedUsers.map(user =>
+                const resetPromises = chunkedUsers.map((user) =>
                     this._dbService.user.update({
                         where: { id: user.id },
                         data: { level: LEVEL.BASIC },
-                    })
+                    }),
                 );
                 await Promise.all(resetPromises); // Run updates concurrently
 
                 console.log(`${chunkedUsers.length} users' levels have been reset to BASIC.`);
             }
         } catch (error) {
-            console.error("Error during the yearly reset user levels cron job:", error);
+            console.error('Error during the yearly reset user levels cron job:', error);
         }
 
-        console.log("++++++++++ Cron Job: Yearly Reset of User Levels Finished ++++++++++");
+        console.log('++++++++++ Cron Job: Yearly Reset of User Levels Finished ++++++++++');
     }
 
     @Cron(CronExpression.EVERY_30_MINUTES, { name: 'cancel-card-unpaid-orders' })
     async HandleCancelUnpaidCardOrders() {
-        console.log("++++++++++ Cron Job: Cancel Card Unpaid Orders Started ++++++++++");
+        console.log('++++++++++ Cron Job: Cancel Card Unpaid Orders Started ++++++++++');
         try {
             const ordersToCancel = await this._dbService.order.findMany({
-                where:{
+                where: {
                     AND: {
-                        paid: null,
+                        paymentStatus: PaymentStatus.PENDING,
                         paymentType: PaymentType.CARD,
-                        status: { not: OrderStatus.CANCELLED }
-                    }
+                        orderType: OrderType.REGISTERED_LAUNDRY,
+                        status: { not: OrderStatus.CANCELLED },
+                    },
                 },
-            })
+            });
 
             console.log(`Found ${ordersToCancel.length} card unpaid orders to cancel.`);
 
             const chunkedOrders = chunk(ordersToCancel, 50);
 
             for (const chunkUsers of chunkedOrders) {
-                const cancelPromises = chunkUsers.map(order =>
+                const cancelPromises = chunkUsers.map((order) =>
                     this._dbService.order.update({
                         where: { id: order.id },
-                        data: { status: OrderStatus.CANCELLED },
-                    })
+                        data: {
+                            status: OrderStatus.CANCELLED,
+                            paymentStatus: PaymentStatus.CANCELLED,
+                        },
+                    }),
                 );
-                await Promise.all(cancelPromises); // Run updates concurrently
+                await Promise.all(cancelPromises);
 
                 console.log(`${chunkUsers.length} orders have been cancelled.`);
             }
-        }catch(error){
-            console.error("Error during the cancel card unpaid orders cron job:", error);
+        } catch (error) {
+            console.error('Error during the cancel card unpaid orders cron job:', error);
         }
-        
-        console.log("++++++++++ Cron Job: Cancel Unpaid Card Orders Finished ++++++++++");
 
+        console.log('++++++++++ Cron Job: Cancel Unpaid Card Orders Finished ++++++++++');
     }
 
     @Cron(CronExpression.EVERY_HOUR, { name: 'deactivate-exprired-coupons' })
     async deactivateExpiredCoupons() {
-        console.log("++++++++++ Cron Job: Deactivate Expired Coupons Started ++++++++++");
+        console.log('++++++++++ Cron Job: Deactivate Expired Coupons Started ++++++++++');
         try {
             const expiredCoupons = await this._dbService.coupon.findMany({
                 where: {
@@ -209,26 +212,26 @@ export default class CronService {
             const chunkedCoupons = chunk(expiredCoupons, 50);
 
             for (const chunkCoupons of chunkedCoupons) {
-                const deactivatePromises = chunkCoupons.map(coupon =>
+                const deactivatePromises = chunkCoupons.map((coupon) =>
                     this._dbService.coupon.update({
                         where: { id: coupon.id },
                         data: { isActive: false },
-                    })
+                    }),
                 );
                 await Promise.all(deactivatePromises); // Run updates concurrently
 
                 console.log(`${chunkCoupons.length} coupons have been deactivated.`);
             }
         } catch (error) {
-            console.error("Error during the deactivate expired coupons cron job:", error);
+            console.error('Error during the deactivate expired coupons cron job:', error);
         }
 
-        console.log("++++++++++ Cron Job: Deactivate Expired Coupons Finished ++++++++++");
+        console.log('++++++++++ Cron Job: Deactivate Expired Coupons Finished ++++++++++');
     }
 
     @Cron(CronExpression.EVERY_HOUR, { name: 'activate-coupons' })
     async activateCoupons() {
-        console.log("++++++++++ Cron Job: Activate Coupons Started ++++++++++");
+        console.log('++++++++++ Cron Job: Activate Coupons Started ++++++++++');
         try {
             const readyToActivateCoupons = await this._dbService.coupon.findMany({
                 where: {
@@ -242,19 +245,19 @@ export default class CronService {
             const chunkedCoupons = chunk(readyToActivateCoupons, 50);
 
             for (const chunkCoupons of chunkedCoupons) {
-                const activatePromises = chunkCoupons.map(coupon =>
+                const activatePromises = chunkCoupons.map((coupon) =>
                     this._dbService.coupon.update({
                         where: { id: coupon.id },
                         data: { isActive: true },
-                    })
+                    }),
                 );
                 await Promise.all(activatePromises);
                 console.log(`${chunkCoupons.length} coupons have been activated.`);
             }
         } catch (error) {
-            console.error("Error during the activate coupons cron job:", error);
+            console.error('Error during the activate coupons cron job:', error);
         }
 
-        console.log("++++++++++ Cron Job: Activate Coupons Finished ++++++++++");
+        console.log('++++++++++ Cron Job: Activate Coupons Finished ++++++++++');
     }
 }

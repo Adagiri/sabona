@@ -9,6 +9,7 @@ import {
     TipType,
     OrderType,
     DeliveryType,
+    ServiceChargeType,
 } from '@prisma/client';
 import CreateOrderRequestDTO from './dto/request/createOrder.request';
 import AcceptOrderRequestDTO from '../vendor/dto/request/acceptOrder.request';
@@ -29,7 +30,6 @@ import { CreateTipDTO } from './dto/request/createTip.request';
 import { HasTippedResponseDTO } from './dto/response/hasTipped.response';
 import { AddTipResponseDto } from './dto/response/addTip.response';
 import LocationService from '../location/location.service';
-import { DELIVERY_CHARGES } from 'src/constants';
 import { CalculateFeesRequestDTO } from './dto/request/calculateFees.request';
 import { CalculateFeesResponseDTO } from './dto/response/calculateFees.response';
 import { BooleanResponseDTO } from 'src/core/response/response.schema';
@@ -43,22 +43,8 @@ export interface FeeCalculationInput {
     deliveryLat: number;
     deliveryLong: number;
     customServiceCharge?: number;
-}
-
-export interface FeeCalculationResult {
-    subtotal: number;
-    serviceCharge: number;
-    deliveryFee: number;
-    vatAmount: number;
-    total: number;
-    distance: number;
-    breakdown: {
-        baseDeliveryFee: number;
-        distanceDeliveryFee: number;
-        expressMultiplier?: number;
-        serviceChargeRate: number;
-        vatRate: number;
-    };
+    couponCode?: string;
+    userId?: string;
 }
 
 @Injectable()
@@ -69,25 +55,155 @@ export default class CustomerService {
         private _locationService: LocationService,
     ) {}
 
-    async calculateOrderFees(data: CalculateFeesRequestDTO): Promise<CalculateFeesResponseDTO> {
+    async calculateOrderFees(data: CalculateFeesRequestDTO, userId?: string): Promise<CalculateFeesResponseDTO> {
         try {
+            let itemsTotal = 0;
+
+            if (data.orderType === OrderType.REGISTERED_LAUNDRY) {
+                if (!data.services || data.services.length === 0) {
+                    throw new BadRequestException('Services with items are required for registered laundry orders');
+                }
+
+                itemsTotal = await this.calculateSubtotalFromServices(data.services);
+            } else if (data.orderType === OrderType.CUSTOM_LAUNDRY) {
+                if (!data.customOrderAmount) {
+                    throw new BadRequestException('Custom order amount is required for custom laundry orders');
+                }
+                itemsTotal = data.customOrderAmount;
+            } else {
+                throw new BadRequestException('Invalid order type');
+            }
+
             const result = await this.calculateOrderFeez({
                 orderType: data.orderType,
-                subtotal: data.subtotal,
+                subtotal: itemsTotal,
                 deliveryType: data.deliveryType,
                 pickupLat: data.pickupLat,
                 pickupLong: data.pickupLong,
                 deliveryLat: data.deliveryLat,
                 deliveryLong: data.deliveryLong,
                 customServiceCharge: data.customServiceCharge,
+                couponCode: data.couponCode,
+                userId: userId,
             });
 
-            return {
-                data: result,
-            };
+            return result;
         } catch (error) {
             throw new BadRequestException(error.message);
         }
+    }
+
+    private async calculateSubtotalFromServices(
+        services: Array<{ serviceId: string; items: Array<{ id: string; quantity: number }> }>,
+    ): Promise<number> {
+        let subtotal = 0;
+        const laundryIds = new Set<string>();
+
+        for (const service of services) {
+            const laundryService = await this._dbService.laundryService.findUnique({
+                where: { id: service.serviceId },
+                select: { laundryId: true, name: true },
+            });
+
+            if (!laundryService) {
+                throw new BadRequestException(`Service with ID ${service.serviceId} not found`);
+            }
+
+            laundryIds.add(laundryService.laundryId);
+
+            for (const item of service.items) {
+                const serviceItem = await this._dbService.laundryServiceItem.findUnique({
+                    where: {
+                        id: item.id,
+                        laundryServiceId: service.serviceId,
+                    },
+                    select: { platformPrice: true, name: true },
+                });
+
+                if (!serviceItem) {
+                    throw new BadRequestException(
+                        `Service item with ID ${item.id} not found or doesn't belong to service ${service.serviceId}`,
+                    );
+                }
+
+                subtotal += serviceItem.platformPrice * item.quantity;
+            }
+        }
+
+        if (laundryIds.size > 1) {
+            throw new BadRequestException('All service items must belong to the same laundry');
+        }
+
+        return Math.round(subtotal * 100) / 100;
+    }
+
+    private async applyCouponDiscount(
+        couponCode: string,
+        preDiscountAmount: number,
+        userId: string,
+    ): Promise<{ discountAmount: number; couponCode: string }> {
+        const coupon = await this._dbService.coupon.findFirst({
+            where: {
+                code: couponCode.toUpperCase(),
+                isActive: true,
+                expiryDate: { gte: new Date() },
+            },
+            select: {
+                id: true,
+                code: true,
+                type: true,
+                discount: true,
+                maxDiscount: true,
+                minOrderAmount: true,
+                singleUse: true,
+                usageLimit: true,
+            },
+        });
+
+        if (!coupon) {
+            throw new BadRequestException('Invalid or expired coupon');
+        }
+
+        // Check minimum order amount
+        if (coupon.minOrderAmount && preDiscountAmount < coupon.minOrderAmount) {
+            throw new BadRequestException(`Minimum order amount of ${coupon.minOrderAmount} SAR not met`);
+        }
+
+        // Check single use
+        if (coupon.singleUse) {
+            const existingUsage = await this._dbService.couponUsage.findFirst({
+                where: { userId, couponId: coupon.id },
+            });
+            if (existingUsage) {
+                throw new BadRequestException('Coupon already used');
+            }
+        }
+
+        // Check usage limit
+        if (coupon.usageLimit) {
+            const totalUsage = await this._dbService.couponUsage.count({
+                where: { couponId: coupon.id },
+            });
+            if (totalUsage >= coupon.usageLimit) {
+                throw new BadRequestException('Coupon usage limit reached');
+            }
+        }
+
+        // Calculate discount
+        let discountAmount = 0;
+        if (coupon.type === CouponType.PERCENTAGE) {
+            discountAmount = preDiscountAmount * (coupon.discount / 100);
+            if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) {
+                discountAmount = coupon.maxDiscount;
+            }
+        } else {
+            discountAmount = Math.min(coupon.discount, preDiscountAmount);
+        }
+
+        return {
+            discountAmount: Math.round(discountAmount * 100) / 100,
+            couponCode: coupon.code,
+        };
     }
 
     /**
@@ -95,19 +211,16 @@ export default class CustomerService {
      * Custom orders handled by CustomOrderService
      */
     async CreateOrder(data: CreateOrderRequestDTO, user: User): Promise<any> {
-        // Only handle registered laundry orders
         if (data.orderType !== OrderType.REGISTERED_LAUNDRY) {
             throw new BadRequestException(
                 'This endpoint only handles registered laundry orders. Use /custom-order/create for custom orders.',
             );
         }
 
-        // Validate required fields for regular orders
         if (!data.laundryId || !data.services || data.services.length === 0) {
             throw new BadRequestException('laundryId and services are required for registered laundry orders');
         }
 
-        // Validate laundry exists
         const laundry = await this._dbService.laundry.findUnique({
             where: { id: data.laundryId },
             select: { vendorId: true, name: true },
@@ -118,18 +231,47 @@ export default class CustomerService {
         }
 
         // Find closest available driver
-        const closestDriver = await this._locationService.findClosestAvailableDriver(
-            data.pickupLat,
-            data.pickupLong,
-            50, // 50km max radius
-        );
+        const closestDriver = await this._locationService.findClosestAvailableDriver(data.pickupLat, data.pickupLong);
         if (!closestDriver) {
             throw new BadRequestException('No available drivers in your area at the moment. Please try again later.');
         }
 
-        // Handle coupon validation if provided
-        if (data.couponId) {
-            await this.validateCoupon(data, user);
+        const subtotal = await this.calculateSubtotalFromServices(data.services);
+
+        // Calculate fees using the new system (includes coupon validation)
+        const feeCalculation = await this.calculateOrderFeez({
+            subtotal: subtotal,
+            orderType: data.orderType,
+            deliveryType: data.deliveryType,
+            pickupLat: data.pickupLat,
+            pickupLong: data.pickupLong,
+            deliveryLat: data.deliveryLat,
+            deliveryLong: data.deliveryLong,
+            couponCode: data.couponCode,
+            customServiceCharge: data.adminServiceCharge,
+            userId: user.id,
+        });
+
+        const feeData = feeCalculation.data;
+
+        // Create coupon usage record if coupon was applied
+        let couponId: string | undefined;
+        if (data.couponCode && feeData.discountAmount > 0) {
+            const coupon = await this._dbService.coupon.findFirst({
+                where: { code: data.couponCode.toUpperCase() },
+                select: { id: true },
+            });
+
+            if (coupon) {
+                couponId = coupon.id;
+                // Create usage record
+                await this._dbService.couponUsage.create({
+                    data: {
+                        userId: user.id,
+                        couponId: coupon.id,
+                    },
+                });
+            }
         }
 
         // Get device tokens for notifications
@@ -144,31 +286,37 @@ export default class CustomerService {
             }),
         ]);
 
-        const feeCalculation = await this.calculateOrderFeez({
-            orderType: data.orderType,
-            subtotal: data.baseAmount || data.totalAmount,
-            deliveryType: data.deliveryType,
-            pickupLat: data.pickupLat,
-            pickupLong: data.pickupLong,
-            deliveryLat: data.deliveryLat,
-            deliveryLong: data.deliveryLong,
-            customServiceCharge: data.adminServiceCharge,
-        });
-
-        // Create order
+        // Create order with detailed fee breakdown
         const order = await this._dbService.order.create({
             data: {
                 userId: user.id,
                 orderType: OrderType.REGISTERED_LAUNDRY,
                 laundryId: data.laundryId,
-                baseAmount: data.baseAmount || data.totalAmount,
-                totalAmount: feeCalculation.total,
-                discountAmount: data.discountAmount || 0,
-                couponId: data.couponId,
+
+                // Detailed fee breakdown
+                subtotalAmount: feeData.subtotal,
+                serviceCharge: feeData.serviceCharge,
+                deliveryFee: feeData.deliveryFee,
+                preDiscountAmount: feeData.preDiscountAmount,
+                discountAmount: feeData.discountAmount,
+                postDiscountAmount: feeData.postDiscountAmount,
+                vatAmount: feeData.vatFee,
+                vatPercentage: feeData.vatPercentage / 100, // Store as decimal
+                totalAmount: feeData.finalAmount,
+                distanceKm: feeData.breakdown.distance,
+
+                // Legacy fields for backward compatibility
+                baseAmount: feeData.subtotal,
+
+                // Coupon
+                couponId: couponId,
+
+                // Order details
                 paymentType: data.paymentType,
                 status: data.paymentType === PaymentType.CASH ? OrderStatus.PENDING : OrderStatus.PENDING_PAYMENT,
                 deliveryType: data.deliveryType,
-                notes: data.note,
+
+                // Create related records
                 pickup: {
                     create: {
                         pickupAddress: data.pickupAddress,
@@ -197,11 +345,6 @@ export default class CustomerService {
                         },
                     })),
                 },
-                serviceCharge: feeCalculation.serviceCharge,
-                deliveryFee: feeCalculation.deliveryFee,
-                vatAmount: feeCalculation.vatAmount,
-
-                distanceKm: feeCalculation.distance,
             },
         });
 
@@ -212,11 +355,9 @@ export default class CustomerService {
             },
         });
 
-
         // Extract tokens
         const customerTokens = extractTokens(customerDeviceTokens);
         const vendorTokens = extractTokens(vendorDeviceTokens);
-
 
         if (vendorTokens?.length) {
             const vendorNotificationData = {
@@ -279,7 +420,7 @@ export default class CustomerService {
             });
         }
 
-        // Notify vendor
+        // Notify vendor (second notification)
         if (vendorTokens?.length) {
             const vendorNotificationData = {
                 tokens: vendorTokens,
@@ -312,78 +453,7 @@ export default class CustomerService {
 
         return {
             data: order,
-            assignedDriver: {
-                riderId: closestDriver.riderId,
-                name: `${closestDriver.firstName} ${closestDriver.lastName}`,
-                distance: closestDriver.distance,
-                phone: closestDriver.phone,
-            },
-            message: `Order created and assigned to driver ${closestDriver.distance}km away`,
         };
-    }
-
-    /**
-     * Validate coupon for regular orders
-     */
-    private async validateCoupon(data: CreateOrderRequestDTO, user: User): Promise<void> {
-        const revalidateCoupon = await this._dbService.coupon.findFirst({
-            where: {
-                id: data.couponId,
-                isActive: true,
-            },
-            select: {
-                singleUse: true,
-                usageLimit: true,
-                discount: true,
-                type: true,
-                minOrderAmount: true,
-                maxDiscount: true,
-            },
-        });
-
-        if (!revalidateCoupon) {
-            throw new BadRequestException('Coupon is not valid');
-        }
-
-        const cartAmountBeforeDiscount =
-            data.baseAmount! -
-            (data.deliveryType === DeliveryType.EXPRESS ? DELIVERY_CHARGES.EXPRESS : DELIVERY_CHARGES.NORMAL);
-
-        if (revalidateCoupon.minOrderAmount && cartAmountBeforeDiscount < revalidateCoupon.minOrderAmount) {
-            throw new BadRequestException('Minimum order amount not met');
-        }
-
-        // Validate coupon usage
-        if (revalidateCoupon.singleUse) {
-            const couponUsed = await this._dbService.couponUsage.findFirst({
-                where: {
-                    userId: user.id,
-                    couponId: data.couponId,
-                },
-            });
-
-            if (couponUsed) {
-                throw new BadRequestException('Coupon already used');
-            }
-        }
-
-        if (revalidateCoupon.usageLimit !== null) {
-            const couponUsage = await this._dbService.couponUsage.findMany({
-                where: { couponId: data.couponId },
-            });
-
-            if (couponUsage.length >= revalidateCoupon.usageLimit) {
-                throw new BadRequestException('Coupon limit reached');
-            }
-        }
-
-        // Create coupon usage record
-        await this._dbService.couponUsage.create({
-            data: {
-                userId: user.id,
-                couponId: data.couponId,
-            },
-        });
     }
 
     async CancelOrder(params: AcceptOrderRequestDTO, user: User): Promise<CancelOrderResponseDTO> {
@@ -919,10 +989,9 @@ export default class CustomerService {
         }
     }
 
-    private async calculateOrderFeez(input: FeeCalculationInput): Promise<FeeCalculationResult> {
+    private async calculateOrderFeez(input: FeeCalculationInput): Promise<CalculateFeesResponseDTO> {
         const settings = await this.getAdminSettings();
 
-        // Calculate distance
         const distance = this._locationService['calculateDistance'](
             input.pickupLat,
             input.pickupLong,
@@ -936,36 +1005,54 @@ export default class CustomerService {
             );
         }
 
-        // Calculate service charge
         const serviceCharge = this.calculateServiceCharge(input, settings);
 
-        // Calculate delivery fee
         const deliveryFee = this.calculateDeliveryFee(input, distance, settings);
 
-        // Calculate subtotal after service charge and delivery
-        const subtotalWithFees = input.subtotal + serviceCharge + deliveryFee;
+        const preDiscountAmount = input.subtotal + serviceCharge + deliveryFee;
 
-        // Calculate VAT on total (including service charge and delivery)
-        const vatAmount = settings.vatEnabled ? Math.round(subtotalWithFees * settings.vatRate * 100) / 100 : 0;
+        let discountAmount = 0;
+        let couponCode: string | undefined;
 
-        const total = subtotalWithFees + vatAmount;
+        if (input.couponCode && input.userId) {
+            const couponResult = await this.applyCouponDiscount(input.couponCode, preDiscountAmount, input.userId);
+            discountAmount = couponResult.discountAmount;
+            couponCode = couponResult.couponCode;
+        }
+
+        const postDiscountAmount = preDiscountAmount - discountAmount;
+
+        const vatPercentage = settings.vatRate * 100;
+        const vatFee = settings.vatEnabled ? Math.round(postDiscountAmount * settings.vatRate * 100) / 100 : 0;
+
+        // Calculate final total
+        const finalAmount = postDiscountAmount + vatFee;
 
         return {
-            subtotal: input.subtotal,
-            serviceCharge,
-            deliveryFee,
-            vatAmount,
-            total,
-            distance,
-            breakdown: {
-                baseDeliveryFee: settings.deliveryBaseRate,
-                distanceDeliveryFee: distance * settings.deliveryPerKmRate,
-                expressMultiplier: input.deliveryType === 'EXPRESS' ? settings.expressMultiplier : undefined,
-                serviceChargeRate:
-                    settings.serviceChargeType === 'PERCENTAGE'
-                        ? settings.serviceChargeRate
-                        : settings.serviceChargeRate,
-                vatRate: settings.vatRate,
+            data: {
+                subtotal: input.subtotal,
+                serviceCharge,
+                deliveryFee,
+                couponCode,
+                discountAmount,
+                preDiscountAmount,
+                postDiscountAmount,
+                vatFee,
+                vatPercentage,
+                finalAmount,
+                breakdown: {
+                    baseDeliveryFee: settings.deliveryBaseRate,
+                    distanceDeliveryFee: distance * settings.deliveryPerKmRate,
+                    distance,
+                    expressMultiplier:
+                        input.deliveryType === DeliveryType.EXPRESS ? settings.expressMultiplier : undefined,
+                    serviceChargeRate:
+                        settings.serviceChargeType === ServiceChargeType.PERCENTAGE
+                            ? settings.serviceChargeRate
+                            : settings.serviceChargeRate,
+                    serviceChargeType: settings.serviceChargeType,
+                    vatRate: settings.vatRate,
+                },
             },
         };
     }
@@ -982,7 +1069,7 @@ export default class CustomerService {
                 ? settings.customOrderServiceChargeRate
                 : settings.serviceChargeRate;
 
-        if (settings.serviceChargeType === 'PERCENTAGE') {
+        if (settings.serviceChargeType === ServiceChargeType.PERCENTAGE) {
             return Math.round(input.subtotal * (rate / 100) * 100) / 100;
         } else {
             return rate; // Fixed amount
@@ -990,25 +1077,24 @@ export default class CustomerService {
     }
 
     private calculateDeliveryFee(input: FeeCalculationInput, distance: number, settings: any): number {
-        // Check if order qualifies for free delivery
         if (input.subtotal >= settings.freeDeliveryThreshold) {
             return 0;
         }
 
         let deliveryFee = settings.deliveryBaseRate + distance * settings.deliveryPerKmRate;
 
-        // Apply express multiplier if needed
-        if (input.deliveryType === 'EXPRESS') {
+        if (input.deliveryType === DeliveryType.EXPRESS) {
             deliveryFee *= settings.expressMultiplier;
         }
 
         return Math.round(deliveryFee * 100) / 100;
     }
+
     private async getAdminSettings() {
         try {
             let settings = await this._dbService.adminSettings.findFirst({
                 where: {
-                    deletedAt: null, 
+                    deletedAt: null,
                 },
             });
 

@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
-import { OrderType, OrderStatus, User, UserType } from '@prisma/client';
+import { OrderType, OrderStatus, User, UserType, DeliveryType } from '@prisma/client';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
 import CreateOrderRequestDTO from '../customer/dto/request/createOrder.request';
 import NotificationService from '../notification/notification.service';
 import { extractTokens } from 'src/helpers/util.helper';
 import { DELIVERY_CHARGES } from 'src/constants';
+import { CreateCustomOrderRequestDTO } from './dto/request/createCustomOrder.request';
 
 interface CustomOrderEstimate {
     estimatedCost: number;
@@ -24,8 +25,9 @@ export default class CustomOrderService {
     /**
      * Create custom order for admin review
      */
-    async createCustomOrder(data: CreateOrderRequestDTO, user: User): Promise<any> {
+    async createCustomOrder(data: CreateCustomOrderRequestDTO, user: User): Promise<any> {
         // Validate custom order requirements
+        console.log(data)
         this.validateCustomOrderData(data);
 
         // Calculate estimated costs
@@ -45,15 +47,12 @@ export default class CustomOrderService {
                 customLaundryAddress: data.customLaundryAddress,
 
                 // Pricing (preliminary)
-                totalAmount: data.totalAmount || estimate.estimatedCost,
-                baseAmount: data.baseAmount || estimate.estimatedCost,
-                adminServiceCharge: data.adminServiceCharge,
+                totalAmount: estimate.estimatedCost,
 
                 // Payment info
                 paymentType: data.paymentType,
-                status: OrderStatus.PENDING, // Awaiting admin review
-                deliveryType: data.deliveryType,
-                notes: data.note,
+                status: OrderStatus.PENDING,
+                deliveryType: DeliveryType.NORMAL,
 
                 // Customer addresses (same as regular orders)
                 pickup: {
@@ -92,22 +91,16 @@ export default class CustomOrderService {
     /**
      * Validate custom order data
      */
-    private validateCustomOrderData(data: CreateOrderRequestDTO): void {
-        if (data.orderType !== OrderType.CUSTOM_LAUNDRY) {
-            throw new BadRequestException('Invalid order type for custom order creation');
-        }
+    private validateCustomOrderData(data: CreateCustomOrderRequestDTO): void {
+
 
         const required = [
-            'customLaundryName',
             'customLaundryDescription',
             'customLaundryLat',
             'customLaundryLong',
             'pickupAddress',
             'pickupLat',
             'pickupLong',
-            'deliveryAddress',
-            'deliveryLat',
-            'deliveryLong',
         ];
 
         for (const field of required) {
@@ -138,7 +131,7 @@ export default class CustomOrderService {
     /**
      * Calculate estimated cost for custom order
      */
-    private async calculateCustomOrderEstimate(data: CreateOrderRequestDTO): Promise<CustomOrderEstimate> {
+    private async calculateCustomOrderEstimate(data: CreateCustomOrderRequestDTO): Promise<CustomOrderEstimate> {
         // Calculate distance between pickup and custom laundry
         const distance = this.calculateDistance(
             data.pickupLat,

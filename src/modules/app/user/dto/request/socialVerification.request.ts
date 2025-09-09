@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { UserType } from '@prisma/client';
 import {
     IsOptional,
@@ -37,7 +37,6 @@ export class SocialVerificationRequestDTO {
     latitude: number;
 
     @ApiProperty()
-    @IsOptional()
     @IsOptional()
     referrerId: string;
 

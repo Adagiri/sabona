@@ -6,6 +6,9 @@ export default class UpdateUserDetailsResponseDTO {
     id: string;
 
     @ApiProperty()
+    name: string;
+
+    @ApiProperty()
     firstName: string;
 
     @ApiProperty()

@@ -12,7 +12,6 @@ import { Injectable } from '@nestjs/common';
 import { MediaType } from '@prisma/client';
 import AppConfig from '../../../configs/app.config';
 import { GenerateUUID } from '../../../helpers/util.helper';
-import { APP_ENV } from 'src/constants';
 
 type UploadObjectToS3Args = {
     data: any;
@@ -68,8 +67,11 @@ export default class S3Service {
                     Action: [
                         's3:PutObject',
                         's3:AbortMultipartUpload',
+                        's3:CreateMultipartUpload',
+                        's3:CompleteMultipartUpload',
                         's3:PutObjectAcl',
                         's3:GetObject',
+                        's3:PutObjectTagging',
                         's3:ListMultipartUploadParts',
                     ],
                     Resource: this._generateS3ResourceARN(resource),
@@ -89,12 +91,24 @@ export default class S3Service {
         const command = new AssumeRoleCommand({
             RoleArn: AppConfig.AWS.STS_ROLE_ARN,
             RoleSessionName: this._generateUniqueRoleSessionName(mediaId),
-            DurationSeconds: AppConfig.APP.ENV === APP_ENV.PROD ? 3600 : 28800,
+            DurationSeconds: 2400,
             Policy: JSON.stringify(this._generateSTSPolicy(path)),
         });
         try {
             const { Credentials } = await this._stsClient.send(command);
 
+            console.log('Role assumption successful:', {
+                roleArn: AppConfig.AWS.STS_ROLE_ARN,
+                sessionName: this._generateUniqueRoleSessionName(mediaId),
+                policy: this._generateSTSPolicy(path),
+            });
+
+             console.log('=== UPLOAD DEBUG ===');
+             console.log('Upload path:', path);
+             console.log('Bucket:', AppConfig.AWS.BUCKET);
+             console.log('Generated ARN:', this._generateS3ResourceARN(path));
+             console.log('Complete STS Policy:');
+             console.log('===================');
             return {
                 accessKeyId: Credentials.AccessKeyId,
                 secretAccessKey: Credentials.SecretAccessKey,

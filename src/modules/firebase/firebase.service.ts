@@ -55,6 +55,13 @@ export default class FirebaseService {
     }
 
     async verifyToken(token: string) {
+        try {
+    console.log(JSON.stringify(AppConfig));
+
         return await admin.auth().verifyIdToken(token);
+            
+        } catch (error) {
+            console.log(error)
+        }
     }
 }
