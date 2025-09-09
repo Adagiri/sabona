@@ -45,6 +45,7 @@ export default class CreateOrderRequestDTO {
 
     // NEW: Custom laundry fields
     @ApiProperty({ required: false, description: 'Optional for CUSTOM_LAUNDRY orders' })
+    @ValidateIf((o) => o.orderType === OrderType.CUSTOM_LAUNDRY)
     @IsString()
     customLaundryName?: string;
 
