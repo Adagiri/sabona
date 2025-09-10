@@ -51,7 +51,7 @@ export default class AuthController {
 
     @Post({
         path: 'sendLoginCode',
-        description: 'send login code for existing users',
+        description: 'send login code for existing drivers or customers',
         response: SendVerificationCodeResponseDTO,
     })
     SendLoginCode(@Body() data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
