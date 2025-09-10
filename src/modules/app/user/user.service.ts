@@ -62,6 +62,10 @@ export default class UserService {
             throw new BadRequestException('Phone number is not registered');
         }
 
+        if (user.type === UserType.VENDOR) {
+            throw new BadRequestException('Phone number already registered as a vendor');
+        }
+
         if (AppConfig.APP.ENV === APP_ENV.TEST || ['+966563651254', '+966563651244'].indexOf(data.phone) !== -1) {
             return {
                 message: 'Login code sent successfully',
@@ -509,9 +513,11 @@ export default class UserService {
             (AppConfig.APP.ENV !== APP_ENV.PROD || ['+966563651254', '+966563651244'].indexOf(data.phone) !== -1) &&
             data.otp === OTP_CODE_FOR_TEST
         ) {
+            console.log('I raaan');
+
             const existingUser = await this._dbService.user.findFirst({
                 where: { phone: data.phone, type: data?.type },
-                select: { id: true },
+                select: { id: true, type: true, phone: true },
             });
             console.log(data.type);
             console.log(existingUser, 'EXISTING USER');
@@ -519,7 +525,7 @@ export default class UserService {
                 const token = await this.Login(data);
                 return { token };
             } else {
-                console.log(data);
+                console.log('i AM NOW RUNNING');
                 const token = await this.Signup(data);
                 return { token };
             }
@@ -532,9 +538,12 @@ export default class UserService {
             }
 
             const existingUser = await this._dbService.user.findFirst({
-                where: { phone: data.phone },
-                select: { id: true },
+                where: { phone: data.phone, type: data?.type },
+                select: { id: true, type: true, phone: true },
             });
+
+            console.log(data.type);
+            console.log(existingUser, 'EXISTING USER');
             if (existingUser) {
                 const token = await this.Login(data);
                 return { token };
@@ -546,10 +555,10 @@ export default class UserService {
     }
 
     async socialVerification(data: SocialVerificationRequestDTO): Promise<VerifyOtpResponseDTO> {
-        console.log(1)
+        console.log(1);
         const decodedToken = await this._firebaseService.verifyToken(data.token);
         console.log(2);
-        console.log(decodedToken)
+        console.log(decodedToken);
 
         if (decodedToken) {
             const existingUser = await this._dbService.user.findFirst({
