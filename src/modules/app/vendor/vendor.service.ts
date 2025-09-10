@@ -511,7 +511,7 @@ export default class VendorService {
     //     if (data.services) {
     //         for (const service of data.services) {
     //             if (service.iconId) {
-    //                 const icon = await this._dbService.media.findFirst({
+    //                 const icon = await this._dbService.icon.findFirst({
     //                     where: {
     //                         id: service.iconId,
     //                         deletedAt: null,
@@ -691,7 +691,7 @@ export default class VendorService {
 
         // Validate icon exists if provided
         if (data.iconId) {
-            const icon = await this._dbService.media.findFirst({
+            const icon = await this._dbService.icon.findFirst({
                 where: {
                     id: data.iconId,
                     deletedAt: null,
@@ -760,7 +760,7 @@ export default class VendorService {
 
         // Validate icon exists if provided
         if (data.iconId) {
-            const icon = await this._dbService.media.findFirst({
+            const icon = await this._dbService.icon.findFirst({
                 where: {
                     id: data.iconId,
                     deletedAt: null,
@@ -1309,7 +1309,7 @@ export default class VendorService {
 
         // Validate icon exists if provided
         if (data.iconId) {
-            const icon = await this._dbService.media.findFirst({
+            const icon = await this._dbService.icon.findFirst({
                 where: {
                     id: data.iconId,
                     deletedAt: null,
