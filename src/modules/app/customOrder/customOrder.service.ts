@@ -47,7 +47,7 @@ export default class CustomOrderService {
                 customLaundryAddress: data.customLaundryAddress,
 
                 // Pricing (preliminary)
-                totalAmount: estimate.estimatedCost,
+                totalAmount: 0,
 
                 // Payment info
                 paymentType: data.paymentType,
