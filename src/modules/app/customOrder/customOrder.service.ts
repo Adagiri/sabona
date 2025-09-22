@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
 import { OrderType, OrderStatus, User, UserType, DeliveryType } from '@prisma/client';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
@@ -27,7 +27,7 @@ export default class CustomOrderService {
      */
     async createCustomOrder(data: CreateCustomOrderRequestDTO, user: User): Promise<any> {
         // Validate custom order requirements
-        console.log(data)
+        console.log(data);
         this.validateCustomOrderData(data);
 
         // Calculate estimated costs
@@ -92,8 +92,6 @@ export default class CustomOrderService {
      * Validate custom order data
      */
     private validateCustomOrderData(data: CreateCustomOrderRequestDTO): void {
-
-
         const required = [
             'customLaundryDescription',
             'customLaundryLat',
@@ -355,9 +353,11 @@ export default class CustomOrderService {
                     include: {
                         rider: {
                             select: {
+                                id: true,
                                 firstName: true,
                                 lastName: true,
                                 phone: true,
+                                email: true,
                             },
                         },
                     },
@@ -369,10 +369,16 @@ export default class CustomOrderService {
         });
 
         if (!order) {
-            throw new BadRequestException('Custom order not found');
+            throw new NotFoundException('Custom order not found');
         }
 
-        return { data: order };
+        const result = {
+            ...order,
+            customer: order.user, // Transform user to customer
+            user: undefined,
+        };
+
+        return { data: result };
     }
 
     /**
