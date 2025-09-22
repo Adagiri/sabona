@@ -102,4 +102,14 @@ export default class CustomOrderController {
     async getCustomOrderById(@Param('orderId') orderId: string): Promise<any> {
         return await this._customOrderService.getCustomOrderById(orderId);
     }
+
+    // @Authorized(UserType.ADMIN)
+    // @Get({
+    //     path: '/admin/custom-order/:orderId',
+    //     description: 'Get custom order details by ID (frontend-specific endpoint)',
+    //     response: {},
+    // })
+    // async getCustomOrderByIdForAdmin(@Param('orderId') orderId: string): Promise<any> {
+    //     return await this._customOrderService.getCustomOrderById(orderId);
+    // }
 }

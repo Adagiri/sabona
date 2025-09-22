@@ -52,6 +52,8 @@ export default class AdminService {
     async GetAllOrders(data: FindOrderRequestDTO): Promise<AllOrderListDto> {
         const where: Prisma.OrderWhereInput = {
             ...(!!data.type && { status: data.type }), // Only include 'status' condition if it exists
+
+            ...(data.orderType && { orderType: data.orderType }),
         };
 
         // Get pagination and order options
@@ -64,6 +66,7 @@ export default class AdminService {
             select: {
                 id: true,
                 status: true,
+                orderType: true,
                 user: {
                     select: {
                         firstName: true,

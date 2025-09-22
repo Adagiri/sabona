@@ -19,23 +19,27 @@ class Laundry {
 }
 
 export class Order {
-  @ApiProperty()
-  @IsString()
-  id: string;
+    @ApiProperty()
+    @IsString()
+    id: string;
 
-  @ApiProperty()
-  @IsString()
-  status: string;
+    @ApiProperty()
+    @IsString()
+    status: string;
 
-  @ApiProperty({ type: [Service] })
-  services: Service[];
+    @ApiProperty()
+    @IsString()
+    orderType: string;
 
-  @ApiProperty({ type: Laundry })
-  laundry: Laundry;
+    @ApiProperty({ type: [Service] })
+    services: Service[];
 
-  @ApiProperty()
-  @IsNumber()
-  totalQuantity: number;
+    @ApiProperty({ type: Laundry })
+    laundry: Laundry;
+
+    @ApiProperty()
+    @IsNumber()
+    totalQuantity: number;
 }
 
 export class AllOrderListDto {
