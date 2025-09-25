@@ -100,12 +100,16 @@ export class SecretLoaderService {
                     for (const [key, value] of Object.entries(secretData)) {
                         const envVarName = this.pathToEnvVar(`${secretName}/${key}`);
                         process.env[envVarName] = value as string;
+
+                        console.log(envVarName, ':', value);
                         this.loadedCount++;
                     }
                 } catch {
                     // If not JSON, treat as single value
                     const envVarName = this.pathToEnvVar(secretName);
                     process.env[envVarName] = response.SecretString;
+                    console.log(envVarName, ':', response.SecretString);
+
                     this.loadedCount++;
                 }
             }

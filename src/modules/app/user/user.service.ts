@@ -57,7 +57,7 @@ export default class UserService {
         const user = await this._dbService.user.findUnique({
             where: { phone: data.phone },
         });
-
+        console.log(user, 'user');
         if (!user) {
             throw new BadRequestException('Phone number is not registered');
         }
