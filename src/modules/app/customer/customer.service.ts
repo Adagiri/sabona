@@ -1077,6 +1077,12 @@ export default class CustomerService {
     }
 
     private calculateDeliveryFee(input: FeeCalculationInput, distance: number, settings: any): number {
+        const useFixed = true;
+
+        if (useFixed) {
+            return 15;
+        }
+
         if (input.subtotal >= settings.freeDeliveryThreshold) {
             return 0;
         }
@@ -1087,7 +1093,7 @@ export default class CustomerService {
             deliveryFee *= settings.expressMultiplier;
         }
 
-        return Math.round(deliveryFee * 100) / 100;
+        return Number((Math.round(deliveryFee * 100) / 100).toFixed(2));
     }
 
     private async getAdminSettings() {

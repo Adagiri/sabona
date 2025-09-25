@@ -11,6 +11,7 @@ export interface PayTabsWebhookData {
     merchant_reference_id?: string;
     tran_ref?: string;
     tran_total?: string;
+    tran_type?: string;
     response_status?: string;
 
     payment_result?: {
@@ -44,10 +45,9 @@ export default class PayTabsService {
             // await this.validatePayTabsSignature(webhookData, headers);
             // Extract order information
             const orderId = webhookData.cart_id || webhookData.merchant_reference_id;
-            // const orderId = '554184b9-9237-46c6-85bf-f3f4c4f6e734';
             const transactionRef = webhookData.tran_ref;
             const amount = parseFloat(webhookData.tran_total || '0');
-            const status = this.mapPayTabsStatus(webhookData.response_status);
+            const status = this.mapPayTabsStatus(webhookData.response_status, webhookData.tran_type);
 
             if (!orderId) {
                 throw new BadRequestException('Missing order ID in webhook data');
@@ -114,6 +114,8 @@ export default class PayTabsService {
                 await this.handleRegularOrderSuccess(order, webhookData);
             } else if (webhookData.status === 'failed') {
                 await this.handleRegularOrderFailure(order);
+            } else if (webhookData.status === 'refund') {
+                await this.handleRegularOrderRefund(order, webhookData);
             }
         } catch (error) {
             console.error('Error handling regular order payment:', error);
@@ -130,6 +132,8 @@ export default class PayTabsService {
                 await this.handleCustomOrderSuccess(order, webhookData);
             } else if (webhookData.status === 'failed') {
                 await this.handleCustomOrderFailure(order);
+            } else if (webhookData.status === 'refund') {
+                await this.handleCustomOrderRefund(order, webhookData);
             }
         } catch (error) {
             console.error('Error handling custom order payment:', error);
@@ -565,10 +569,11 @@ export default class PayTabsService {
     /**
      * Map PayTabs status to our status format
      */
-    private mapPayTabsStatus(payTabsStatus?: string): string {
+    private mapPayTabsStatus(payTabsStatus?: string, payTabsTransType?: string): string {
         switch (payTabsStatus) {
             case 'A':
-                return 'success';
+                return payTabsTransType === 'Refund' ? 'refund' : 'success';
+
             case 'H':
                 return 'pending';
             case 'D':
@@ -577,6 +582,136 @@ export default class PayTabsService {
                 return 'failed';
             default:
                 return 'unknown';
+        }
+    }
+
+    /**
+     * Handle regular order refund
+     */
+    private async handleRegularOrderRefund(order: any, webhookData: any): Promise<void> {
+        try {
+            await this._dbService.$transaction(async (tx) => {
+                // Update order payment status
+                await tx.order.update({
+                    where: { id: order.id },
+                    data: {
+                        paid: false,
+                        paymentStatus: PaymentStatus.REFUNDED,
+                        status: OrderStatus.CANCELLED,
+                    },
+                });
+
+                await tx.payment.upsert({
+                    where: { orderId: order.id },
+                    update: {
+                        transactionRef: webhookData.transactionRef,
+                        amount: webhookData.amount,
+                        status: 'REFUNDED',
+                        type: 'Refund',
+                    },
+                    create: {
+                        orderId: order.id,
+                        transactionRef: webhookData.transactionRef,
+                        amount: webhookData.amount,
+                        paymentMethod: 'ONLINE',
+                        status: 'REFUNDED',
+                        paymentType: PaymentTransactionType.ORDER,
+                        tipTransactionId: null,
+                        type: 'Refund',
+                    },
+                });
+
+                // Add status history
+                await tx.orderStatusHistory.create({
+                    data: {
+                        orderId: order.id,
+                        status: OrderStatus.CANCELLED,
+                        timestamp: new Date(),
+                    },
+                });
+            });
+
+            await this.sendPaymentRefundNotifications(order, 'Your payment has been refunded.');
+        } catch (error) {
+            console.error('Error handling regular order refund:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Handle custom order refund
+     */
+    private async handleCustomOrderRefund(order: any, webhookData: any): Promise<void> {
+        try {
+            await this._dbService.$transaction(async (tx) => {
+                await tx.order.update({
+                    where: { id: order.id },
+                    data: {
+                        customerPaid: false,
+                        paymentStatus: PaymentStatus.REFUNDED,
+                        status: OrderStatus.CANCELLED,
+                    },
+                });
+
+                await tx.payment.upsert({
+                    where: { orderId: order.id },
+                    update: {
+                        transactionRef: webhookData.transactionRef,
+                        amount: webhookData.amount,
+                        status: 'REFUNDED',
+                        type: 'Refund',
+                    },
+                    create: {
+                        orderId: order.id,
+                        transactionRef: webhookData.transactionRef,
+                        amount: webhookData.amount,
+                        paymentMethod: 'ONLINE',
+                        status: 'REFUNDED',
+                        paymentType: PaymentTransactionType.ORDER,
+                        tipTransactionId: null,
+                        type: 'Refund',
+                    },
+                });
+
+                await tx.orderStatusHistory.create({
+                    data: {
+                        orderId: order.id,
+                        status: OrderStatus.CANCELLED,
+                        timestamp: new Date(),
+                    },
+                });
+            });
+
+            await this.sendPaymentRefundNotifications(order, 'Your reimbursement has been refunded.');
+        } catch (error) {
+            console.error('Error handling custom order refund:', error);
+            throw error;
+        }
+    }
+
+    private async sendPaymentRefundNotifications(order: any, message: string): Promise<void> {
+        try {
+            const customerTokens = await this._dbService.deviceToken.findMany({
+                where: { userId: order.userId, deletedAt: null },
+            });
+
+            if (customerTokens.length > 0) {
+                const tokens = extractTokens(customerTokens);
+
+                await this._notificationService.SendNotificationToMultipleTokens({
+                    tokens: tokens,
+                    title: 'Payment Refunded',
+                    body: `Order #${order.orderNumber}: ${message}`,
+                    notificationData: {
+                        orderId: order.id,
+                        key: 'GET_ORDER_BY_ID',
+                        route: 'TrackOrder',
+                    },
+                });
+            }
+        } catch (error) {
+            console.error('Error sending refund notifications:', error);
+            throw error;
         }
     }
 }

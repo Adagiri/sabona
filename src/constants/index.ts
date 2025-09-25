@@ -35,8 +35,8 @@ export enum APP_ENV {
 }
 
 export const DELIVERY_CHARGES = {
-    NORMAL: 10,
-    EXPRESS: 20,
+    NORMAL: 15,
+    EXPRESS: 30,
 };
 
 export const SERVICE_CHARGES = 7;

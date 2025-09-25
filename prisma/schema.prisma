@@ -26,6 +26,7 @@ enum PaymentStatus {
   COMPLETED
   FAILED
   CANCELLED
+  REFUNDED
 }
 
 // UserType enum to classify different types of users in the system
