@@ -16,10 +16,14 @@ export class EditLaundryServiceItemRequestDTO {
     vendorPrice: number;
 
     @ApiProperty()
+    @IsNumber()
+    expressPrice: number;
+
+    @ApiProperty()
     @IsOptional()
     @IsNumber()
     price: number;
-    
+
     @ApiProperty({ description: 'Category ID for this item', required: false })
     @IsString()
     @IsOptional()

@@ -51,6 +51,7 @@ export default class OrderService {
                                         name: true,
                                         vendorPrice: true, // NEW: Use dual pricing
                                         platformPrice: true, // NEW: Use dual pricing
+                                        expressPrice: true, // NEW: Use dual pricing
                                         price: true, // DEPRECATED: Keep for backward compatibility
                                     },
                                 },

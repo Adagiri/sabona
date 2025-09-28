@@ -62,6 +62,7 @@ export default class RiderService {
                                             select: {
                                                 name: true,
                                                 platformPrice: true, // Use new dual pricing
+                                                expressPrice: true, // Use new dual pricing
                                             },
                                         },
                                     },

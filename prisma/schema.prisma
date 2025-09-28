@@ -515,6 +515,7 @@ model LaundryServiceItem {
 
   vendorPrice             Float // What vendor receives
   platformPrice           Float // What user pays (vendor price + platform markup)
+  expressPrice            Float // What user pays if express delivery is selected
   price                   Float?
   createdAt               DateTime                  @default(now()) @db.Timestamptz()
   updatedAt               DateTime                  @default(now()) @updatedAt @db.Timestamptz()
@@ -590,7 +591,7 @@ model Order {
   vatAmount          Float? // VAT amount
   distanceKm         Float? // Distance for delivery fee calculation
 
-  paymentStatus  PaymentStatus?         @default(PENDING)
+  paymentStatus  PaymentStatus?        @default(PENDING)
   status         OrderStatus           @default(PENDING) // High-level status of the order
   baseAmount     Float? // Base amount before discounts
   discountAmount Float? // Amount discounted due to the coupon

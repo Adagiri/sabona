@@ -864,6 +864,7 @@ export default class VendorService {
             name: item.name,
             vendorPrice: item.vendorPrice,
             platformPrice: item.platformPrice,
+            expressPrice: item.expressPrice,
             categoryId: item.categoryId,
             laundryServiceId: serviceId,
         }));
@@ -941,8 +942,8 @@ export default class VendorService {
             updateData.vendorPrice = data.vendorPrice;
         }
 
-        if (data.platformPrice !== undefined) {
-            updateData.platformPrice = data.platformPrice;
+        if (data.expressPrice !== undefined) {
+            updateData.expressPrice = data.expressPrice;
         }
         if (data.categoryId !== undefined) {
             updateData.categoryId = data.categoryId;
@@ -1037,6 +1038,7 @@ export default class VendorService {
                 createdAt: true,
                 vendorPrice: true,
                 platformPrice: true,
+                expressPrice: true,
                 category: {
                     select: {
                         id: true,
