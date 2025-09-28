@@ -9,6 +9,7 @@ class AssignedOrderItem {
     laundryServiceItem: {
         name: string;
         platformPrice: number;
+        expressPrice: number;
     };
 }
 
