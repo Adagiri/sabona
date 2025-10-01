@@ -5,7 +5,6 @@ import { BadRequestException } from 'src/core/exceptions/response.exception';
 import NotificationService from '../notification/notification.service';
 import { extractTokens } from 'src/helpers/util.helper';
 import { UploadCustomOrderReceiptRequestDTO } from './dto/request/uploadCustomOrderReceipt.request';
-import SMSService from 'src/modules/sms/sms.service';
 import AppConfig from 'src/configs/app.config';
 
 interface PayTabsInvoiceResponse {
@@ -19,7 +18,6 @@ export default class AdminCustomOrderService {
     constructor(
         private _dbService: DatabaseService,
         private _notificationService: NotificationService,
-        private _smsService: SMSService,
     ) {}
 
     /**
@@ -644,18 +642,6 @@ export default class AdminCustomOrderService {
             };
 
             await this._notificationService.SendNotificationToMultipleTokens(notificationData);
-        }
-
-        // Send SMS with invoice link
-        try {
-            await this._smsService.sendSMS({
-                to: user.phone,
-                message: `Your laundry order #${order.orderNumber} is ready. Pay now: ${invoiceUrl}`,
-            });
-            console.log(`✅ SMS sent to ${user.phone}`);
-        } catch (error) {
-            console.error('Failed to send invoice SMS:', error);
-            // Don't throw - notification failure shouldn't break the flow
         }
     }
 
