@@ -1086,7 +1086,7 @@ export default class CustomerService {
     }
 
     private calculateDeliveryFee(input: FeeCalculationInput, distance: number, settings: any): number {
-        const useFixed = true;
+        const useFixed = false;
 
         if (useFixed) {
             return 15;

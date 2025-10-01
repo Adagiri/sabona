@@ -1,10 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNumber, IsEnum, Min, Length } from 'class-validator';
+import { IsString, IsNumber, IsEnum, IsOptional, Min, Length } from 'class-validator';
 
 export class UploadCustomOrderReceiptRequestDTO {
-    @ApiProperty({ description: 'Path to uploaded receipt image' })
+    @ApiProperty({ description: 'Media ID of uploaded receipt image' })
     @IsString()
-    receiptImagePath: string;
+    receiptImageId: string; // Changed from receiptImagePath
 
     @ApiProperty({ description: 'Name of the custom vendor from receipt' })
     @IsString()
@@ -13,10 +13,15 @@ export class UploadCustomOrderReceiptRequestDTO {
 
     @ApiProperty({ description: 'Amount paid to custom vendor (from receipt)' })
     @IsNumber()
-    @Min(1, { message: 'Amount must be greater than 0' })
+    @Min(1)
     amountPaid: number;
 
-    @ApiProperty({ enum: ['CASH', 'CARD'], description: 'Payment method used by driver' })
-    @IsEnum(['CASH', 'CARD'])
-    paymentMethod: 'CASH' | 'CARD';
+    @ApiProperty({ enum: ['CASH', 'CARD', 'BANK_TRANSFER', 'MOBILE_PAYMENT'] })
+    @IsEnum(['CASH', 'CARD', 'BANK_TRANSFER', 'MOBILE_PAYMENT'])
+    paymentMethod: string;
+
+    @ApiProperty({ required: false })
+    @IsString()
+    @IsOptional()
+    notes?: string;
 }

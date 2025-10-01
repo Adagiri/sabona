@@ -56,8 +56,6 @@ import {
 import { UpdateCustomOrderPricingRequestDTO } from './dto/request/updateCustomOrderPricing.request';
 import CustomOrderService from '../customOrder/customOrder.service';
 
-import { UseInterceptors } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import AdminCustomOrderService from './adminCustomOrder.service';
 import { AssignDriverToCustomOrderRequestDTO } from './dto/request/assignDriverToCustomOrder.request';
 import { UploadCustomOrderReceiptRequestDTO } from './dto/request/uploadCustomOrderReceipt.request';
@@ -625,27 +623,12 @@ export default class AdminController {
         description: 'Upload receipt and generate PayTabs invoice for custom order',
         response: UploadReceiptResponseDTO,
     })
-    @UseInterceptors(FileInterceptor('receiptImage'))
     async uploadCustomOrderReceipt(
         @Param('orderId') orderId: string,
         @Body() data: UploadCustomOrderReceiptRequestDTO,
-        // @UploadedFile() receiptImage: Express.Multer.File,
         @CurrentUser() adminUser: User,
     ): Promise<UploadReceiptResponseDTO> {
-        // Handle file upload - save to your preferred storage (AWS S3, local filesystem, etc.)
-        // const receiptImagePath = await this.saveReceiptImage(receiptImage);
-        const receiptImagePath = '/';
-
-        return await this._adminCustomOrderService.uploadCustomOrderReceipt(
-            orderId,
-            {
-                receiptImagePath: receiptImagePath,
-                vendorName: data.vendorName,
-                amountPaid: data.amountPaid,
-                paymentMethod: data.paymentMethod,
-            },
-            adminUser,
-        );
+        return await this._adminCustomOrderService.uploadCustomOrderReceipt(orderId, data, adminUser);
     }
 
     @Authorized(UserType.ADMIN)
@@ -834,7 +817,7 @@ export default class AdminController {
         description: 'Get admin settings',
     })
     async getAdminSettings(): Promise<GetAdminSettingsResponseDTO> {
-        console.log("I ran")
+        console.log('I ran');
         return this._adminService.getAdminSettings();
     }
 
@@ -844,7 +827,7 @@ export default class AdminController {
         description: 'Update admin settings',
     })
     async updateAdminSettings(@Body() data: UpdateAdminSettingsRequestDTO): Promise<BooleanResponseDTO> {
-        console.log(data)
+        console.log(data);
         return this._adminService.updateAdminSettings(data);
     }
 }
