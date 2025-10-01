@@ -1099,10 +1099,17 @@ export default class CustomerService {
         let deliveryFee = settings.deliveryBaseRate + distance * settings.deliveryPerKmRate;
 
         if (input.deliveryType === DeliveryType.EXPRESS) {
-            deliveryFee *= settings.expressMultiplier;
+            deliveryFee *= 15;
+            // deliveryFee *= settings.expressMultiplier;
         }
 
-        return Number((Math.round(deliveryFee * 100) / 100).toFixed(2));
+        if (input.deliveryType === DeliveryType.NORMAL) {
+            deliveryFee *= 9;
+            // deliveryFee *= settings.expressMultiplier;
+        }
+
+        return deliveryFee;
+        // return Number((Math.round(deliveryFee * 100) / 100).toFixed(2));
     }
 
     private async getAdminSettings() {
