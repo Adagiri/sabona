@@ -9,10 +9,21 @@ import S3Service from '../media/s3.service';
 import VendorModule from '../vendor/vendor.module';
 import CustomOrderModule from '../customOrder/customOrder.module';
 import AdminCustomOrderModule from './adminCustomOrder.module';
+import SMSModule from 'src/modules/sms/sms.module';
 
 
 @Module({
-    imports: [DatabaseModule, OrderModule, NotificationModule, MediaModule, VendorModule, CustomOrderModule, AdminCustomOrderModule],
+    // ADD THIS
+    imports: [
+        DatabaseModule,
+        OrderModule,
+        NotificationModule,
+        MediaModule,
+        VendorModule,
+        CustomOrderModule,
+        AdminCustomOrderModule,
+        SMSModule
+    ],
     exports: [AdminService],
     providers: [AdminService, S3Service],
     controllers: [AdminController],

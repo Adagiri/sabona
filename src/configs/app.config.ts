@@ -62,6 +62,9 @@ const AppConfig = {
         get VERIFY_SERVICE_SID() {
             return process.env.APP_TWILIO_VERIFY_SERVICE_SID;
         },
+        get PHONE_NUMBER() {
+            return process.env.APP_TWILIO_PHONE_NUMBER;
+        },
     },
     OAUTH: {
         get GOOGLE() {
