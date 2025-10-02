@@ -1096,15 +1096,16 @@ export default class CustomerService {
             return 0;
         }
 
-        let deliveryFee = settings.deliveryBaseRate + distance * settings.deliveryPerKmRate;
+        // let deliveryFee = settings.deliveryBaseRate + distance * settings.deliveryPerKmRate;
+        let deliveryFee = 0
 
         if (input.deliveryType === DeliveryType.EXPRESS) {
-            deliveryFee *= 15;
+            deliveryFee = 15;
             // deliveryFee *= settings.expressMultiplier;
         }
 
         if (input.deliveryType === DeliveryType.NORMAL) {
-            deliveryFee *= 9;
+            deliveryFee = 9;
             // deliveryFee *= settings.expressMultiplier;
         }
 

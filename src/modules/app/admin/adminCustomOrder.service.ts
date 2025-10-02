@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
-import { OrderStatus, OrderType, User, UserType, RiderOrderType } from '@prisma/client';
+import { OrderStatus, OrderType, User, UserType, RiderOrderType, Order } from '@prisma/client';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
 import NotificationService from '../notification/notification.service';
 import { extractTokens } from 'src/helpers/util.helper';
@@ -243,14 +243,22 @@ export default class AdminCustomOrderService {
     /**
      * Generate PayTabs invoice for customer payment recovery
      */
-    private async generatePayTabsInvoice(order: any, vendorAmount: number): Promise<PayTabsInvoiceResponse> {
-        const totalAmount = vendorAmount; // Use vendor amount directly
+    private async generatePayTabsInvoice(order: Order, vendorAmount: number): Promise<PayTabsInvoiceResponse> {
+        // Validate inputs
+        // if (!order.user.email) {
+        //     throw new Error('Customer email is required for payment processing');
+        // }
+
+        if (vendorAmount <= 0) {
+            throw new Error('Invalid payment amount');
+        }
 
         try {
-            const response = await fetch(`${AppConfig.PAYTABS.BASE_URL}/payment/request`, {
+            const response = await fetch(`https://secure.paytabs.sa/payment/request`, {
                 method: 'POST',
                 headers: {
-                    Authorization: AppConfig.PAYTABS.SERVER_KEY,
+                    // CRITICAL: Must be lowercase 'authorization', NOT 'Authorization'
+                    authorization: AppConfig.PAYTABS.SERVER_KEY, // Direct key, no "Bearer"
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
@@ -260,52 +268,43 @@ export default class AdminCustomOrderService {
                     cart_id: order.id,
                     cart_description: `Custom laundry order #${order.orderNumber}`,
                     cart_currency: 'SAR',
-                    cart_amount: totalAmount,
+                    cart_amount: vendorAmount,
                     customer_details: {
-                        name: `${order.user.firstName} ${order.user.lastName}`,
-                        email: order.user.email || 'customer@sabonah.com',
-                        phone: order.user.phone,
-                        street1: order.pickup?.pickupAddress || 'N/A',
+                        name: 'Ridwan',
+                        email: 'ibrahimridwan47@gmail.com',
+                        phone: '+2348037296906',
+                        street1: 'N/A',
                         city: 'Riyadh',
                         state: 'Riyadh',
                         country: 'SA',
                         zip: '00000',
                     },
-                    callback: `${process.env.APP_URL}/api/v1/webhook/paytabs`,
-                    return: `${process.env.APP_URL}/orders/${order.id}/payment-success`,
+                    callback: `http://localhost:8080/api/v1/webhook/paytabs`,
+                    return: `http://localhost:8080/orders/${order.id}/payment-success`,
                 }),
             });
 
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error('PayTabs API error:', errorText);
-                throw new Error(`PayTabs API failed: ${response.status}`);
+                throw new Error(`PayTabs API failed with status ${response.status}: ${errorText}`);
             }
 
             const payTabsResponse = await response.json();
 
-            // PayTabs returns different response formats
-            if (payTabsResponse.redirect_url) {
-                return {
-                    invoiceId: payTabsResponse.tran_ref || `PT_${Date.now()}`,
-                    invoiceUrl: payTabsResponse.redirect_url,
-                    transactionRef: payTabsResponse.tran_ref || `TXN_${Date.now()}`,
-                };
-            } else {
-                // Handle error response
-                console.error('PayTabs error response:', payTabsResponse);
-                throw new Error(payTabsResponse.message || 'PayTabs invoice generation failed');
+            if (!payTabsResponse.redirect_url || !payTabsResponse.tran_ref) {
+                console.error('Invalid PayTabs response:', payTabsResponse);
+                throw new Error(payTabsResponse.message || 'PayTabs response missing required fields');
             }
+
+            return {
+                invoiceId: payTabsResponse.tran_ref,
+                invoiceUrl: payTabsResponse.redirect_url,
+                transactionRef: payTabsResponse.tran_ref,
+            };
         } catch (error) {
             console.error('Error generating PayTabs invoice:', error);
-
-            // Fallback to mock for development/testing
-            console.warn('⚠️ Using mock PayTabs response - configure PayTabs for production');
-            return {
-                invoiceId: `PT_MOCK_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                invoiceUrl: `https://secure.paytabs.com/payment/page/${Date.now()}`,
-                transactionRef: `TXN_MOCK_${Date.now()}`,
-            };
+            throw error; // Re-throw, don't return mock data
         }
     }
 
