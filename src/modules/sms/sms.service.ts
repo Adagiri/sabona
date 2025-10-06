@@ -56,23 +56,4 @@ export default class SMSService {
         }
         return verificationCheck;
     }
-
-    async sendSMS(params: { to: string; message: string }): Promise<any> {
-        if (!this._smsClient) {
-            console.error('Twilio client not initialized');
-            throw new Error('SMS service not configured');
-        }
-
-        try {
-            const message = await this._smsClient.messages.create({
-                body: params.message,
-                from: AppConfig.TWILIO.PHONE_NUMBER,
-                to: params.to,
-            });
-            return message.sid;
-        } catch (error) {
-            console.error('Error sending SMS:', error);
-            throw error;
-        }
-    }
 }

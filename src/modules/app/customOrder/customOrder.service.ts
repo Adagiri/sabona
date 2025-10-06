@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
-import { OrderType, OrderStatus, User, UserType, DeliveryType } from '@prisma/client';
+import { OrderType, OrderStatus, User, UserType, DeliveryType, PaymentStatus } from '@prisma/client';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
 import CreateOrderRequestDTO from '../customer/dto/request/createOrder.request';
 import NotificationService from '../notification/notification.service';
@@ -590,5 +590,85 @@ export default class CustomOrderService {
         });
 
         return { data: orders };
+    }
+
+    async cancelCustomOrder(orderId: string, reason: string, refundCustomer?: boolean): Promise<any> {
+        const order = await this._dbService.order.findUnique({
+            where: { id: orderId },
+            include: {
+                user: true,
+                payment: true,
+            },
+        });
+
+        if (!order) {
+            throw new BadRequestException('Order not found');
+        }
+
+        if (order.status === OrderStatus.CANCELLED) {
+            throw new BadRequestException('Order already cancelled');
+        }
+
+        await this._dbService.$transaction(async (tx) => {
+            // Update order status
+            await tx.order.update({
+                where: { id: orderId },
+                data: {
+                    status: OrderStatus.CANCELLED,
+                    cancelReason: reason,
+                },
+            });
+
+            // Add to status history
+            await tx.orderStatusHistory.create({
+                data: {
+                    orderId,
+                    status: OrderStatus.CANCELLED,
+                    timestamp: new Date(),
+                },
+            });
+
+            // If customer paid and refund requested, update payment status
+            if (order.customerPaid && refundCustomer) {
+                await tx.order.update({
+                    where: { id: orderId },
+                    data: {
+                        customerPaid: false,
+                        paymentStatus: PaymentStatus.REFUNDED,
+                    },
+                });
+
+                if (order.payment) {
+                    await tx.payment.update({
+                        where: { orderId },
+                        data: {
+                            status: 'REFUNDED',
+                            type: 'Refund',
+                        },
+                    });
+                }
+            }
+        });
+
+        // Send notification
+        const customerTokens = await this._dbService.deviceToken.findMany({
+            where: { userId: order.userId, deletedAt: null },
+        });
+
+        if (customerTokens.length > 0) {
+            const tokens = customerTokens.map((t) => t.token);
+            await this._notificationService.SendNotificationToMultipleTokens({
+                tokens,
+                title: 'Order Cancelled',
+                body: `Your order has been cancelled. Reason: ${reason}`,
+                notificationData: {
+                    orderId: order.id,
+                    key: 'GET_ORDER_BY_ID',
+                    route: 'TrackOrder',
+                },
+            });
+        }
+
+        return { message: 'Order cancelled successfully' };
     }
 }

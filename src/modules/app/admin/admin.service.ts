@@ -3,7 +3,7 @@ import DatabaseService from '../../../database/database.service';
 import { AllOrderListDto } from './dto/response/allorderlist.response.dto';
 import FindUsersRequestDTO from '../user/dto/request/find.request';
 import FindUsersResponseDTO from '../user/dto/response/find.response';
-import { CouponType, Prisma, ServiceChargeType, UserStatus, UserType } from '@prisma/client';
+import { CouponType, OrderStatus, PaymentStatus, Prisma, ServiceChargeType, UserStatus, UserType } from '@prisma/client';
 import {
     extractTokens,
     GetDateFilterOptions,
@@ -1219,7 +1219,7 @@ export default class AdminService {
     }
 
     async getAdminSettings(): Promise<GetAdminSettingsResponseDTO> {
-        let settings = await this._dbService.adminSettings.findFirst({where: {deletedAt: null}});
+        let settings = await this._dbService.adminSettings.findFirst({ where: { deletedAt: null } });
 
         if (!settings) {
             settings = await this._dbService.adminSettings.create({
@@ -1245,7 +1245,7 @@ export default class AdminService {
     }
 
     async updateAdminSettings(data: UpdateAdminSettingsRequestDTO): Promise<BooleanResponseDTO> {
-        const settings = await this._dbService.adminSettings.findFirst({where: {deletedAt: null}});
+        const settings = await this._dbService.adminSettings.findFirst({ where: { deletedAt: null } });
 
         if (settings) {
             await this._dbService.adminSettings.update({
@@ -1276,5 +1276,81 @@ export default class AdminService {
         return {
             data: true,
         };
+    }
+
+    async cancelOrder(orderId: string, reason: string, refundCustomer?: boolean): Promise<any> {
+        const order = await this._dbService.order.findUnique({
+            where: { id: orderId },
+            include: {
+                user: true,
+                payment: true,
+            },
+        });
+
+        if (!order) {
+            throw new BadRequestException('Order not found');
+        }
+
+        if (order.status === OrderStatus.CANCELLED) {
+            throw new BadRequestException('Order already cancelled');
+        }
+
+        await this._dbService.$transaction(async (tx) => {
+            await tx.order.update({
+                where: { id: orderId },
+                data: {
+                    status: OrderStatus.CANCELLED,
+                    cancelReason: reason,
+                },
+            });
+
+            await tx.orderStatusHistory.create({
+                data: {
+                    orderId,
+                    status: OrderStatus.CANCELLED,
+                    timestamp: new Date(),
+                },
+            });
+
+            if (order.paid && refundCustomer) {
+                await tx.order.update({
+                    where: { id: orderId },
+                    data: {
+                        paid: false,
+                        paymentStatus: PaymentStatus.REFUNDED,
+                    },
+                });
+
+                if (order.payment) {
+                    await tx.payment.update({
+                        where: { orderId },
+                        data: {
+                            status: 'REFUNDED',
+                            type: 'Refund',
+                        },
+                    });
+                }
+            }
+        });
+
+        const customerTokens = await this._dbService.deviceToken.findMany({
+            where: { userId: order.userId, deletedAt: null },
+        });
+
+        if (customerTokens.length > 0) {
+            const tokens = customerTokens.map((t) => t.token);
+            await this._notificationService.SendNotificationToMultipleTokens({
+                tokens,
+                title: 'Order Cancelled',
+                body: `Your order has been cancelled. Reason: ${reason}`,
+                notificationData: {
+                    orderId: order.id,
+                    key: 'GET_ORDER_BY_ID',
+                    route: 'TrackOrder',
+                },
+            });
+        }
+
+        return { message: 'Order cancelled successfully' };
     }
 }

@@ -74,6 +74,8 @@ import { FinalizeRiderDocumentRequestDTO, UploadRiderDocumentRequestDTO } from '
 import { BooleanResponseDTO } from 'src/core/response/response.schema';
 import { GetAdminSettingsResponseDTO } from './dto/response/adminSettings.response';
 import { UpdateAdminSettingsRequestDTO } from './dto/request/updateAdminSettings.request';
+import { CancelCustomOrderRequestDTO } from './dto/customOrders.dto';
+import { CancelOrderRequestDTO } from './dto/request/cancelOrder.request';
 
 @ApiController({
     path: '/admin',
@@ -829,5 +831,28 @@ export default class AdminController {
     async updateAdminSettings(@Body() data: UpdateAdminSettingsRequestDTO): Promise<BooleanResponseDTO> {
         console.log(data);
         return this._adminService.updateAdminSettings(data);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/custom-order/:orderId/cancel',
+        description: 'Cancel custom order',
+        response: {},
+    })
+    async cancelCustomOrder(
+        @Param('orderId') orderId: string,
+        @Body() data: CancelCustomOrderRequestDTO,
+    ): Promise<any> {
+        return await this._customOrderService.cancelCustomOrder(orderId, data.reason, data.refundCustomer);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/order/:orderId/cancel',
+        description: 'Cancel regular order',
+        response: {},
+    })
+    async cancelOrder(@Param('orderId') orderId: string, @Body() data: CancelOrderRequestDTO): Promise<any> {
+        return await this._adminService.cancelOrder(orderId, data.reason, data.refundCustomer);
     }
 }

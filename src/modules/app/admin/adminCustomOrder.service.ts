@@ -518,7 +518,7 @@ export default class AdminCustomOrderService {
         });
 
         const availableDriversWithDistance = availableRiders
-            .filter((rider) => rider.RiderOrder.length === 0) // Not busy
+            .filter((rider) => rider.RiderOrder.length !== 0) // Not busy
             .map((rider) => {
                 const distance = this.calculateDistance(
                     order.pickup!.pickupLat,
