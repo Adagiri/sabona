@@ -560,6 +560,8 @@ model Order {
   laundryId   String? // Foreign key to the Laundry model
   laundry     Laundry?  @relation(fields: [laundryId], references: [id])
 
+  cancelReason String?
+
   // Custom laundry fields
   customLaundryName        String? // For custom orders
   customLaundryDescription String? // User's detailed description/needs
