@@ -3,7 +3,7 @@ import DatabaseService from '../../../database/database.service';
 import { AllOrderListDto } from './dto/response/allorderlist.response.dto';
 import FindUsersRequestDTO from '../user/dto/request/find.request';
 import FindUsersResponseDTO from '../user/dto/response/find.response';
-import { CouponType, OrderStatus, PaymentStatus, Prisma, ServiceChargeType, UserStatus, UserType } from '@prisma/client';
+import { CouponType, OrderStatus, PaymentStatus, Prisma, ServiceChargeType, User, UserStatus, UserType } from '@prisma/client';
 import {
     extractTokens,
     GetDateFilterOptions,
@@ -39,6 +39,8 @@ import MediaService from '../media/media.service';
 import { UpdateAdminSettingsRequestDTO } from './dto/request/updateAdminSettings.request';
 import { BooleanResponseDTO } from 'src/core/response/response.schema';
 import { GetAdminSettingsResponseDTO } from './dto/response/adminSettings.response';
+import { DeleteUserRequestDTO } from './dto/request/deleteUser.request';
+import { DeleteUserResponseDTO } from './dto/response/deleteUser.response';
 
 @Injectable()
 export default class AdminService {
@@ -1352,5 +1354,171 @@ export default class AdminService {
         }
 
         return { message: 'Order cancelled successfully' };
+    }
+
+    async deleteUser(userId: string, data: DeleteUserRequestDTO, adminUser: User): Promise<DeleteUserResponseDTO> {
+        const user = await this._dbService.user.findUnique({
+            where: { id: userId },
+            include: {
+                settings: true,
+            },
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        // Prevent admin from deleting themselves
+        if (user.id === adminUser.id) {
+            throw new BadRequestException('Cannot delete your own account');
+        }
+
+        // Check for blocking conditions based on user type
+        if (user.type === UserType.USER) {
+            const activeOrders = await this._dbService.order.count({
+                where: {
+                    userId: user.id,
+                    deletedAt: null,
+                    status: {
+                        in: ['PENDING', 'PENDING_PAYMENT', 'ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
+                    },
+                },
+            });
+
+            if (activeOrders > 0) {
+                throw new BadRequestException(
+                    `Cannot delete user with ${activeOrders} active order(s). Cancel orders first.`,
+                );
+            }
+        }
+
+        if (user.type === UserType.RIDER) {
+            const activeAssignments = await this._dbService.riderOrder.count({
+                where: {
+                    riderId: user.id,
+                    deletedAt: null,
+                    order: {
+                        status: {
+                            in: ['ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
+                        },
+                    },
+                },
+            });
+
+            if (activeAssignments > 0) {
+                throw new BadRequestException(
+                    `Cannot delete rider with ${activeAssignments} active delivery assignment(s).`,
+                );
+            }
+        }
+
+        if (user.type === UserType.VENDOR) {
+            const activeOrders = await this._dbService.vendorOrder.count({
+                where: {
+                    vendorId: user.id,
+                    deletedAt: null,
+                    order: {
+                        status: {
+                            in: ['ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
+                        },
+                    },
+                },
+            });
+
+            if (activeOrders > 0) {
+                throw new BadRequestException(`Cannot delete vendor with ${activeOrders} active order(s) to process.`);
+            }
+
+            const activeLaundries = await this._dbService.laundry.count({
+                where: {
+                    vendorId: user.id,
+                    deletedAt: null,
+                },
+            });
+
+            if (activeLaundries > 0) {
+                throw new BadRequestException(
+                    `Cannot delete vendor with ${activeLaundries} active laundry/laundries. Delete laundries first.`,
+                );
+            }
+        }
+
+        // Use transaction to ensure atomicity
+        await this._dbService.$transaction(async (tx) => {
+            // 1. Store original phone/email in audit fields, then null out active fields
+            await tx.user.update({
+                where: { id: userId },
+                data: {
+                    // Audit fields - preserve for history (NOT INDEXED)
+                    deletedPhone: user.phone,
+                    deletedEmail: user.email,
+                    deletionReason: data.reason || null,
+                    deletedByAdminId: adminUser.id,
+
+                    // Active fields - null to free for reuse (INDEXED)
+                    phone: null,
+                    email: user.email ? `deleted_${userId}@deleted.local` : null,
+                },
+            });
+
+            // 2. Handle rider/vendor specific cleanup...
+            if (user.type === UserType.RIDER) {
+                await tx.riderOrder.updateMany({
+                    where: { riderId: userId, deletedAt: null },
+                    data: { deletedAt: new Date() },
+                });
+
+                await tx.pickup.updateMany({
+                    where: { riderId: userId },
+                    data: { riderId: null },
+                });
+
+                await tx.delivery.updateMany({
+                    where: { riderId: userId },
+                    data: { riderId: null },
+                });
+            }
+
+            if (user.type === UserType.VENDOR) {
+                await tx.vendorOrder.updateMany({
+                    where: { vendorId: userId, deletedAt: null },
+                    data: { deletedAt: new Date() },
+                });
+            }
+
+            // 3. Soft delete the user
+            await tx.user.delete({
+                where: { id: userId },
+            });
+
+            // await tx.notification.create({
+            //     data: {
+            //         userId: adminUser.id,
+            //         message: `Admin deleted ${user.type} account: ${user.firstName} ${user.lastName} (Phone: ${user.phone || 'N/A'}). Reason: ${data.reason || 'No reason provided'}`,
+            //         status: 'UNREAD',
+            //         type: 'OTHER',
+            //         data: {
+            //             action: 'USER_DELETION',
+            //             deletedUserId: userId,
+            //             deletedUserType: user.type,
+            //             deletedPhone: user.phone,
+            //             deletedEmail: user.email,
+            //             reason: data.reason,
+            //             timestamp: new Date().toISOString(),
+            //         },
+            //     },
+            // });
+        });
+
+        return {
+            message: `${user.type} account deleted successfully`,
+            data: {
+                userId: user.id,
+                userType: user.type,
+                phoneFreed: !!user.phone,
+                emailFreed: !!user.email,
+                deletedPhone: user.phone || undefined, // Return for confirmation
+            },
+        };
     }
 }

@@ -76,6 +76,8 @@ import { GetAdminSettingsResponseDTO } from './dto/response/adminSettings.respon
 import { UpdateAdminSettingsRequestDTO } from './dto/request/updateAdminSettings.request';
 import { CancelCustomOrderRequestDTO } from './dto/customOrders.dto';
 import { CancelOrderRequestDTO } from './dto/request/cancelOrder.request';
+import { DeleteUserResponseDTO } from './dto/response/deleteUser.response';
+import { DeleteUserRequestDTO } from './dto/request/deleteUser.request';
 
 @ApiController({
     path: '/admin',
@@ -833,6 +835,7 @@ export default class AdminController {
         return this._adminService.updateAdminSettings(data);
     }
 
+    // 
     @Authorized(UserType.ADMIN)
     @Patch({
         path: '/custom-order/:orderId/cancel',
@@ -854,5 +857,19 @@ export default class AdminController {
     })
     async cancelOrder(@Param('orderId') orderId: string, @Body() data: CancelOrderRequestDTO): Promise<any> {
         return await this._adminService.cancelOrder(orderId, data.reason, data.refundCustomer);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Delete({
+        path: '/users/:userId',
+        description: 'Delete user account (customer, rider, or vendor)',
+        response: DeleteUserResponseDTO,
+    })
+    async deleteUser(
+        @Param('userId') userId: string,
+        @Body() data: DeleteUserRequestDTO,
+        @CurrentUser() adminUser: User,
+    ): Promise<DeleteUserResponseDTO> {
+        return this._adminService.deleteUser(userId, data, adminUser);
     }
 }
