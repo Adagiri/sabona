@@ -195,6 +195,11 @@ model User {
 
   level LEVEL? @default(BASIC) // User level
 
+  deletedPhone     String? // Store original phone for audit trail
+  deletedEmail     String? // Store original email for audit trail
+  deletionReason   String? // Admin's reason for deletion
+  deletedByAdminId String? // Which admin deleted this user
+
   addresses UserAddress[] // A user can have multiple addresses
 
   devices      Device[] // Relation to devices used by the user
