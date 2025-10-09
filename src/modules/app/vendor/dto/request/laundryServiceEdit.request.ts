@@ -1,16 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsInt } from 'class-validator';
+import { IsOptional, IsInt } from 'class-validator';
+import { ServiceNameTranslationDTO, ServiceDescriptionTranslationDTO } from './createLaundry.request';
 
 export default class EditLaundryServiceRequestDTO {
-    @ApiProperty({ required: false })
-    @IsString()
+    @ApiProperty({ type: ServiceNameTranslationDTO, required: false })
     @IsOptional()
-    name?: string;
+    nameLocale?: ServiceNameTranslationDTO;
 
-    @ApiProperty({ required: false })
-    @IsString()
+    @ApiProperty({ type: ServiceDescriptionTranslationDTO, required: false })
     @IsOptional()
-    description?: string;
+    descriptionLocale?: ServiceDescriptionTranslationDTO;
 
     @ApiProperty({ description: 'Media ID for SVG icon', required: false })
     @IsInt()

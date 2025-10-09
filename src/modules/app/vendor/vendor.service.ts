@@ -634,21 +634,34 @@ export default class VendorService {
             throw new BadRequestException('Laundry does not exist');
         }
 
+        const updateData: any = {};
+
+        // Handle name translation
+        if (data.nameLocale) {
+            updateData.nameLocale = data.nameLocale;
+            updateData.name = data.nameLocale.en; // Auto-populate from English
+        }
+
+        // Handle address translation
+        if (data.addressLocale) {
+            updateData.addressLocale = data.addressLocale;
+            updateData.address = data.addressLocale.en; // Auto-populate from English
+        }
+
         const updatedLaundry = await this._dbService.laundry.update({
             where: {
                 id: laundryId,
             },
-            data: {
-                name: data.name,
-                address: data.address,
-            },
+            data: updateData,
         });
 
         if (!updatedLaundry) {
             throw new BadRequestException('Failed to update laundry');
         }
 
-        return { message: 'Laundry Updated Successfully' };
+        return {
+            message: 'Laundry Updated Successfully',
+        };
     }
 
     async deleteLaundry(laundryId: string): Promise<LaundryMessageResponseDTO> {
@@ -695,41 +708,31 @@ export default class VendorService {
                 where: {
                     id: data.iconId,
                     deletedAt: null,
-                    // extension: 'svg',
                 },
             });
 
             if (!icon) {
-                throw new BadRequestException('SVG icon not found or invalid format');
+                throw new BadRequestException('Icon does not exist');
             }
         }
 
         const service = await this._dbService.laundryService.create({
             data: {
-                laundryId: laundryId,
-                name: data.name,
-                description: data.description,
+                laundryId,
+                nameLocale: data.nameLocale,
+                name: data.nameLocale.en,
+                descriptionLocale: data.descriptionLocale,
+                description: data.descriptionLocale?.en,
                 iconId: data.iconId,
-            },
-            include: {
-                icon: {
-                    select: {
-                        id: true,
-                        name: true,
-                        type: true,
-                        media: {
-                            select: {
-                                id: true,
-                                path: true,
-                                name: true,
-                            },
-                        },
-                    },
-                },
             },
         });
 
-        return service;
+        return {
+            data: {
+                message: 'Service Added Successfully',
+                service,
+            },
+        };
     }
 
     async editLaundryService(
@@ -758,33 +761,48 @@ export default class VendorService {
             throw new BadRequestException('Service does not exist');
         }
 
-        // Validate icon exists if provided
+        // Validate icon if provided
         if (data.iconId) {
             const icon = await this._dbService.icon.findFirst({
                 where: {
                     id: data.iconId,
                     deletedAt: null,
-                    // extension: 'svg',
                 },
             });
 
             if (!icon) {
-                throw new BadRequestException('SVG icon not found or invalid format');
+                throw new BadRequestException('Icon does not exist');
             }
+        }
+
+        const updateData: any = {};
+
+        // Handle name translation
+        if (data.nameLocale) {
+            updateData.nameLocale = data.nameLocale;
+            updateData.name = data.nameLocale.en; // Auto-populate from English
+        }
+
+        // Handle description translation
+        if (data.descriptionLocale) {
+            updateData.descriptionLocale = data.descriptionLocale;
+            updateData.description = data.descriptionLocale.en; // Auto-populate from English
+        }
+
+        if (data.iconId !== undefined) {
+            updateData.iconId = data.iconId;
         }
 
         await this._dbService.laundryService.update({
             where: {
                 id: serviceId,
             },
-            data: {
-                ...(data.name && { name: data.name }),
-                ...(data.description !== undefined && { description: data.description }),
-                ...(data.iconId !== undefined && { iconId: data.iconId }),
-            },
+            data: updateData,
         });
 
-        return { message: 'Service Updated Successfully' };
+        return {
+            message: 'Service Updated Successfully',
+        };
     }
 
     async deleteLaundryService(laundryId: string, serviceId: string): Promise<LaundryServiceMessageResponseDTO> {
@@ -861,7 +879,8 @@ export default class VendorService {
         }
 
         const items = data.items.map((item) => ({
-            name: item.name,
+            nameLocale: item.nameLocale,
+            name: item.nameLocale.en, // Auto-populate from English
             vendorPrice: item.vendorPrice,
             platformPrice: item.platformPrice,
             expressPrice: item.expressPrice,
@@ -877,10 +896,13 @@ export default class VendorService {
             throw new BadRequestException('Failed to add items');
         }
 
-        return { data: { message: 'Items Added Successfully' } };
+        return {
+            data: {
+                message: 'Items Added Successfully',
+            },
+        };
     }
 
-    // Update editLaundryServiceItem method
     async editLaundryServiceItem(
         laundryId: string,
         serviceId: string,
@@ -935,16 +957,25 @@ export default class VendorService {
         }
 
         const updateData: any = {};
-        if (data.name !== undefined) {
-            updateData.name = data.name;
+
+        // Handle name translation
+        if (data.nameLocale) {
+            updateData.nameLocale = data.nameLocale;
+            updateData.name = data.nameLocale.en; // Auto-populate from English
         }
+
         if (data.vendorPrice !== undefined) {
             updateData.vendorPrice = data.vendorPrice;
+        }
+
+        if (data.platformPrice !== undefined) {
+            updateData.platformPrice = data.platformPrice;
         }
 
         if (data.expressPrice !== undefined) {
             updateData.expressPrice = data.expressPrice;
         }
+
         if (data.categoryId !== undefined) {
             updateData.categoryId = data.categoryId;
         }
@@ -960,7 +991,12 @@ export default class VendorService {
             throw new BadRequestException('Failed to update item');
         }
 
-        return { data: { message: 'Item Updated Successfully' } };
+        return {
+            data: {
+                message: 'Item Updated Successfully',
+                item: updatedItem,
+            },
+        };
     }
 
     async deleteLaundryServiceItem(laundryId: string, serviceId: string, itemId: string): Promise<any> {
@@ -1182,41 +1218,27 @@ export default class VendorService {
     async createLaundryItemCategory(
         data: CreateLaundryItemCategoryRequestDTO,
     ): Promise<LaundryItemCategoryResponseDTO> {
+        // Validate icon if provided
         if (data.iconId) {
             const icon = await this._dbService.icon.findFirst({
                 where: {
                     id: data.iconId,
+                    deletedAt: null,
                 },
             });
 
             if (!icon) {
-                throw new BadRequestException('Icon not found');
+                throw new BadRequestException('Icon does not exist');
             }
         }
 
         const category = await this._dbService.laundryItemCategory.create({
             data: {
-                name: data.name,
-                description: data.description,
+                nameLocale: data.nameLocale,
+                name: data.nameLocale.en, // Auto-populate from English
+                descriptionLocale: data.descriptionLocale,
+                description: data.descriptionLocale?.en, // Auto-populate from English
                 iconId: data.iconId,
-            },
-            include: {
-                icon: {
-                    select: {
-                        id: true,
-                        name: true,
-                        type: true,
-                        createdAt: true,
-                        updatedAt: true,
-                        media: {
-                            select: {
-                                id: true,
-                                path: true,
-                                name: true,
-                            },
-                        },
-                    },
-                },
             },
         });
 
@@ -1309,33 +1331,48 @@ export default class VendorService {
             throw new BadRequestException('Category does not exist');
         }
 
-        // Validate icon exists if provided
+        // Validate icon if provided
         if (data.iconId) {
             const icon = await this._dbService.icon.findFirst({
                 where: {
                     id: data.iconId,
                     deletedAt: null,
-                    // extension: 'svg',
                 },
             });
 
             if (!icon) {
-                throw new BadRequestException('SVG icon not found or invalid format');
+                throw new BadRequestException('Icon does not exist');
             }
+        }
+
+        const updateData: any = {};
+
+        // Handle name translation
+        if (data.nameLocale) {
+            updateData.nameLocale = data.nameLocale;
+            updateData.name = data.nameLocale.en; // Auto-populate from English
+        }
+
+        // Handle description translation
+        if (data.descriptionLocale) {
+            updateData.descriptionLocale = data.descriptionLocale;
+            updateData.description = data.descriptionLocale.en; // Auto-populate from English
+        }
+
+        if (data.iconId !== undefined) {
+            updateData.iconId = data.iconId;
         }
 
         await this._dbService.laundryItemCategory.update({
             where: {
                 id: categoryId,
             },
-            data: {
-                ...(data.name && { name: data.name }),
-                ...(data.description !== undefined && { description: data.description }),
-                ...(data.iconId !== undefined && { iconId: data.iconId }),
-            },
+            data: updateData,
         });
 
-        return { message: 'Category Updated Successfully' };
+        return {
+            message: 'Category Updated Successfully',
+        };
     }
 
     async deleteLaundryItemCategory(categoryId: string): Promise<LaundryItemCategoryMessageResponseDTO> {

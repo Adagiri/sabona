@@ -3,7 +3,15 @@ import DatabaseService from '../../../database/database.service';
 import { AllOrderListDto } from './dto/response/allorderlist.response.dto';
 import FindUsersRequestDTO from '../user/dto/request/find.request';
 import FindUsersResponseDTO from '../user/dto/response/find.response';
-import { CouponType, OrderStatus, PaymentStatus, Prisma, ServiceChargeType, User, UserStatus, UserType } from '@prisma/client';
+import {
+    OrderStatus,
+    PaymentStatus,
+    Prisma,
+    ServiceChargeType,
+    User,
+    UserStatus,
+    UserType,
+} from '@prisma/client';
 import {
     extractTokens,
     GetDateFilterOptions,
@@ -493,41 +501,38 @@ export default class AdminService {
     }
 
     async createCoupon(data: CreateCouponRequest): Promise<CreateCouponResponseDTO> {
-        const couponCodeAlreadyExists = await this._dbService.coupon.findUnique({
+        // Check if coupon code already exists
+        const existingCoupon = await this._dbService.coupon.findFirst({
             where: {
-                code: data.code.toUpperCase(),
+                code: data.code,
+                deletedAt: null,
             },
         });
 
-        if (couponCodeAlreadyExists) {
+        if (existingCoupon) {
             throw new BadRequestException('Coupon code already exists');
-        }
-
-        if (data.type === CouponType.FIXED && !data.minOrderAmount) {
-            throw new BadRequestException('Minimum order amount is required for fixed discount coupons');
         }
 
         const coupon = await this._dbService.coupon.create({
             data: {
-                code: data.code.toUpperCase(),
-                name: data.name,
+                code: data.code,
+                nameLocale: data.nameLocale,
+                name: data.nameLocale.en,
                 discount: data.discount,
                 type: data.type,
-                startDate: data.startDate ? data.startDate : new Date(),
                 maxDiscount: data.maxDiscount,
+                minOrderAmount: data.minOrderAmount,
                 expiryDate: data.expiryDate,
+                startDate: data.startDate,
                 usageLimit: data.usageLimit,
                 singleUse: data.singleUse,
-                minOrderAmount: data.minOrderAmount,
-                isActive: data.isActive,
+                isActive: data.isActive ?? true,
             },
         });
 
-        if (!coupon) {
-            throw new BadRequestException('Error creating coupon');
-        }
-
-        return coupon;
+        return {
+            ...coupon,
+        };
     }
 
     async getCoupons(data: PaginatedRequest): Promise<any> {
