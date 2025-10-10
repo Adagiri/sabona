@@ -596,7 +596,7 @@ model Order {
   discountAmount Float? // Amount discounted due to the coupon
   totalAmount    Float // Total amount for the order
   couponId       String? // Nullable coupon ID field
-  coupon         Coupon?               @relation(fields: [couponId], references: [id])
+  coupon         Coupon?    @relation(fields: [couponId], references: [id])
   services       OrderLaundryService[]
   payment        Payment? // Payment details for the order
   paymentType    PaymentType? // Payment type for the order

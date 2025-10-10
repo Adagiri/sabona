@@ -1219,7 +1219,7 @@ export default class AdminService {
     }
 
     async getAdminSettings(): Promise<GetAdminSettingsResponseDTO> {
-        let settings = await this._dbService.adminSettings.findFirst({where: {deletedAt: null}});
+        let settings = await this._dbService.adminSettings.findFirst({ where: { deletedAt: null } });
 
         if (!settings) {
             settings = await this._dbService.adminSettings.create({
@@ -1245,7 +1245,7 @@ export default class AdminService {
     }
 
     async updateAdminSettings(data: UpdateAdminSettingsRequestDTO): Promise<BooleanResponseDTO> {
-        const settings = await this._dbService.adminSettings.findFirst({where: {deletedAt: null}});
+        const settings = await this._dbService.adminSettings.findFirst({ where: { deletedAt: null } });
 
         if (settings) {
             await this._dbService.adminSettings.update({

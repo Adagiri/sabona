@@ -1,7 +1,8 @@
 import { compare, genSalt, hash } from 'bcrypt-nodejs';
 import { OrderDirection } from '../core/request/paginated.request';
 import * as gpc from 'generate-pincode';
-import AppConfig from 'src/configs/app.config';
+// import AppConfig from 'src/configs/app.config';
+import AppConfig from '../configs/app.config';
 import { v4 as uuid } from 'uuid';
 import { Prisma } from '@prisma/client';
 
@@ -125,10 +126,7 @@ export function ObjectIdToHexString(value: any): string {
         }
     }
 
-    const id =
-        value && typeof value == 'object' && value.id
-            ? Object.keys(value.id).map((key) => value.id[key])
-            : [];
+    const id = value && typeof value == 'object' && value.id ? Object.keys(value.id).map((key) => value.id[key]) : [];
 
     let hexString = '';
     for (const el of id) {
@@ -192,9 +190,7 @@ export function IsAndroid(userAgent: string) {
 }
 
 export function ConvertVersionStringToFloatNumber(versionString) {
-    return parseFloat(
-        versionString.split('.')[0] + '.' + versionString.split('.').slice(1).join(''),
-    );
+    return parseFloat(versionString.split('.')[0] + '.' + versionString.split('.').slice(1).join(''));
 }
 
 export function ReplaceObjectValuesInString(text: string, obj = {}): string {
@@ -288,9 +284,8 @@ type DeviceToken = {
 
 // Since your input is a direct array of DeviceToken objects
 export const extractTokens = (deviceTokens: DeviceToken[]): string[] => {
-    return deviceTokens.map(deviceToken => deviceToken.token);
+    return deviceTokens.map((deviceToken) => deviceToken.token);
 };
-
 
 export function GetDateFilterOptions(filter?: DateFilter): Prisma.UserWhereInput {
     if (!filter) return {};
@@ -334,10 +329,7 @@ export function GetDateFilterOptions(filter?: DateFilter): Prisma.UserWhereInput
     }
 }
 
-export function GetSlotFilterOptions(
-    startDate?: Date,
-    endDate?: Date
-) {
+export function GetSlotFilterOptions(startDate?: Date, endDate?: Date) {
     if (!startDate || !endDate) return {};
 
     return {

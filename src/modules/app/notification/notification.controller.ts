@@ -1,4 +1,4 @@
-import { Body, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { Body, Param, Query } from '@nestjs/common';
 import NotificationService from './notification.service';
 import { ApiController, Authorized, CurrentUser, Get, Patch, Post } from '../../../core/decorators';
 import SendNotificationRequestDTO, { MultipleDeviceNotificationDto } from './dto/request/notification.request';
@@ -6,14 +6,13 @@ import { SendMultipleNotificationResponseDTO, SendNotificationResponseDTO } from
 import { User } from '@prisma/client';
 import PaginatedRequest from 'src/core/request/paginated.request';
 import { GetNotificationResponseDTO } from './dto/response/getNotifications.response';
-import UpdateUserDetailsRequestDTO from '../user/dto/request/update_details.request';
+// import UpdateUserDetailsRequestDTO from '../user/dto/request/update_details.request';
 import ReadNotificationRequestDTO from './dto/request/readnotification.request';
 import { MarkNotificationsReadResponseDTO } from './dto/response/readNotificaiton.response';
 
 @ApiController({ version: '1', tag: 'notification' })
-
 export default class NotificationController {
-    constructor(private _notificationService: NotificationService) { }
+    constructor(private _notificationService: NotificationService) {}
 
     @Authorized()
     @Get({
@@ -28,16 +27,12 @@ export default class NotificationController {
     @Authorized()
     @Patch({
         path: '/notification/:id',
-        description: "Mark notification as read",
-        response: MarkNotificationsReadResponseDTO
+        description: 'Mark notification as read',
+        response: MarkNotificationsReadResponseDTO,
     })
-
-    MarkNotificationsRead(
-        @Param() params: ReadNotificationRequestDTO
-    ): Promise<MarkNotificationsReadResponseDTO> {
+    MarkNotificationsRead(@Param() params: ReadNotificationRequestDTO): Promise<MarkNotificationsReadResponseDTO> {
         return this._notificationService.MarkNotificationsRead(params);
     }
-
 
     // @Authorized()
     @Post({
@@ -45,12 +40,9 @@ export default class NotificationController {
         description: 'Send a notification to a single device',
         response: SendNotificationResponseDTO,
     })
-    async SendNotification(
-        @Body() body: SendNotificationRequestDTO,
-    ): Promise<SendNotificationResponseDTO> {
+    async SendNotification(@Body() body: SendNotificationRequestDTO): Promise<SendNotificationResponseDTO> {
         return await this._notificationService.SendNotification(body);
     }
-
 
     // @Authorized()
     @Post({
@@ -59,9 +51,8 @@ export default class NotificationController {
         response: SendMultipleNotificationResponseDTO,
     })
     async SendMultipleNotifications(
-        @Body() data: MultipleDeviceNotificationDto
+        @Body() data: MultipleDeviceNotificationDto,
     ): Promise<SendMultipleNotificationResponseDTO> {
         return await this._notificationService.SendNotificationToMultipleTokens(data);
     }
-
 }
