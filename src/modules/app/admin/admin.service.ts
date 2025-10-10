@@ -3,15 +3,7 @@ import DatabaseService from '../../../database/database.service';
 import { AllOrderListDto } from './dto/response/allorderlist.response.dto';
 import FindUsersRequestDTO from '../user/dto/request/find.request';
 import FindUsersResponseDTO from '../user/dto/response/find.response';
-import {
-    OrderStatus,
-    PaymentStatus,
-    Prisma,
-    ServiceChargeType,
-    User,
-    UserStatus,
-    UserType,
-} from '@prisma/client';
+import { OrderStatus, PaymentStatus, Prisma, ServiceChargeType, User, UserStatus, UserType } from '@prisma/client';
 import {
     extractTokens,
     GetDateFilterOptions,
@@ -318,8 +310,10 @@ export default class AdminService {
             throw new BadRequestException('User not found');
         }
 
-        if (user.type === UserType.VENDOR && (!data.contactPhone || !data.address)) {
-            throw new BadRequestException('For vendor application, address and contact phone fields are required');
+        if (user.type === UserType.VENDOR && (!data.contactPhone || !data.addressLocale)) {
+            throw new BadRequestException(
+                'For vendor application, address, addressLocale, and contact phone fields are required',
+            );
         }
 
         if (user.status === UserStatus.ACTIVE) {
@@ -392,7 +386,8 @@ export default class AdminService {
                         name: user.settings?.laundryName || 'Default Laundry Name',
                         long: user.settings?.long || 0,
                         lat: user.settings?.lat || 0,
-                        address: data.address,
+                        addressLocale: data.addressLocale,
+                        address: data.addressLocale.en,
                         vendorId: user.id,
                     },
                 });

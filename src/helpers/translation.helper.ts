@@ -18,12 +18,12 @@ export function translateData<T>(data: any, locale: string = 'en'): T {
         for (const [key, value] of Object.entries(data)) {
             // Check if this is a *Locale field
             if (key.endsWith('Locale')) {
+                console.log("Yeaah")
                 const baseField = key.replace('Locale', '');
 
                 // If the base field exists, translate it
                 if (baseField in data) {
                     const localeData = value as any;
-
                     // Extract translated value
                     if (localeData && typeof localeData === 'object') {
                         result[baseField] = localeData[locale] || localeData.en || data[baseField];

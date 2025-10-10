@@ -1,0 +1,12 @@
+{
+    "laundry.created": "Laundry created successfully",
+    "laundry.updated": "Laundry updated successfully",
+    "laundry.deleted": "Laundry deleted successfully",
+    "laundry.service.created": "Service created successfully",
+    "laundry.service.updated": "Service updated successfully",
+    "laundry.service.deleted": "Service deleted successfully",
+    "laundry.service.items.created": "Items added successfully",
+    "category.created": "Category created successfully",
+    "category.updated": "Category updated successfully",
+    "category.deleted": "Category deleted successfully"
+}

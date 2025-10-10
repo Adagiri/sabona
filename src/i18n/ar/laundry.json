@@ -1,0 +1,12 @@
+{
+    "laundry.created": "تم إنشاء المغسلة بنجاح",
+    "laundry.updated": "تم تحديث المغسلة بنجاح",
+    "laundry.deleted": "تم حذف المغسلة بنجاح",
+    "laundry.service.created": "تم إنشاء الخدمة بنجاح",
+    "laundry.service.updated": "تم تحديث الخدمة بنجاح",
+    "laundry.service.deleted": "تم حذف الخدمة بنجاح",
+    "laundry.service.items.created": "تم إضافة العناصر بنجاح",
+    "category.created": "تم إنشاء الفئة بنجاح",
+    "category.updated": "تم تحديث الفئة بنجاح",
+    "category.deleted": "تم حذف الفئة بنجاح"
+}

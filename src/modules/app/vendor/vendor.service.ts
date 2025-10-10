@@ -587,6 +587,15 @@ export default class VendorService {
                 deletedAt: null,
             },
             include: {
+                vendor: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        phone: true,
+                    },
+                },
                 laundryService: {
                     where: {
                         deletedAt: null,
@@ -628,39 +637,97 @@ export default class VendorService {
             where: {
                 id: laundryId,
             },
+            include: {
+                vendor: true,
+            },
         });
 
         if (!laundry) {
             throw new BadRequestException('Laundry does not exist');
         }
 
-        const updateData: any = {};
+        // Use transaction to update both laundry and vendor
+        await this._dbService.$transaction(async (tx) => {
+            // Update laundry data
+            const laundryUpdateData: any = {};
 
-        // Handle name translation
-        if (data.nameLocale) {
-            updateData.nameLocale = data.nameLocale;
-            updateData.name = data.nameLocale.en; // Auto-populate from English
-        }
+            // Handle name translation
+            if (data.nameLocale) {
+                laundryUpdateData.nameLocale = data.nameLocale;
+                laundryUpdateData.name = data.nameLocale.en; // Auto-populate from English
+            }
 
-        // Handle address translation
-        if (data.addressLocale) {
-            updateData.addressLocale = data.addressLocale;
-            updateData.address = data.addressLocale.en; // Auto-populate from English
-        }
+            // Handle address translation
+            if (data.addressLocale) {
+                laundryUpdateData.addressLocale = data.addressLocale;
+                laundryUpdateData.address = data.addressLocale.en; // Auto-populate from English
+            }
 
-        const updatedLaundry = await this._dbService.laundry.update({
-            where: {
-                id: laundryId,
-            },
-            data: updateData,
+            // Handle coordinates
+            if (data.lat !== undefined) {
+                laundryUpdateData.lat = data.lat;
+            }
+
+            if (data.long !== undefined) {
+                laundryUpdateData.long = data.long;
+            }
+
+            // Update laundry if there's data to update
+            if (Object.keys(laundryUpdateData).length > 0) {
+                await tx.laundry.update({
+                    where: {
+                        id: laundryId,
+                    },
+                    data: laundryUpdateData,
+                });
+            }
+
+            // Update vendor data if provided
+            const vendorUpdateData: any = { name: data.vendorName };
+
+            if (data.vendorName !== undefined) {
+                // Split name into firstName and lastName
+                const nameParts = data.vendorName.trim().split(' ');
+                if (nameParts.length === 1) {
+                    vendorUpdateData.firstName = nameParts[0];
+                    vendorUpdateData.lastName = '';
+                } else {
+                    vendorUpdateData.firstName = nameParts[0];
+                    vendorUpdateData.lastName = nameParts.slice(1).join(' ');
+                }
+            }
+
+            if (data.vendorEmail !== undefined) {
+                // Check if email is already taken by another user
+                if (data.vendorEmail !== laundry.vendor.email) {
+                    const existingUser = await tx.user.findFirst({
+                        where: {
+                            email: data.vendorEmail,
+                            id: { not: laundry.vendorId },
+                        },
+                    });
+
+                    if (existingUser) {
+                        throw new BadRequestException('Email is already taken by another user');
+                    }
+                }
+
+                vendorUpdateData.email = data.vendorEmail;
+            }
+
+            // Update vendor if there's data to update
+            if (Object.keys(vendorUpdateData).length > 0) {
+                await tx.user.update({
+                    where: {
+                        id: laundry.vendorId,
+                    },
+                    data: vendorUpdateData,
+                });
+            }
         });
 
-        if (!updatedLaundry) {
-            throw new BadRequestException('Failed to update laundry');
-        }
-
         return {
-            message: 'Laundry Updated Successfully',
+            message: 'Laundry and Vendor Updated Successfully',
         };
     }
 

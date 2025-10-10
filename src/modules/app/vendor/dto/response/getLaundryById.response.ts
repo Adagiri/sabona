@@ -27,6 +27,9 @@ class LaundryDataDTO {
     @ApiProperty()
     address: string;
 
+    @ApiProperty()
+    vendor: any;
+
     @ApiProperty({ type: [LaundryServiceDTO], description: 'List of laundry services' })
     laundryService: LaundryServiceDTO[];
 }
