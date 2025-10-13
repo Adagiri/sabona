@@ -40,13 +40,13 @@ async verifyPhoneNumber(
     let errorMessage;
     switch (error?.status) {
       case 404:
-        errorMessage = 'Code not found, try to request a new one';
+        errorMessage = 'sms.code_not_found';
         break;
       case 400:
-        errorMessage = 'Invalid code';
+        errorMessage = 'sms.invalid_code';
         break;
       case 429:
-        errorMessage = 'Max check attempts reached, please wait 10 minutes before retrying';
+        errorMessage = 'sms.max_attempts_reached';
         break;
       default:
         errorMessage = error.message;
@@ -55,7 +55,7 @@ async verifyPhoneNumber(
     return errorMessage;
   }
   if (verificationCheck?.status == VerificationStatus.PENDING) {
-    throw new ForbiddenException('Invalid code');
+    throw new ForbiddenException('sms.invalid_code');
   }
   return verificationCheck;
   }

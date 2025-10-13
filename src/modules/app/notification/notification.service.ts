@@ -52,10 +52,10 @@ export default class NotificationService {
         });
 
         if (!notification) {
-            throw new BadRequestException('Something went wrong');
+            throw new BadRequestException('errors.fatal'); // Already exists
         }
 
-        return { message: 'Notifications marked as read' };
+        return { message: 'notification.marked_read' };
     }
 
     async SendNotification(data: SendNotificationRequestDTO): Promise<SendNotificationResponseDTO> {

@@ -5,7 +5,7 @@ import NotificationService from '../notification/notification.service';
 import LocationService from '../location/location.service';
 import { OrderType, PaymentType, DeliveryType, UserType, UserStatus, LEVEL } from '@prisma/client';
 import { BadRequestException } from '@nestjs/common';
-import { I18nService } from 'nestjs-i18n';
+// import { I18nService } from 'nestjs-i18n';
 
 // Mock helper functions
 jest.mock('../../../helpers/util.helper', () => ({

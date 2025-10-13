@@ -621,12 +621,12 @@ export default class CustomerService {
             ]);
 
             if (feedbacksCreated.some((feedback) => feedback === true)) {
-                return { message: 'Feedback added successfully' };
+                return { message: 'feedback.added_successfully' };
             } else {
-                throw new BadRequestException('Error adding feedback');
+                throw new BadRequestException('feedback.error_adding');
             }
         } else {
-            throw new BadRequestException('Order is not completed');
+            throw new BadRequestException('order.not_completed');
         }
     }
 
@@ -669,7 +669,7 @@ export default class CustomerService {
         });
 
         if (!coupon) {
-            throw new BadRequestException('Invalid coupon');
+            throw new BadRequestException('coupon.invalid');
         }
 
         if (coupon.singleUse) {

@@ -11,14 +11,19 @@ import { extractTokens } from 'src/helpers/util.helper';
 import NotificationService from '../notification/notification.service';
 import LocationService from '../location/location.service';
 import { BooleanResponseDTO } from 'src/core/response/response.schema';
-
+import { I18nContext, I18nService } from 'nestjs-i18n';
 @Injectable()
 export default class RiderService {
+    private readonly locale: string;
     constructor(
         private _dbService: DatabaseService,
         private _notificationService: NotificationService,
         private _locationService: LocationService,
-    ) {}
+        private i18n: I18nService,
+    ) {
+        this.locale = I18nContext.current()?.lang || 'en';
+    }
+
     /**
      * Get orders assigned to this specific rider
      * NO MORE general order list - only assigned orders
@@ -241,7 +246,7 @@ export default class RiderService {
                         const vendorNotificationData = {
                             tokens: vendorTokens,
                             title: 'Driver Confirmed!',
-                            body: 'Driver is on the way to pick up from customer',
+                            body: this.i18n.translate('order.driver_on_way_pickup', { lang: this.locale }),
                             notificationData: {
                                 orderId: params.orderId,
                                 key: 'GET_ORDER_BY_ID',
@@ -255,7 +260,7 @@ export default class RiderService {
                             data: {
                                 userId: vendorId[0].vendorId,
                                 orderId: params.orderId,
-                                message: 'Driver is on the way to pick up from customer',
+                                message: this.i18n.translate('order.driver_on_way_pickup', { lang: this.locale }),
                                 status: 'UNREAD',
                                 data: {
                                     orderId: params.orderId,
@@ -287,7 +292,7 @@ export default class RiderService {
                     // Send notifications about pickup
                     const customerNotificationData = {
                         tokens: customerTokens,
-                        title: 'Order Picked Up!',
+                        title: this.i18n.translate('order.picked_up_title', { lang: this.locale }),
                         body: 'Your order has been picked up by the driver',
                         notificationData: {
                             orderId: params.orderId,

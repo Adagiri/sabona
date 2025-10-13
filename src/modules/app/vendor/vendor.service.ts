@@ -26,13 +26,19 @@ import { CreateLaundryItemCategoryRequestDTO } from './dto/request/createLaundry
 import EditLaundryServiceRequestDTO from './dto/request/laundryServiceEdit.request';
 import LocationService from '../location/location.service';
 import { BooleanResponseDTO } from 'src/core/response/response.schema';
+import { I18nContext, I18nService } from 'nestjs-i18n';
+
 @Injectable()
 export default class VendorService {
+    private readonly locale: string;
     constructor(
         private _dbService: DatabaseService,
         private _notificationService: NotificationService,
         private _locationService: LocationService,
-    ) {}
+        private i18n: I18nService,
+    ) {
+        this.locale = I18nContext.current()?.lang || 'en';
+    }
 
     async getOrderRequests(user: User, param: GetOrderRequestDTO): Promise<GetOrderRequestsResponseDTO> {
         const orderRequests = await this._dbService.order.findMany({
@@ -308,7 +314,7 @@ export default class VendorService {
                 const customerOrderRejectedNotificationData = {
                     tokens: customerTokens,
                     title: 'Order Rejected!',
-                    body: 'Your order has been rejected by the vendor.',
+                    body: this.i18n.translate('order.rejected_by_vendor', { lang: this.locale }),
                     notificationData: {
                         orderId: order.id,
                         key: 'FETCH_ORDERS',
@@ -324,7 +330,7 @@ export default class VendorService {
                 });
 
                 if (isOrderRejected) {
-                    throw new BadRequestException('Order already rejected');
+                    throw new BadRequestException('order.already_rejected');
                 }
 
                 await this._dbService.order.update({
@@ -345,7 +351,7 @@ export default class VendorService {
                             data: {
                                 userId: customer.userId,
                                 orderId: order.id,
-                                message: 'Your order has been rejected by the vendor.',
+                                message: this.i18n.translate('order.rejected_by_vendor', { lang: this.locale }),
                                 status: 'UNREAD',
                                 data: {
                                     orderId: order.id,

@@ -1,0 +1,9 @@
+
+{
+    "order.already_rejected": "Order already rejected",
+    "order.rejected_by_vendor": "Your order has been rejected by the vendor",
+    "order.not_completed": "Order is not completed",
+    "order.picked_up_title": "Order Picked Up!",
+    "order.driver_on_way_pickup": "Driver is on the way to pick up from customer",
+    "order.unknown_type": "Unknown order type"
+}

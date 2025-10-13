@@ -1,0 +1,8 @@
+{
+    "order.already_rejected": "تم رفض الطلب بالفعل",
+    "order.rejected_by_vendor": "تم رفض طلبك من قبل المغسلة",
+    "order.not_completed": "الطلب غير مكتمل",
+    "order.picked_up_title": "تم استلام الطلب!",
+    "order.driver_on_way_pickup": "السائق في الطريق لاستلام الطلب من العميل",
+    "order.unknown_type": "نوع طلب غير معروف"
+}

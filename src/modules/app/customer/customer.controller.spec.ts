@@ -4,7 +4,6 @@ import CustomerService from './customer.service';
 import CustomOrderService from '../customOrder/customOrder.service';
 import { DeliveryType, LEVEL, OrderType, PaymentType, UserStatus, UserType } from '@prisma/client';
 import CreateOrderRequestDTO from './dto/request/createOrder.request';
-import { BadRequestException } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
 
 describe('CustomerController', () => {
