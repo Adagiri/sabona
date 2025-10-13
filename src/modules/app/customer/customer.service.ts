@@ -67,7 +67,7 @@ export default class CustomerService {
                     throw new BadRequestException('Services with items are required for registered laundry orders');
                 }
 
-                itemsTotal = await this.calculateSubtotalFromServices(data.services);
+                itemsTotal = await this.calculateSubtotalFromServices(data.services, data.deliveryType);
             } else if (data.orderType === OrderType.CUSTOM_LAUNDRY) {
                 if (!data.customOrderAmount) {
                     throw new BadRequestException('Custom order amount is required for custom laundry orders');
@@ -98,6 +98,7 @@ export default class CustomerService {
 
     private async calculateSubtotalFromServices(
         services: Array<{ serviceId: string; items: Array<{ id: string; quantity: number }> }>,
+        deliveryType?: DeliveryType,
     ): Promise<number> {
         let subtotal = 0;
         const laundryIds = new Set<string>();
@@ -120,7 +121,11 @@ export default class CustomerService {
                         id: item.id,
                         laundryServiceId: service.serviceId,
                     },
-                    select: { platformPrice: true, name: true },
+                    select: {
+                        platformPrice: true,
+                        expressPrice: true,
+                        name: true,
+                    },
                 });
 
                 if (!serviceItem) {
@@ -129,7 +134,11 @@ export default class CustomerService {
                     );
                 }
 
-                subtotal += serviceItem.platformPrice * item.quantity;
+                // Choose price based on delivery type
+                const priceToUse =
+                    deliveryType === DeliveryType.EXPRESS ? serviceItem.expressPrice : serviceItem.platformPrice;
+
+                subtotal += priceToUse * item.quantity;
             }
         }
 
@@ -239,7 +248,7 @@ export default class CustomerService {
             throw new BadRequestException('No available drivers in your area at the moment. Please try again later.');
         }
 
-        const subtotal = await this.calculateSubtotalFromServices(data.services);
+        const subtotal = await this.calculateSubtotalFromServices(data.services, data.deliveryType);
 
         // Calculate fees using the new system (includes coupon validation)
         const feeCalculation = await this.calculateOrderFeez({
@@ -1080,7 +1089,7 @@ export default class CustomerService {
     }
 
     private calculateDeliveryFee(input: FeeCalculationInput, distance: number, settings: any): number {
-        const useFixed = true;
+        const useFixed = false;
 
         if (useFixed) {
             return 15;
@@ -1090,13 +1099,21 @@ export default class CustomerService {
             return 0;
         }
 
-        let deliveryFee = settings.deliveryBaseRate + distance * settings.deliveryPerKmRate;
+        // let deliveryFee = settings.deliveryBaseRate + distance * settings.deliveryPerKmRate;
+        let deliveryFee = 0
 
         if (input.deliveryType === DeliveryType.EXPRESS) {
-            deliveryFee *= settings.expressMultiplier;
+            deliveryFee = 15;
+            // deliveryFee *= settings.expressMultiplier;
         }
 
-        return Number((Math.round(deliveryFee * 100) / 100).toFixed(2));
+        if (input.deliveryType === DeliveryType.NORMAL) {
+            deliveryFee = 9;
+            // deliveryFee *= settings.expressMultiplier;
+        }
+
+        return deliveryFee;
+        // return Number((Math.round(deliveryFee * 100) / 100).toFixed(2));
     }
 
     private async getAdminSettings() {

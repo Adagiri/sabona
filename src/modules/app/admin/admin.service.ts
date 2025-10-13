@@ -3,7 +3,7 @@ import DatabaseService from '../../../database/database.service';
 import { AllOrderListDto } from './dto/response/allorderlist.response.dto';
 import FindUsersRequestDTO from '../user/dto/request/find.request';
 import FindUsersResponseDTO from '../user/dto/response/find.response';
-import { CouponType, Prisma, ServiceChargeType, UserStatus, UserType } from '@prisma/client';
+import { OrderStatus, PaymentStatus, Prisma, ServiceChargeType, User, UserStatus, UserType } from '@prisma/client';
 import {
     extractTokens,
     GetDateFilterOptions,
@@ -39,6 +39,8 @@ import MediaService from '../media/media.service';
 import { UpdateAdminSettingsRequestDTO } from './dto/request/updateAdminSettings.request';
 import { BooleanResponseDTO } from 'src/core/response/response.schema';
 import { GetAdminSettingsResponseDTO } from './dto/response/adminSettings.response';
+import { DeleteUserRequestDTO } from './dto/request/deleteUser.request';
+import { DeleteUserResponseDTO } from './dto/response/deleteUser.response';
 
 @Injectable()
 export default class AdminService {
@@ -308,8 +310,10 @@ export default class AdminService {
             throw new BadRequestException('User not found');
         }
 
-        if (user.type === UserType.VENDOR && (!data.contactPhone || !data.address)) {
-            throw new BadRequestException('For vendor application, address and contact phone fields are required');
+        if (user.type === UserType.VENDOR && (!data.contactPhone || !data.addressLocale)) {
+            throw new BadRequestException(
+                'For vendor application, address, addressLocale, and contact phone fields are required',
+            );
         }
 
         if (user.status === UserStatus.ACTIVE) {
@@ -382,7 +386,8 @@ export default class AdminService {
                         name: user.settings?.laundryName || 'Default Laundry Name',
                         long: user.settings?.long || 0,
                         lat: user.settings?.lat || 0,
-                        address: data.address,
+                        addressLocale: data.addressLocale,
+                        address: data.addressLocale.en,
                         vendorId: user.id,
                     },
                 });
@@ -491,41 +496,38 @@ export default class AdminService {
     }
 
     async createCoupon(data: CreateCouponRequest): Promise<CreateCouponResponseDTO> {
-        const couponCodeAlreadyExists = await this._dbService.coupon.findUnique({
+        // Check if coupon code already exists
+        const existingCoupon = await this._dbService.coupon.findFirst({
             where: {
-                code: data.code.toUpperCase(),
+                code: data.code,
+                deletedAt: null,
             },
         });
 
-        if (couponCodeAlreadyExists) {
+        if (existingCoupon) {
             throw new BadRequestException('Coupon code already exists');
-        }
-
-        if (data.type === CouponType.FIXED && !data.minOrderAmount) {
-            throw new BadRequestException('Minimum order amount is required for fixed discount coupons');
         }
 
         const coupon = await this._dbService.coupon.create({
             data: {
-                code: data.code.toUpperCase(),
-                name: data.name,
+                code: data.code,
+                nameLocale: data.nameLocale,
+                name: data.nameLocale.en,
                 discount: data.discount,
                 type: data.type,
-                startDate: data.startDate ? data.startDate : new Date(),
                 maxDiscount: data.maxDiscount,
+                minOrderAmount: data.minOrderAmount,
                 expiryDate: data.expiryDate,
+                startDate: data.startDate,
                 usageLimit: data.usageLimit,
                 singleUse: data.singleUse,
-                minOrderAmount: data.minOrderAmount,
-                isActive: data.isActive,
+                isActive: data.isActive ?? true,
             },
         });
 
-        if (!coupon) {
-            throw new BadRequestException('Error creating coupon');
-        }
-
-        return coupon;
+        return {
+            ...coupon,
+        };
     }
 
     async getCoupons(data: PaginatedRequest): Promise<any> {
@@ -1275,6 +1277,248 @@ export default class AdminService {
 
         return {
             data: true,
+        };
+    }
+
+    async cancelOrder(orderId: string, reason: string, refundCustomer?: boolean): Promise<any> {
+        const order = await this._dbService.order.findUnique({
+            where: { id: orderId },
+            include: {
+                user: true,
+                payment: true,
+            },
+        });
+
+        if (!order) {
+            throw new BadRequestException('Order not found');
+        }
+
+        if (order.status === OrderStatus.CANCELLED) {
+            throw new BadRequestException('Order already cancelled');
+        }
+
+        await this._dbService.$transaction(async (tx) => {
+            await tx.order.update({
+                where: { id: orderId },
+                data: {
+                    status: OrderStatus.CANCELLED,
+                    cancelReason: reason,
+                },
+            });
+
+            await tx.orderStatusHistory.create({
+                data: {
+                    orderId,
+                    status: OrderStatus.CANCELLED,
+                    timestamp: new Date(),
+                },
+            });
+
+            if (order.paid && refundCustomer) {
+                await tx.order.update({
+                    where: { id: orderId },
+                    data: {
+                        paid: false,
+                        paymentStatus: PaymentStatus.REFUNDED,
+                    },
+                });
+
+                if (order.payment) {
+                    await tx.payment.update({
+                        where: { orderId },
+                        data: {
+                            status: 'REFUNDED',
+                            type: 'Refund',
+                        },
+                    });
+                }
+            }
+        });
+
+        const customerTokens = await this._dbService.deviceToken.findMany({
+            where: { userId: order.userId, deletedAt: null },
+        });
+
+        if (customerTokens.length > 0) {
+            const tokens = customerTokens.map((t) => t.token);
+            await this._notificationService.SendNotificationToMultipleTokens({
+                tokens,
+                title: 'Order Cancelled',
+                body: `Your order has been cancelled. Reason: ${reason}`,
+                notificationData: {
+                    orderId: order.id,
+                    key: 'GET_ORDER_BY_ID',
+                    route: 'TrackOrder',
+                },
+            });
+        }
+
+        return { message: 'Order cancelled successfully' };
+    }
+
+    async deleteUser(userId: string, data: DeleteUserRequestDTO, adminUser: User): Promise<DeleteUserResponseDTO> {
+        const user = await this._dbService.user.findUnique({
+            where: { id: userId },
+            include: {
+                settings: true,
+            },
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        // Prevent admin from deleting themselves
+        if (user.id === adminUser.id) {
+            throw new BadRequestException('Cannot delete your own account');
+        }
+
+        // Check for blocking conditions based on user type
+        if (user.type === UserType.USER) {
+            const activeOrders = await this._dbService.order.count({
+                where: {
+                    userId: user.id,
+                    deletedAt: null,
+                    status: {
+                        in: ['PENDING', 'PENDING_PAYMENT', 'ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
+                    },
+                },
+            });
+
+            if (activeOrders > 0) {
+                throw new BadRequestException(
+                    `Cannot delete user with ${activeOrders} active order(s). Cancel orders first.`,
+                );
+            }
+        }
+
+        if (user.type === UserType.RIDER) {
+            const activeAssignments = await this._dbService.riderOrder.count({
+                where: {
+                    riderId: user.id,
+                    deletedAt: null,
+                    order: {
+                        status: {
+                            in: ['ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
+                        },
+                    },
+                },
+            });
+
+            if (activeAssignments > 0) {
+                throw new BadRequestException(
+                    `Cannot delete rider with ${activeAssignments} active delivery assignment(s).`,
+                );
+            }
+        }
+
+        if (user.type === UserType.VENDOR) {
+            const activeOrders = await this._dbService.vendorOrder.count({
+                where: {
+                    vendorId: user.id,
+                    deletedAt: null,
+                    order: {
+                        status: {
+                            in: ['ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
+                        },
+                    },
+                },
+            });
+
+            if (activeOrders > 0) {
+                throw new BadRequestException(`Cannot delete vendor with ${activeOrders} active order(s) to process.`);
+            }
+
+            const activeLaundries = await this._dbService.laundry.count({
+                where: {
+                    vendorId: user.id,
+                    deletedAt: null,
+                },
+            });
+
+            if (activeLaundries > 0) {
+                throw new BadRequestException(
+                    `Cannot delete vendor with ${activeLaundries} active laundry/laundries. Delete laundries first.`,
+                );
+            }
+        }
+
+        // Use transaction to ensure atomicity
+        await this._dbService.$transaction(async (tx) => {
+            // 1. Store original phone/email in audit fields, then null out active fields
+            await tx.user.update({
+                where: { id: userId },
+                data: {
+                    // Audit fields - preserve for history (NOT INDEXED)
+                    deletedPhone: user.phone,
+                    deletedEmail: user.email,
+                    deletionReason: data.reason || null,
+                    deletedByAdminId: adminUser.id,
+
+                    // Active fields - null to free for reuse (INDEXED)
+                    phone: null,
+                    email: user.email ? `deleted_${userId}@deleted.local` : null,
+                },
+            });
+
+            // 2. Handle rider/vendor specific cleanup...
+            if (user.type === UserType.RIDER) {
+                await tx.riderOrder.updateMany({
+                    where: { riderId: userId, deletedAt: null },
+                    data: { deletedAt: new Date() },
+                });
+
+                await tx.pickup.updateMany({
+                    where: { riderId: userId },
+                    data: { riderId: null },
+                });
+
+                await tx.delivery.updateMany({
+                    where: { riderId: userId },
+                    data: { riderId: null },
+                });
+            }
+
+            if (user.type === UserType.VENDOR) {
+                await tx.vendorOrder.updateMany({
+                    where: { vendorId: userId, deletedAt: null },
+                    data: { deletedAt: new Date() },
+                });
+            }
+
+            // 3. Soft delete the user
+            await tx.user.delete({
+                where: { id: userId },
+            });
+
+            // await tx.notification.create({
+            //     data: {
+            //         userId: adminUser.id,
+            //         message: `Admin deleted ${user.type} account: ${user.firstName} ${user.lastName} (Phone: ${user.phone || 'N/A'}). Reason: ${data.reason || 'No reason provided'}`,
+            //         status: 'UNREAD',
+            //         type: 'OTHER',
+            //         data: {
+            //             action: 'USER_DELETION',
+            //             deletedUserId: userId,
+            //             deletedUserType: user.type,
+            //             deletedPhone: user.phone,
+            //             deletedEmail: user.email,
+            //             reason: data.reason,
+            //             timestamp: new Date().toISOString(),
+            //         },
+            //     },
+            // });
+        });
+
+        return {
+            message: `${user.type} account deleted successfully`,
+            data: {
+                userId: user.id,
+                userType: user.type,
+                phoneFreed: !!user.phone,
+                emailFreed: !!user.email,
+                deletedPhone: user.phone || undefined, // Return for confirmation
+            },
         };
     }
 }

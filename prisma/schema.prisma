@@ -195,6 +195,11 @@ model User {
 
   level LEVEL? @default(BASIC) // User level
 
+  deletedPhone     String? // Store original phone for audit trail
+  deletedEmail     String? // Store original email for audit trail
+  deletionReason   String? // Admin's reason for deletion
+  deletedByAdminId String? // Which admin deleted this user
+
   addresses UserAddress[] // A user can have multiple addresses
 
   devices      Device[] // Relation to devices used by the user
@@ -463,8 +468,10 @@ model Delivery {
 
 model Laundry {
   id             String           @id @default(uuid())
-  name           String // Name of the laundry
-  address        String? // Address of the laundry
+  name           String
+  nameLocale     Json?            @db.JsonB
+  address        String?
+  addressLocale  Json?            @db.JsonB
   lat            Float // Latitude of the laundry address
   long           Float // Longitude of the laundry address 
   vendor         User             @relation("VendorLaundry", fields: [vendorId], references: [id])
@@ -480,10 +487,12 @@ model Laundry {
 
 model LaundryService {
   id                  String                @id @default(uuid())
-  laundryId           String // Foreign key to Laundry model
+  laundryId           String
   laundry             Laundry               @relation(fields: [laundryId], references: [id])
-  name                String // Name of the service (e.g., "Wash & Fold")
-  description         String? // Optional description of the service
+  name                String
+  nameLocale          Json?                 @db.JsonB
+  description         String?
+  descriptionLocale   Json?                 @db.JsonB
   iconId              Int?
   icon                Icon?                 @relation("ServiceIcon", fields: [iconId], references: [id])
   laundryServiceItems LaundryServiceItem[] // Relation to LaundryServiceItem model
@@ -496,7 +505,9 @@ model LaundryService {
 model LaundryItemCategory {
   id                  String               @id @default(uuid())
   name                String               @unique
+  nameLocale          Json?                @db.JsonB
   description         String?
+  descriptionLocale   Json?                @db.JsonB
   iconId              Int?
   icon                Icon?                @relation("CategoryIcon", fields: [iconId], references: [id])
   laundryServiceItems LaundryServiceItem[] // Relation to LaundryServiceItem
@@ -507,14 +518,16 @@ model LaundryItemCategory {
 
 model LaundryServiceItem {
   id               String               @id @default(uuid())
-  laundryServiceId String // Foreign key to LaundryService model
+  laundryServiceId String
   laundryService   LaundryService       @relation(fields: [laundryServiceId], references: [id])
-  categoryId       String? // Foreign key to LaundryItemCategory
+  categoryId       String?
   category         LaundryItemCategory? @relation(fields: [categoryId], references: [id])
-  name             String // Name of the item (e.g., "T-shirt")
+  name             String
+  nameLocale       Json?
 
   vendorPrice             Float // What vendor receives
   platformPrice           Float // What user pays (vendor price + platform markup)
+  expressPrice            Float // What user pays if express delivery is selected
   price                   Float?
   createdAt               DateTime                  @default(now()) @db.Timestamptz()
   updatedAt               DateTime                  @default(now()) @updatedAt @db.Timestamptz()
@@ -559,6 +572,8 @@ model Order {
   laundryId   String? // Foreign key to the Laundry model
   laundry     Laundry?  @relation(fields: [laundryId], references: [id])
 
+  cancelReason String?
+
   // Custom laundry fields
   customLaundryName        String? // For custom orders
   customLaundryDescription String? // User's detailed description/needs
@@ -590,7 +605,7 @@ model Order {
   vatAmount          Float? // VAT amount
   distanceKm         Float? // Distance for delivery fee calculation
 
-  paymentStatus  PaymentStatus?         @default(PENDING)
+  paymentStatus  PaymentStatus?        @default(PENDING)
   status         OrderStatus           @default(PENDING) // High-level status of the order
   baseAmount     Float? // Base amount before discounts
   discountAmount Float? // Amount discounted due to the coupon
@@ -727,17 +742,18 @@ model Coupon {
   id             String        @id @default(uuid())
   code           String        @unique
   name           String
+  nameLocale     Json?
   discount       Float
   type           CouponType
-  maxDiscount    Float? // For percentage-based discounts
-  minOrderAmount Float? // Minimum order amount required to apply this coupon
+  maxDiscount    Float?
+  minOrderAmount Float?
   expiryDate     DateTime
   startDate      DateTime?
   isActive       Boolean       @default(true)
-  usageLimit     Int? // Maximum allowed uses for this coupon
-  singleUse      Boolean       @default(true) // True for single-use per user
+  usageLimit     Int?
+  singleUse      Boolean       @default(true)
   orders         Order[]
-  couponUsage    CouponUsage[] // Relation to track usage by individual users
+  couponUsage    CouponUsage[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   deletedAt      DateTime?

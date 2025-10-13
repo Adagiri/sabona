@@ -75,7 +75,7 @@ export default class MediaService {
                 size: data.size,
             },
         });
-
+        console.log(media);
         const credentials = await this._s3Service.GetFileUploadPermissions(location, media.id);
 
         return {
@@ -98,8 +98,12 @@ export default class MediaService {
             if (!media) {
                 throw new NotFoundException('media.not_found');
             }
-
-            if (media.access === MediaAccess.PRIVATE && (!data || data?.userId !== media.userId)) {
+            console.log(media.userId, data.userId);
+            if (
+                media.access === MediaAccess.PRIVATE &&
+                (!data || data?.userId !== media.userId) &&
+                data.userId !== 'admin'
+            ) {
                 throw new ForbiddenException('media.not_allowed');
             }
 

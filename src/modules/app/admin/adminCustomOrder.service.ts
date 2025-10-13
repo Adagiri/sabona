@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
-import { OrderStatus, OrderType, User, UserType, RiderOrderType } from '@prisma/client';
+import { OrderStatus, OrderType, User, UserType, RiderOrderType, Order } from '@prisma/client';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
 import NotificationService from '../notification/notification.service';
 import { extractTokens } from 'src/helpers/util.helper';
+import { UploadCustomOrderReceiptRequestDTO } from './dto/request/uploadCustomOrderReceipt.request';
+import AppConfig from 'src/configs/app.config';
 
 interface PayTabsInvoiceResponse {
     invoiceId: string;
@@ -137,12 +139,7 @@ export default class AdminCustomOrderService {
      */
     async uploadCustomOrderReceipt(
         orderId: string,
-        receiptData: {
-            receiptImagePath: string;
-            vendorName: string;
-            amountPaid: number;
-            paymentMethod: 'CASH' | 'CARD';
-        },
+        receiptData: UploadCustomOrderReceiptRequestDTO, // Changed signature
         adminUser: User,
     ): Promise<any> {
         const order = await this._dbService.order.findUnique({
@@ -170,27 +167,32 @@ export default class AdminCustomOrderService {
             throw new BadRequestException('Receipt already uploaded for this order');
         }
 
+        // Get media record by ID
+        const receiptMedia = await this._dbService.media.findUnique({
+            where: { id: parseInt(receiptData.receiptImageId) },
+        });
+
+        if (!receiptMedia) {
+            throw new BadRequestException('Receipt image not found');
+        }
+
         // Update order with receipt information
-        const updatedOrder = await this._dbService.order.update({
+        await this._dbService.order.update({
             where: { id: orderId },
             data: {
-                customVendorReceipt: receiptData.receiptImagePath,
+                customVendorReceipt: receiptMedia.path, // Use media path
                 customVendorName: receiptData.vendorName,
                 customVendorPaid: receiptData.amountPaid,
                 customPaymentMethod: receiptData.paymentMethod,
-                status: OrderStatus.IN_PROGRESS, // Vendor is now processing
+                totalAmount: receiptData.amountPaid, // Set customer invoice amount
+                status: OrderStatus.IN_PROGRESS,
             },
         });
 
-        console.log(updatedOrder);
-        // Generate PayTabs invoice for customer to reimburse the payment
-        const payTabsInvoice = await this.generatePayTabsInvoice(
-            order,
-            receiptData.amountPaid,
-            order.adminServiceCharge || 0,
-        );
+        // Generate PayTabs invoice
+        const payTabsInvoice = await this.generatePayTabsInvoice(order, receiptData.amountPaid);
 
-        // Update order with PayTabs information
+        // Update order with PayTabs info
         await this._dbService.order.update({
             where: { id: orderId },
             data: {
@@ -238,52 +240,72 @@ export default class AdminCustomOrderService {
             message: 'Receipt uploaded and payment invoice sent to customer',
         };
     }
-
     /**
      * Generate PayTabs invoice for customer payment recovery
      */
-    private async generatePayTabsInvoice(
-        order: any,
-        vendorAmount: number,
-        adminServiceCharge: number,
-    ): Promise<PayTabsInvoiceResponse> {
-        // Mock PayTabs integration - replace with actual PayTabs API
-        const totalAmount = vendorAmount + adminServiceCharge;
-        console.log(totalAmount);
-        // This would be actual PayTabs API call
-        const mockPayTabsResponse = {
-            invoiceId: `PT_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            invoiceUrl: `https://secure.paytabs.com/payment/page/${Date.now()}`,
-            transactionRef: `TXN_${Date.now()}`,
-        };
+    private async generatePayTabsInvoice(order: Order, vendorAmount: number): Promise<PayTabsInvoiceResponse> {
+        // Validate inputs
+        // if (!order.user.email) {
+        //     throw new Error('Customer email is required for payment processing');
+        // }
 
-        // TODO: Replace with actual PayTabs integration
-        /*
-        const payTabsResponse = await fetch('https://secure.paytabs.com/payment/request', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.PAYTABS_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                profile_id: process.env.PAYTABS_PROFILE_ID,
-                tran_type: 'sale',
-                tran_class: 'ecom',
-                cart_description: `Custom laundry order #${order.orderNumber} reimbursement`,
-                cart_currency: 'SAR',
-                cart_amount: totalAmount,
-                customer_details: {
-                    name: `${order.user.firstName} ${order.user.lastName}`,
-                    email: order.user.email,
-                    phone: order.user.phone
+        if (vendorAmount <= 0) {
+            throw new Error('Invalid payment amount');
+        }
+
+        try {
+            const response = await fetch(`https://secure.paytabs.sa/payment/request`, {
+                method: 'POST',
+                headers: {
+                    // CRITICAL: Must be lowercase 'authorization', NOT 'Authorization'
+                    authorization: AppConfig.PAYTABS.SERVER_KEY, // Direct key, no "Bearer"
+                    'Content-Type': 'application/json',
                 },
-                callback: `${process.env.APP_URL}/api/paytabs/callback`,
-                return: `${process.env.APP_URL}/orders/${order.id}/payment-success`
-            })
-        });
-        */
+                body: JSON.stringify({
+                    profile_id: AppConfig.PAYTABS.PROFILE_ID,
+                    tran_type: 'sale',
+                    tran_class: 'ecom',
+                    cart_id: order.id,
+                    cart_description: `Custom laundry order #${order.orderNumber}`,
+                    cart_currency: 'SAR',
+                    cart_amount: vendorAmount,
+                    customer_details: {
+                        name: 'Ridwan',
+                        email: 'ibrahimridwan47@gmail.com',
+                        phone: '+2348037296906',
+                        street1: 'N/A',
+                        city: 'Riyadh',
+                        state: 'Riyadh',
+                        country: 'SA',
+                        zip: '00000',
+                    },
+                    callback: `http://localhost:8080/api/v1/webhook/paytabs`,
+                    return: `http://localhost:8080/orders/${order.id}/payment-success`,
+                }),
+            });
 
-        return mockPayTabsResponse;
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('PayTabs API error:', errorText);
+                throw new Error(`PayTabs API failed with status ${response.status}: ${errorText}`);
+            }
+
+            const payTabsResponse = await response.json();
+
+            if (!payTabsResponse.redirect_url || !payTabsResponse.tran_ref) {
+                console.error('Invalid PayTabs response:', payTabsResponse);
+                throw new Error(payTabsResponse.message || 'PayTabs response missing required fields');
+            }
+
+            return {
+                invoiceId: payTabsResponse.tran_ref,
+                invoiceUrl: payTabsResponse.redirect_url,
+                transactionRef: payTabsResponse.tran_ref,
+            };
+        } catch (error) {
+            console.error('Error generating PayTabs invoice:', error);
+            throw error; // Re-throw, don't return mock data
+        }
     }
 
     /**
@@ -496,7 +518,7 @@ export default class AdminCustomOrderService {
         });
 
         const availableDriversWithDistance = availableRiders
-            .filter((rider) => rider.RiderOrder.length === 0) // Not busy
+            .filter((rider) => rider.RiderOrder.length !== 0) // Not busy
             .map((rider) => {
                 const distance = this.calculateDistance(
                     order.pickup!.pickupLat,
@@ -604,6 +626,7 @@ export default class AdminCustomOrderService {
 
         const tokens = extractTokens(customerTokens);
 
+        // Send push notification
         if (tokens?.length) {
             const notificationData = {
                 tokens: tokens,
@@ -619,9 +642,6 @@ export default class AdminCustomOrderService {
 
             await this._notificationService.SendNotificationToMultipleTokens(notificationData);
         }
-
-        // TODO: Send WhatsApp message with payment link
-        console.log(`WhatsApp message to ${user.phone}: Your custom order payment link: ${invoiceUrl}`);
     }
 
     /**

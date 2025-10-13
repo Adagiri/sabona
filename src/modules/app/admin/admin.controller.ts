@@ -56,8 +56,6 @@ import {
 import { UpdateCustomOrderPricingRequestDTO } from './dto/request/updateCustomOrderPricing.request';
 import CustomOrderService from '../customOrder/customOrder.service';
 
-import { UseInterceptors } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import AdminCustomOrderService from './adminCustomOrder.service';
 import { AssignDriverToCustomOrderRequestDTO } from './dto/request/assignDriverToCustomOrder.request';
 import { UploadCustomOrderReceiptRequestDTO } from './dto/request/uploadCustomOrderReceipt.request';
@@ -76,6 +74,11 @@ import { FinalizeRiderDocumentRequestDTO, UploadRiderDocumentRequestDTO } from '
 import { BooleanResponseDTO } from 'src/core/response/response.schema';
 import { GetAdminSettingsResponseDTO } from './dto/response/adminSettings.response';
 import { UpdateAdminSettingsRequestDTO } from './dto/request/updateAdminSettings.request';
+import { CancelCustomOrderRequestDTO } from './dto/customOrders.dto';
+import { CancelOrderRequestDTO } from './dto/request/cancelOrder.request';
+import { DeleteUserResponseDTO } from './dto/response/deleteUser.response';
+import { DeleteUserRequestDTO } from './dto/request/deleteUser.request';
+import { IgnoreTranslation } from 'src/core/decorators/ignore_translation.decorator';
 
 @ApiController({
     path: '/admin',
@@ -263,6 +266,7 @@ export default class AdminController {
     }
 
     @Authorized(UserType.ADMIN)
+    @IgnoreTranslation()
     @Get({
         path: '/coupons/all',
         description: 'Get All Coupons',
@@ -312,6 +316,7 @@ export default class AdminController {
     }
 
     @Authorized(UserType.ADMIN)
+    @IgnoreTranslation()
     @Get({
         path: '/laundries',
         description: 'Get all laundries',
@@ -322,6 +327,7 @@ export default class AdminController {
     }
 
     @Authorized(UserType.ADMIN)
+    @IgnoreTranslation()
     @Get({
         path: '/laundry/:laundryId',
         description: 'Get laundry by id',
@@ -368,6 +374,7 @@ export default class AdminController {
     }
 
     @Authorized(UserType.ADMIN)
+    @IgnoreTranslation()
     @Get({
         path: '/laundry/:laundryId/services',
         description: 'Get all services for a laundry',
@@ -422,6 +429,7 @@ export default class AdminController {
     }
 
     @Authorized(UserType.ADMIN)
+    @IgnoreTranslation()
     @Get({
         path: '/laundry/:laundryId/service/:serviceId/items',
         description: 'Get all laundry service items',
@@ -478,6 +486,7 @@ export default class AdminController {
     }
 
     @Authorized(UserType.ADMIN)
+    @IgnoreTranslation()
     @Get({
         path: '/categories',
         description: 'Get all laundry item categories',
@@ -488,6 +497,7 @@ export default class AdminController {
     }
 
     @Authorized(UserType.ADMIN)
+    @IgnoreTranslation()
     @Get({
         path: '/category/:categoryId',
         description: 'Get laundry item category by id',
@@ -625,27 +635,12 @@ export default class AdminController {
         description: 'Upload receipt and generate PayTabs invoice for custom order',
         response: UploadReceiptResponseDTO,
     })
-    @UseInterceptors(FileInterceptor('receiptImage'))
     async uploadCustomOrderReceipt(
         @Param('orderId') orderId: string,
         @Body() data: UploadCustomOrderReceiptRequestDTO,
-        // @UploadedFile() receiptImage: Express.Multer.File,
         @CurrentUser() adminUser: User,
     ): Promise<UploadReceiptResponseDTO> {
-        // Handle file upload - save to your preferred storage (AWS S3, local filesystem, etc.)
-        // const receiptImagePath = await this.saveReceiptImage(receiptImage);
-        const receiptImagePath = '/';
-
-        return await this._adminCustomOrderService.uploadCustomOrderReceipt(
-            orderId,
-            {
-                receiptImagePath: receiptImagePath,
-                vendorName: data.vendorName,
-                amountPaid: data.amountPaid,
-                paymentMethod: data.paymentMethod,
-            },
-            adminUser,
-        );
+        return await this._adminCustomOrderService.uploadCustomOrderReceipt(orderId, data, adminUser);
     }
 
     @Authorized(UserType.ADMIN)
@@ -834,7 +829,7 @@ export default class AdminController {
         description: 'Get admin settings',
     })
     async getAdminSettings(): Promise<GetAdminSettingsResponseDTO> {
-        console.log("I ran")
+        console.log('I ran');
         return this._adminService.getAdminSettings();
     }
 
@@ -844,7 +839,45 @@ export default class AdminController {
         description: 'Update admin settings',
     })
     async updateAdminSettings(@Body() data: UpdateAdminSettingsRequestDTO): Promise<BooleanResponseDTO> {
-        console.log(data)
+        console.log(data);
         return this._adminService.updateAdminSettings(data);
+    }
+
+    //
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/custom-order/:orderId/cancel',
+        description: 'Cancel custom order',
+        response: {},
+    })
+    async cancelCustomOrder(
+        @Param('orderId') orderId: string,
+        @Body() data: CancelCustomOrderRequestDTO,
+    ): Promise<any> {
+        return await this._customOrderService.cancelCustomOrder(orderId, data.reason, data.refundCustomer);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/order/:orderId/cancel',
+        description: 'Cancel regular order',
+        response: {},
+    })
+    async cancelOrder(@Param('orderId') orderId: string, @Body() data: CancelOrderRequestDTO): Promise<any> {
+        return await this._adminService.cancelOrder(orderId, data.reason, data.refundCustomer);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Delete({
+        path: '/users/:userId',
+        description: 'Delete user account (customer, rider, or vendor)',
+        response: DeleteUserResponseDTO,
+    })
+    async deleteUser(
+        @Param('userId') userId: string,
+        @Body() data: DeleteUserRequestDTO,
+        @CurrentUser() adminUser: User,
+    ): Promise<DeleteUserResponseDTO> {
+        return this._adminService.deleteUser(userId, data, adminUser);
     }
 }
