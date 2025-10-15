@@ -78,6 +78,7 @@ import { CancelCustomOrderRequestDTO } from './dto/customOrders.dto';
 import { CancelOrderRequestDTO } from './dto/request/cancelOrder.request';
 import { DeleteUserResponseDTO } from './dto/response/deleteUser.response';
 import { DeleteUserRequestDTO } from './dto/request/deleteUser.request';
+import { IgnoreTranslation } from 'src/core/decorators/ignore_translation.decorator';
 
 @ApiController({
     path: '/admin',
@@ -265,6 +266,7 @@ export default class AdminController {
     }
 
     @Authorized(UserType.ADMIN)
+    @IgnoreTranslation()
     @Get({
         path: '/coupons/all',
         description: 'Get All Coupons',
@@ -314,6 +316,7 @@ export default class AdminController {
     }
 
     @Authorized(UserType.ADMIN)
+    @IgnoreTranslation()
     @Get({
         path: '/laundries',
         description: 'Get all laundries',
@@ -324,6 +327,7 @@ export default class AdminController {
     }
 
     @Authorized(UserType.ADMIN)
+    @IgnoreTranslation()
     @Get({
         path: '/laundry/:laundryId',
         description: 'Get laundry by id',
@@ -370,6 +374,7 @@ export default class AdminController {
     }
 
     @Authorized(UserType.ADMIN)
+    @IgnoreTranslation()
     @Get({
         path: '/laundry/:laundryId/services',
         description: 'Get all services for a laundry',
@@ -424,6 +429,7 @@ export default class AdminController {
     }
 
     @Authorized(UserType.ADMIN)
+    @IgnoreTranslation()
     @Get({
         path: '/laundry/:laundryId/service/:serviceId/items',
         description: 'Get all laundry service items',
@@ -480,6 +486,7 @@ export default class AdminController {
     }
 
     @Authorized(UserType.ADMIN)
+    @IgnoreTranslation()
     @Get({
         path: '/categories',
         description: 'Get all laundry item categories',
@@ -490,6 +497,7 @@ export default class AdminController {
     }
 
     @Authorized(UserType.ADMIN)
+    @IgnoreTranslation()
     @Get({
         path: '/category/:categoryId',
         description: 'Get laundry item category by id',
@@ -835,7 +843,7 @@ export default class AdminController {
         return this._adminService.updateAdminSettings(data);
     }
 
-    // 
+    //
     @Authorized(UserType.ADMIN)
     @Patch({
         path: '/custom-order/:orderId/cancel',

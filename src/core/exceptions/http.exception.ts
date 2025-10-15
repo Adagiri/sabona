@@ -1,17 +1,9 @@
-import {
-    ExceptionFilter,
-    Catch,
-    ArgumentsHost,
-    HttpException,
-    BadRequestException,
-    HttpStatus,
-} from '@nestjs/common';
+import { ExceptionFilter, Catch, ArgumentsHost, HttpException, BadRequestException, HttpStatus } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { I18nService } from 'nestjs-i18n';
 
 const LOCALE_HEADER_KEY = 'locale';
-
-function _prepareBadRequestValidationErrors(errors) {
+function _prepareBadRequestValidationErrors(errors: any) {
     const Errors: any = {};
     for (const err of errors) {
         const constraint =
@@ -19,7 +11,12 @@ function _prepareBadRequestValidationErrors(errors) {
             Object.values(err.constraints) &&
             Object.values(err.constraints).length &&
             Object.values(err.constraints)[0];
-        Errors[err.property] = constraint ? constraint : `${err.property} is invalid`;
+        Errors[err.property] = constraint
+            ? constraint
+            : this.i18n.translate('errors.field_invalid', {
+                  args: { field: err.property },
+                  lang: errors.lang,
+              });
     }
     return Errors;
 }

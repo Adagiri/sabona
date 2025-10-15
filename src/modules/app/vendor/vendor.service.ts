@@ -26,13 +26,19 @@ import { CreateLaundryItemCategoryRequestDTO } from './dto/request/createLaundry
 import EditLaundryServiceRequestDTO from './dto/request/laundryServiceEdit.request';
 import LocationService from '../location/location.service';
 import { BooleanResponseDTO } from 'src/core/response/response.schema';
+import { I18nContext, I18nService } from 'nestjs-i18n';
+
 @Injectable()
 export default class VendorService {
+    private readonly locale: string;
     constructor(
         private _dbService: DatabaseService,
         private _notificationService: NotificationService,
         private _locationService: LocationService,
-    ) {}
+        private i18n: I18nService,
+    ) {
+        this.locale = I18nContext.current()?.lang || 'en';
+    }
 
     async getOrderRequests(user: User, param: GetOrderRequestDTO): Promise<GetOrderRequestsResponseDTO> {
         const orderRequests = await this._dbService.order.findMany({
@@ -308,7 +314,7 @@ export default class VendorService {
                 const customerOrderRejectedNotificationData = {
                     tokens: customerTokens,
                     title: 'Order Rejected!',
-                    body: 'Your order has been rejected by the vendor.',
+                    body: this.i18n.translate('order.rejected_by_vendor', { lang: this.locale }),
                     notificationData: {
                         orderId: order.id,
                         key: 'FETCH_ORDERS',
@@ -324,7 +330,7 @@ export default class VendorService {
                 });
 
                 if (isOrderRejected) {
-                    throw new BadRequestException('Order already rejected');
+                    throw new BadRequestException('order.already_rejected');
                 }
 
                 await this._dbService.order.update({
@@ -345,7 +351,7 @@ export default class VendorService {
                             data: {
                                 userId: customer.userId,
                                 orderId: order.id,
-                                message: 'Your order has been rejected by the vendor.',
+                                message: this.i18n.translate('order.rejected_by_vendor', { lang: this.locale }),
                                 status: 'UNREAD',
                                 data: {
                                     orderId: order.id,
@@ -587,6 +593,15 @@ export default class VendorService {
                 deletedAt: null,
             },
             include: {
+                vendor: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        phone: true,
+                    },
+                },
                 laundryService: {
                     where: {
                         deletedAt: null,
@@ -628,27 +643,98 @@ export default class VendorService {
             where: {
                 id: laundryId,
             },
+            include: {
+                vendor: true,
+            },
         });
 
         if (!laundry) {
             throw new BadRequestException('Laundry does not exist');
         }
 
-        const updatedLaundry = await this._dbService.laundry.update({
-            where: {
-                id: laundryId,
-            },
-            data: {
-                name: data.name,
-                address: data.address,
-            },
+        // Use transaction to update both laundry and vendor
+        await this._dbService.$transaction(async (tx) => {
+            // Update laundry data
+            const laundryUpdateData: any = {};
+
+            // Handle name translation
+            if (data.nameLocale) {
+                laundryUpdateData.nameLocale = data.nameLocale;
+                laundryUpdateData.name = data.nameLocale.en; // Auto-populate from English
+            }
+
+            // Handle address translation
+            if (data.addressLocale) {
+                laundryUpdateData.addressLocale = data.addressLocale;
+                laundryUpdateData.address = data.addressLocale.en; // Auto-populate from English
+            }
+
+            // Handle coordinates
+            if (data.lat !== undefined) {
+                laundryUpdateData.lat = data.lat;
+            }
+
+            if (data.long !== undefined) {
+                laundryUpdateData.long = data.long;
+            }
+
+            // Update laundry if there's data to update
+            if (Object.keys(laundryUpdateData).length > 0) {
+                await tx.laundry.update({
+                    where: {
+                        id: laundryId,
+                    },
+                    data: laundryUpdateData,
+                });
+            }
+
+            // Update vendor data if provided
+            const vendorUpdateData: any = { name: data.vendorName };
+
+            if (data.vendorName !== undefined) {
+                // Split name into firstName and lastName
+                const nameParts = data.vendorName.trim().split(' ');
+                if (nameParts.length === 1) {
+                    vendorUpdateData.firstName = nameParts[0];
+                    vendorUpdateData.lastName = '';
+                } else {
+                    vendorUpdateData.firstName = nameParts[0];
+                    vendorUpdateData.lastName = nameParts.slice(1).join(' ');
+                }
+            }
+
+            if (data.vendorEmail !== undefined) {
+                // Check if email is already taken by another user
+                if (data.vendorEmail !== laundry.vendor.email) {
+                    const existingUser = await tx.user.findFirst({
+                        where: {
+                            email: data.vendorEmail,
+                            id: { not: laundry.vendorId },
+                        },
+                    });
+
+                    if (existingUser) {
+                        throw new BadRequestException('Email is already taken by another user');
+                    }
+                }
+
+                vendorUpdateData.email = data.vendorEmail;
+            }
+
+            // Update vendor if there's data to update
+            if (Object.keys(vendorUpdateData).length > 0) {
+                await tx.user.update({
+                    where: {
+                        id: laundry.vendorId,
+                    },
+                    data: vendorUpdateData,
+                });
+            }
         });
 
-        if (!updatedLaundry) {
-            throw new BadRequestException('Failed to update laundry');
-        }
-
-        return { message: 'Laundry Updated Successfully' };
+        return {
+            message: 'Laundry and Vendor Updated Successfully',
+        };
     }
 
     async deleteLaundry(laundryId: string): Promise<LaundryMessageResponseDTO> {
@@ -695,41 +781,31 @@ export default class VendorService {
                 where: {
                     id: data.iconId,
                     deletedAt: null,
-                    // extension: 'svg',
                 },
             });
 
             if (!icon) {
-                throw new BadRequestException('SVG icon not found or invalid format');
+                throw new BadRequestException('Icon does not exist');
             }
         }
 
         const service = await this._dbService.laundryService.create({
             data: {
-                laundryId: laundryId,
-                name: data.name,
-                description: data.description,
-                iconId: data.iconId,
-            },
-            include: {
-                icon: {
-                    select: {
-                        id: true,
-                        name: true,
-                        type: true,
-                        media: {
-                            select: {
-                                id: true,
-                                path: true,
-                                name: true,
-                            },
-                        },
-                    },
-                },
+                laundryId,
+                nameLocale: data?.nameLocale,
+                name: data?.nameLocale.en,
+                descriptionLocale: data?.descriptionLocale,
+                description: data?.descriptionLocale?.en,
+                iconId: data?.iconId,
             },
         });
 
-        return service;
+        return {
+            data: {
+                message: 'Service Added Successfully',
+                service,
+            },
+        };
     }
 
     async editLaundryService(
@@ -758,33 +834,48 @@ export default class VendorService {
             throw new BadRequestException('Service does not exist');
         }
 
-        // Validate icon exists if provided
+        // Validate icon if provided
         if (data.iconId) {
             const icon = await this._dbService.icon.findFirst({
                 where: {
                     id: data.iconId,
                     deletedAt: null,
-                    // extension: 'svg',
                 },
             });
 
             if (!icon) {
-                throw new BadRequestException('SVG icon not found or invalid format');
+                throw new BadRequestException('Icon does not exist');
             }
+        }
+
+        const updateData: any = {};
+
+        // Handle name translation
+        if (data.nameLocale) {
+            updateData.nameLocale = data.nameLocale;
+            updateData.name = data.nameLocale.en; // Auto-populate from English
+        }
+
+        // Handle description translation
+        if (data.descriptionLocale) {
+            updateData.descriptionLocale = data.descriptionLocale;
+            updateData.description = data.descriptionLocale.en; // Auto-populate from English
+        }
+
+        if (data.iconId !== undefined) {
+            updateData.iconId = data.iconId;
         }
 
         await this._dbService.laundryService.update({
             where: {
                 id: serviceId,
             },
-            data: {
-                ...(data.name && { name: data.name }),
-                ...(data.description !== undefined && { description: data.description }),
-                ...(data.iconId !== undefined && { iconId: data.iconId }),
-            },
+            data: updateData,
         });
 
-        return { message: 'Service Updated Successfully' };
+        return {
+            message: 'Service Updated Successfully',
+        };
     }
 
     async deleteLaundryService(laundryId: string, serviceId: string): Promise<LaundryServiceMessageResponseDTO> {
@@ -861,7 +952,8 @@ export default class VendorService {
         }
 
         const items = data.items.map((item) => ({
-            name: item.name,
+            nameLocale: item.nameLocale,
+            name: item.nameLocale.en, // Auto-populate from English
             vendorPrice: item.vendorPrice,
             platformPrice: item.platformPrice,
             expressPrice: item.expressPrice,
@@ -877,10 +969,13 @@ export default class VendorService {
             throw new BadRequestException('Failed to add items');
         }
 
-        return { data: { message: 'Items Added Successfully' } };
+        return {
+            data: {
+                message: 'Items Added Successfully',
+            },
+        };
     }
 
-    // Update editLaundryServiceItem method
     async editLaundryServiceItem(
         laundryId: string,
         serviceId: string,
@@ -935,16 +1030,25 @@ export default class VendorService {
         }
 
         const updateData: any = {};
-        if (data.name !== undefined) {
-            updateData.name = data.name;
+
+        // Handle name translation
+        if (data.nameLocale) {
+            updateData.nameLocale = data.nameLocale;
+            updateData.name = data.nameLocale.en; // Auto-populate from English
         }
+
         if (data.vendorPrice !== undefined) {
             updateData.vendorPrice = data.vendorPrice;
+        }
+
+        if (data.platformPrice !== undefined) {
+            updateData.platformPrice = data.platformPrice;
         }
 
         if (data.expressPrice !== undefined) {
             updateData.expressPrice = data.expressPrice;
         }
+
         if (data.categoryId !== undefined) {
             updateData.categoryId = data.categoryId;
         }
@@ -960,7 +1064,12 @@ export default class VendorService {
             throw new BadRequestException('Failed to update item');
         }
 
-        return { data: { message: 'Item Updated Successfully' } };
+        return {
+            data: {
+                message: 'Item Updated Successfully',
+                item: updatedItem,
+            },
+        };
     }
 
     async deleteLaundryServiceItem(laundryId: string, serviceId: string, itemId: string): Promise<any> {
@@ -1182,41 +1291,27 @@ export default class VendorService {
     async createLaundryItemCategory(
         data: CreateLaundryItemCategoryRequestDTO,
     ): Promise<LaundryItemCategoryResponseDTO> {
+        // Validate icon if provided
         if (data.iconId) {
             const icon = await this._dbService.icon.findFirst({
                 where: {
                     id: data.iconId,
+                    deletedAt: null,
                 },
             });
 
             if (!icon) {
-                throw new BadRequestException('Icon not found');
+                throw new BadRequestException('Icon does not exist');
             }
         }
 
         const category = await this._dbService.laundryItemCategory.create({
             data: {
-                name: data.name,
-                description: data.description,
+                nameLocale: data.nameLocale,
+                name: data.nameLocale.en, // Auto-populate from English
+                descriptionLocale: data.descriptionLocale,
+                description: data.descriptionLocale?.en, // Auto-populate from English
                 iconId: data.iconId,
-            },
-            include: {
-                icon: {
-                    select: {
-                        id: true,
-                        name: true,
-                        type: true,
-                        createdAt: true,
-                        updatedAt: true,
-                        media: {
-                            select: {
-                                id: true,
-                                path: true,
-                                name: true,
-                            },
-                        },
-                    },
-                },
             },
         });
 
@@ -1309,33 +1404,48 @@ export default class VendorService {
             throw new BadRequestException('Category does not exist');
         }
 
-        // Validate icon exists if provided
+        // Validate icon if provided
         if (data.iconId) {
             const icon = await this._dbService.icon.findFirst({
                 where: {
                     id: data.iconId,
                     deletedAt: null,
-                    // extension: 'svg',
                 },
             });
 
             if (!icon) {
-                throw new BadRequestException('SVG icon not found or invalid format');
+                throw new BadRequestException('Icon does not exist');
             }
+        }
+
+        const updateData: any = {};
+
+        // Handle name translation
+        if (data.nameLocale) {
+            updateData.nameLocale = data.nameLocale;
+            updateData.name = data.nameLocale.en; // Auto-populate from English
+        }
+
+        // Handle description translation
+        if (data.descriptionLocale) {
+            updateData.descriptionLocale = data.descriptionLocale;
+            updateData.description = data.descriptionLocale.en; // Auto-populate from English
+        }
+
+        if (data.iconId !== undefined) {
+            updateData.iconId = data.iconId;
         }
 
         await this._dbService.laundryItemCategory.update({
             where: {
                 id: categoryId,
             },
-            data: {
-                ...(data.name && { name: data.name }),
-                ...(data.description !== undefined && { description: data.description }),
-                ...(data.iconId !== undefined && { iconId: data.iconId }),
-            },
+            data: updateData,
         });
 
-        return { message: 'Category Updated Successfully' };
+        return {
+            message: 'Category Updated Successfully',
+        };
     }
 
     async deleteLaundryItemCategory(categoryId: string): Promise<LaundryItemCategoryMessageResponseDTO> {

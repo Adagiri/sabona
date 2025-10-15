@@ -1,22 +1,32 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { CouponType } from "@prisma/client";
-import { Type } from "class-transformer";
-import { IsBoolean, IsDate, IsEnum, IsNumber, IsOptional, IsString } from "class-validator";
+import { ApiProperty } from '@nestjs/swagger';
+import { CouponType } from '@prisma/client';
+import { Type } from 'class-transformer';
+import { IsBoolean, IsDate, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+
+export class CouponNameTranslationDTO {
+    @ApiProperty({ example: 'Summer Sale' })
+    @IsString()
+    @IsNotEmpty()
+    en: string;
+
+    @ApiProperty({ example: 'تخفيضات الصيف' })
+    @IsString()
+    @IsNotEmpty()
+    ar: string;
+
+    [key: string]: string;
+}
 
 export class CreateCouponRequest {
     @ApiProperty({
         description: 'The unique code for the coupon.',
-        example: 'SABONAH_123'
+        example: 'SABONAH_123',
     })
     @IsString()
     code: string;
 
-    @ApiProperty({
-        description: 'Name of the coupon',
-        example: 'First Order Coupon'
-    })
-    @IsString()
-    name: string;
+    @ApiProperty({ type: CouponNameTranslationDTO })
+    nameLocale: CouponNameTranslationDTO;
 
     @ApiProperty({
         example: 'PERCENTAGE',
@@ -24,10 +34,9 @@ export class CreateCouponRequest {
     @IsEnum(CouponType)
     type: CouponType;
 
-
     @ApiProperty({
         description: 'The discount percentage for the coupon.',
-        example: 50
+        example: 50,
     })
     @IsNumber()
     discount: number;
@@ -74,5 +83,4 @@ export class CreateCouponRequest {
     @IsOptional()
     @IsBoolean()
     isActive: boolean;
-    
 }

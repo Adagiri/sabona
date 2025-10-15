@@ -1,0 +1,5 @@
+{
+    "sms.code_not_found": "Code not found, try to request a new one",
+    "sms.invalid_code": "Invalid code",
+    "sms.max_attempts_reached": "Max check attempts reached, please wait 10 minutes before retrying"
+}

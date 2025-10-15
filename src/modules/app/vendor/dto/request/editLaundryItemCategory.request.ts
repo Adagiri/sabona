@@ -1,14 +1,17 @@
-import { IsString, IsOptional, IsNumber } from 'class-validator';
+import { IsOptional, IsNumber } from 'class-validator';
+import { CategoryNameTranslationDTO, CategoryDescriptionTranslationDTO } from './createLaundryItemCategory.request';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class EditLaundryItemCategoryRequestDTO {
+    @ApiProperty({ type: CategoryNameTranslationDTO, required: false })
     @IsOptional()
-    @IsString()
-    name?: string;
+    nameLocale?: CategoryNameTranslationDTO;
 
+    @ApiProperty({ type: CategoryDescriptionTranslationDTO, required: false })
     @IsOptional()
-    @IsString()
-    description?: string;
+    descriptionLocale?: CategoryDescriptionTranslationDTO;
 
+    @ApiProperty({ required: false })
     @IsOptional()
     @IsNumber()
     iconId?: number;

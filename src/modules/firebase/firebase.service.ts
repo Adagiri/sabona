@@ -4,8 +4,8 @@ import { SendMultipleNotificationResponseDTO } from '../app/notification/dto/res
 import SendNotificationRequestDTO, {
     MultipleDeviceNotificationDto,
 } from '../app/notification/dto/request/notification.request';
-import { BadRequestException } from 'src/core/exceptions/response.exception';
-import AppConfig from 'src/configs/app.config';
+import { BadRequestException } from '../../core/exceptions/response.exception';
+import AppConfig from '../../configs/app.config';
 
 @Injectable()
 export default class FirebaseService {
@@ -56,12 +56,11 @@ export default class FirebaseService {
 
     async verifyToken(token: string) {
         try {
-    console.log(JSON.stringify(AppConfig));
+            console.log(JSON.stringify(AppConfig));
 
-        return await admin.auth().verifyIdToken(token);
-            
+            return await admin.auth().verifyIdToken(token);
         } catch (error) {
-            console.log(error)
+            console.log(error);
         }
     }
 }

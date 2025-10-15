@@ -25,7 +25,7 @@ import { CreateCustomOrderResponseDTO } from '../customOrder/dto/response/create
 import { CreateCustomOrderRequestDTO } from '../customOrder/dto/request/createCustomOrder.request';
 import { CalculateFeesResponseDTO } from './dto/response/calculateFees.response';
 import { CalculateFeesRequestDTO } from './dto/request/calculateFees.request';
-import { BooleanResponseDTO } from 'src/core/response/response.schema';
+import { BooleanResponseDTO } from '../../../core/response/response.schema';
 
 @ApiController({
     path: '/customer',
@@ -61,7 +61,7 @@ export default class CustomerController {
         @Body() data: CreateCustomOrderRequestDTO,
         @CurrentUser() user: User,
     ): Promise<CreateCustomOrderResponseDTO> {
-        console.log(data)
+        console.log(data);
         return await this._customOrderService.createCustomOrder(data as any, user);
     }
 

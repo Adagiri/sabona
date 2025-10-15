@@ -1,0 +1,8 @@
+{
+    "media.not_allowed": "الوسائط غير مسموح بها",
+    "media.not_found": "الوسائط غير موجودة",
+    "media.too_large": "حجم الوسائط كبير جداً",
+    "media.service_not_available": "خدمة الوسائط غير متاحة",
+    "media.upload_success": "تم تحميل الوسائط بنجاح",
+    "media.not_supported": "هذا النوع من الوسائط غير مدعوم"
+}

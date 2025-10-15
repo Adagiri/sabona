@@ -1,0 +1,6 @@
+{
+    "coupon.created": "تم إنشاء القسيمة بنجاح",
+    "coupon.updated": "تم تحديث القسيمة بنجاح",
+    "coupon.deleted": "تم حذف القسيمة بنجاح",
+    "coupon.invalid": "كوبون غير صالح"
+}

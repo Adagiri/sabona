@@ -15,11 +15,13 @@ import CreateOrderRequestDTO from './dto/request/createOrder.request';
 import AcceptOrderRequestDTO from '../vendor/dto/request/acceptOrder.request';
 import CancelOrderResponseDTO from './dto/response/cancelOrder.response';
 import { OrderListDto } from './dto/response/orderlist.response.dto';
-import { extractTokens, GetPaginationOptions } from 'src/helpers/util.helper';
+import { extractTokens, GetPaginationOptions } from '../../../helpers/util.helper';
+// import { extractTokens, GetPaginationOptions } from 'src/helpers/util.helper';
 import NotificationService from '../notification/notification.service';
 import CreateFeedbackDTO from './dto/request/createFeeback.request';
 import CreateFeedbackResponseDTO from './dto/response/createFeedback.response';
-import { BadRequestException } from 'src/core/exceptions/response.exception';
+import { BadRequestException } from '../../../core/exceptions/response.exception';
+// import { BadRequestException } from 'src/core/exceptions/response.exception';
 import { HasFeedBackRequestDTO } from './dto/request/hasFeedback.request';
 import { HasFeedbackResponseDTO } from './dto/response/hasFeedback.response.dto';
 import { ValidateCouponQueryRequestDTO, ValidateCouponRequestDTO } from './dto/request/validateCoupon.request';
@@ -32,7 +34,8 @@ import { AddTipResponseDto } from './dto/response/addTip.response';
 import LocationService from '../location/location.service';
 import { CalculateFeesRequestDTO } from './dto/request/calculateFees.request';
 import { CalculateFeesResponseDTO } from './dto/response/calculateFees.response';
-import { BooleanResponseDTO } from 'src/core/response/response.schema';
+import { BooleanResponseDTO } from '../../../core/response/response.schema';
+// import { BooleanResponseDTO } from 'src/core/response/response.schema';
 
 export interface FeeCalculationInput {
     orderType: OrderType;
@@ -627,12 +630,12 @@ export default class CustomerService {
             ]);
 
             if (feedbacksCreated.some((feedback) => feedback === true)) {
-                return { message: 'Feedback added successfully' };
+                return { message: 'feedback.added_successfully' };
             } else {
-                throw new BadRequestException('Error adding feedback');
+                throw new BadRequestException('feedback.error_adding');
             }
         } else {
-            throw new BadRequestException('Order is not completed');
+            throw new BadRequestException('order.not_completed');
         }
     }
 
@@ -675,7 +678,7 @@ export default class CustomerService {
         });
 
         if (!coupon) {
-            throw new BadRequestException('Invalid coupon');
+            throw new BadRequestException('coupon.invalid');
         }
 
         if (coupon.singleUse) {

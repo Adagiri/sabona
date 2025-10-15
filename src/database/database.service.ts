@@ -3,8 +3,10 @@ import { exec } from 'child_process';
 
 import { PrismaClient } from '@prisma/client';
 import { promisify } from 'util';
-import AppConfig from 'src/configs/app.config';
-import { APP_ENV } from 'src/constants';
+import AppConfig from '../configs/app.config';
+// import AppConfig from '/src/configs/app.config';
+import { APP_ENV } from '../constants';
+// import { APP_ENV } from '/src/constants';
 
 const execAsync = promisify(exec);
 

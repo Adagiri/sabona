@@ -29,5 +29,15 @@
     "device.fcm_updated": "FCM token updated successfully",
 
     "oauth.invalid_provider": "This OAuth login is not supported",
-    "oauth.invalid_token": "Invalid OAuth token"
+    "oauth.invalid_token": "Invalid OAuth token",
+
+    "errors.field_invalid": "${field} is invalid",
+    "auth.phone_not_registered": "Phone number is not registered",
+    "auth.phone_registered_as_vendor": "Phone number already registered as a vendor",
+    "auth.login_code_sent": "Login code sent successfully",
+    "auth.error_sending_code": "Error while sending login code, please try again",
+    "auth.invalid_phone_or_password": "Invalid phone number or password",
+    "auth.no_password_use_otp": "No password set for this account. Please use OTP login",
+    "auth.account_not_active": "Account is not active. Please contact support",
+    "auth.invalid_otp": "Invalid or expired OTP code"
 }

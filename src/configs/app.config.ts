@@ -18,6 +18,13 @@ const AppConfig = {
         get LOG_LEVEL() {
             return Number(process.env.APP_LOG_LEVEL);
         },
+        get ADMIN_EMAILS() {
+            return process.env.APP_ADMIN_EMAILS;
+        },
+        get ADMIN_PANEL_URL() {
+            return process.env.APP_ADMIN_PANEL_URL;
+        },
+
         get TOKEN_EXPIRATION() {
             return Number(process.env.APP_TOKEN_EXPIRATION);
         },
@@ -50,6 +57,10 @@ const AppConfig = {
         },
         get STS_ROLE_ARN() {
             return process.env.APP_AWS_STS_ROLE_ARN;
+        },
+
+        get SES_FROM_EMAIL() {
+            return process.env.APP_AWS_SES_FROM_EMAIL;
         },
     },
     TWILIO: {

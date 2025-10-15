@@ -1,11 +1,24 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsNumber, IsString, IsOptional, ValidateNested } from 'class-validator';
+import { IsArray, IsNotEmpty, IsNumber, IsString, IsOptional, ValidateNested } from 'class-validator';
+
+export class ItemNameTranslationDTO {
+    @ApiProperty({ example: 'T-Shirt' })
+    @IsString()
+    @IsNotEmpty()
+    en: string;
+
+    @ApiProperty({ example: 'تي شيرت' })
+    @IsString()
+    @IsNotEmpty()
+    ar: string;
+
+    [key: string]: string;
+}
 
 export class CreateLaundryServiceItemRequestDTO {
-    @ApiProperty()
-    @IsString()
-    name: string;
+    @ApiProperty({ type: ItemNameTranslationDTO })
+    nameLocale: ItemNameTranslationDTO;
 
     @ApiProperty()
     @IsNumber()

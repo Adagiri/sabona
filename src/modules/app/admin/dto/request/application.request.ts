@@ -1,7 +1,8 @@
 import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsEnum, IsNumber, Min, Max } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { IsNotEmpty, IsOptional, IsString, IsEnum, IsNumber, Min, Max, ValidateNested } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import PaginatedRequest from '../../../../../core/request/paginated.request';
+import { LaundryAddressTranslationDTO } from 'src/modules/app/vendor/dto/request/createLaundry.request';
 
 export enum ApplicantType {
     VENDOR = 'VENDOR',
@@ -23,12 +24,12 @@ export class ApproveApplicationRequestDTO {
     @ApiProperty({ required: true })
     @IsOptional()
     @IsString()
-    address: string;
-
-    @ApiProperty({ required: true })
-    @IsOptional()
-    @IsString()
     contactPhone: string;
+
+    @ApiProperty({ type: LaundryAddressTranslationDTO, required: true })
+    @ValidateNested()
+    @Type(() => LaundryAddressTranslationDTO)
+    addressLocale: LaundryAddressTranslationDTO;
 }
 
 export class RejectApplicationRequestDTO {
