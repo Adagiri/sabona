@@ -7,6 +7,7 @@ import NotificationService from '../notification/notification.service';
 import { extractTokens } from '../../../helpers/util.helper';
 import { DELIVERY_CHARGES } from '../../../constants';
 import { CreateCustomOrderRequestDTO } from './dto/request/createCustomOrder.request';
+import { EmailService } from 'src/services/email.service';
 
 interface CustomOrderEstimate {
     estimatedCost: number;
@@ -20,6 +21,7 @@ export default class CustomOrderService {
     constructor(
         private _dbService: DatabaseService,
         private _notificationService: NotificationService,
+        private emailService: EmailService,
     ) {}
 
     /**
@@ -80,6 +82,19 @@ export default class CustomOrderService {
 
         // Notify all admins about new custom order
         await this.notifyAdminsNewCustomOrder(order.id, user);
+
+        // Notify all admins about new custom order through email
+        await this.emailService
+            .sendCustomOrderAlert(order.id, user.name || user.email || 'Unknown Customer', {
+                customLaundryName: data.customLaundryName,
+                customLaundryAddress: data.customLaundryAddress,
+                customLaundryDescription: data.customLaundryDescription,
+                pickupAddress: data.pickupAddress,
+                pickupDate: data.pickupDate,
+            })
+            .catch((err) => {
+                console.error('Failed to send admin email alert:', err);
+            });
 
         return {
             data: order,
