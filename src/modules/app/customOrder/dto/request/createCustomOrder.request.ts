@@ -10,9 +10,8 @@ export class CreateCustomOrderRequestDTO {
     customLaundryName: string;
 
     @ApiProperty({ description: 'Detailed description of laundry needs and items' })
-    @IsOptional()
     @IsString()
-    @Length(0, 1000, { message: 'Description must be between 0 and 1000 characters' })
+    @Length(2, 1000, { message: 'Description must be between 2 and 1000 characters' })
     customLaundryDescription: string;
 
     @ApiProperty({ description: 'Custom laundry latitude (user-pinned location)' })
