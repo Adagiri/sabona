@@ -1,10 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserType } from '@prisma/client';
-import {
-    IsOptional,
-    IsString,
-    Matches,
-} from 'class-validator';
+import { IsOptional, IsString, Matches } from 'class-validator';
 
 export class SignupRequestDTO {
     @ApiProperty()

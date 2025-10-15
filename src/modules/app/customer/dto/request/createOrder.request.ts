@@ -23,7 +23,6 @@ export class OrderServiceDTO {
     @IsArray()
     items: OrderServiceItemDTO[];
 }
-
 export default class CreateOrderRequestDTO {
     // NEW: Order type field
     @ApiProperty({ enum: OrderType, description: 'Type of order - registered or custom laundry' })

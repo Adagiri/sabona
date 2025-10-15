@@ -87,7 +87,7 @@ export default class PayTabsService {
             } else if (order.orderType === OrderType.CUSTOM_LAUNDRY) {
                 await this.handleCustomOrderPayment(order, processedData);
             } else {
-                throw new BadRequestException('Unknown order type');
+                throw new BadRequestException('order.unknown_type');
             }
 
             return {

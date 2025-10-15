@@ -59,21 +59,19 @@ export default class UserService {
         });
         console.log(user, 'user');
         if (!user) {
-            throw new BadRequestException('Phone number is not registered');
+            throw new BadRequestException('auth.phone_not_registered');
         }
 
         if (user.type === UserType.VENDOR) {
-            throw new BadRequestException('Phone number already registered as a vendor');
+            throw new BadRequestException('auth.phone_registered_as_vendor');
         }
 
         if (AppConfig.APP.ENV === APP_ENV.TEST || ['+966563651254', '+966563651244'].indexOf(data.phone) !== -1) {
-            return {
-                message: 'Login code sent successfully',
-            };
+            return { message: 'auth.login_code_sent' };
         } else {
             const otp = await this._smsService.sendVerificationCode(data.phone);
             if (!otp) {
-                throw new BadRequestException('Error while sending login code, Please try again!!!');
+                throw new BadRequestException('auth.error_sending_code');
             }
             return {
                 message: 'Login code sent successfully',
@@ -229,7 +227,7 @@ export default class UserService {
                 }
             } catch (error) {
                 console.error('OTP verification error:', error);
-                throw new BadRequestException('Invalid or expired OTP code');
+                throw new BadRequestException('auth.invalid_otp');
             }
         }
 
@@ -279,7 +277,7 @@ export default class UserService {
         });
 
         if (existingUser) {
-            throw new BadRequestException('This email is already registered');
+            throw new BadRequestException('auth.email_already_exist'); // Already exists
         }
 
         const user = await this._dbService.user.create({
@@ -574,7 +572,7 @@ export default class UserService {
                 return { token };
             }
         } else {
-            throw new BadRequestException('Invalid token');
+            throw new BadRequestException('auth.invalid_token'); // Already exists
         }
     }
 
@@ -595,12 +593,12 @@ export default class UserService {
         });
 
         if (!user) {
-            throw new BadRequestException('Invalid phone number or password');
+            throw new BadRequestException('auth.invalid_phone_or_password');
         }
 
         // Check if user has a password set
         if (!user.password) {
-            throw new BadRequestException('No password set for this account. Please use OTP login.');
+            throw new BadRequestException('auth.no_password_use_otp');
         }
 
         // Verify password
@@ -614,7 +612,7 @@ export default class UserService {
             user.status !== UserStatus.ACTIVE &&
             ['+201221925690', '+201221825444', '+201221925330'].indexOf(data.phone) === -1
         ) {
-            throw new BadRequestException('Account is not active. Please contact support.');
+            throw new BadRequestException('auth.account_not_active');
         }
 
         // Generate token
@@ -630,7 +628,7 @@ export default class UserService {
         });
 
         if (!userDetails) {
-            throw new BadRequestException('User not found');
+            throw new BadRequestException('user.notfound'); // Already exists
         }
 
         // Filter out undefined/null values before updating

@@ -24,5 +24,14 @@
     "device.not_found": "الجهاز غير موجود",
     "device.fcm_updated": "تم تحديث رمز FCM بنجاح",
     "oauth.invalid_provider": "تسجيل الدخول عبر OAuth غير مدعوم",
-    "oauth.invalid_token": "رمز OAuth غير صالح"
+    "oauth.invalid_token": "رمز OAuth غير صالح",
+    "errors.field_invalid": "${field} غير صالح",
+    "auth.phone_not_registered": "رقم الهاتف غير مسجل",
+    "auth.phone_registered_as_vendor": "رقم الهاتف مسجل بالفعل كمغسلة",
+    "auth.login_code_sent": "تم إرسال رمز تسجيل الدخول بنجاح",
+    "auth.error_sending_code": "خطأ أثناء إرسال رمز تسجيل الدخول، يرجى المحاولة مرة أخرى",
+    "auth.invalid_phone_or_password": "رقم الهاتف أو كلمة المرور غير صحيحة",
+    "auth.no_password_use_otp": "لم يتم تعيين كلمة مرور لهذا الحساب. يرجى استخدام تسجيل الدخول عبر OTP",
+    "auth.account_not_active": "الحساب غير نشط. يرجى الاتصال بالدعم",
+    "auth.invalid_otp": "رمز OTP غير صالح أو منتهي الصلاحية"
 }
