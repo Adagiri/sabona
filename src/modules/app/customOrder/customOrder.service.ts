@@ -132,8 +132,8 @@ export default class CustomOrderService {
         }
 
         // Validate description length
-        if (data.customLaundryDescription!.length < 20) {
-            throw new BadRequestException('Custom laundry description must be at least 20 characters');
+        if (data.customLaundryDescription!.length < 2) {
+            throw new BadRequestException('Custom laundry description must be at least 2 characters');
         }
 
         if (data.customLaundryDescription!.length > 1000) {
