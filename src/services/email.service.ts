@@ -35,7 +35,7 @@ Description: ${orderDetails.customLaundryDescription}
 Pickup: ${orderDetails.pickupAddress}
 Pickup Date: ${orderDetails.pickupDate}
 
-View order in admin panel: ${AppConfig.APP.ADMIN_PANEL_URL}/custom-orders/${orderId}
+View order in admin panel: ${AppConfig.APP.ADMIN_PANEL_URL}/custom-order/${orderId}
         `.trim();
 
         return this.sendEmail(this.adminEmails, subject, body);
