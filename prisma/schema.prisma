@@ -291,28 +291,31 @@ model UserSettings {
   deletedAt  DateTime? @db.Timestamptz()
 }
 
-// DeviceToken model to store device tokens for push notifications
 model DeviceToken {
-  id        Int       @id @default(autoincrement()) // Using Int for device token ID
-  userId    String // Changed to String to match User's UUID
+  id        Int       @id @default(autoincrement())
+  userId    String
   user      User      @relation(fields: [userId], references: [id])
   token     String
-  deviceId  String
+  deviceId  Int // Changed from String to Int
+  device    Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   createdAt DateTime  @default(now()) @db.Timestamptz()
-  deletedAt DateTime? @db.Timestamptz() // Optional deletion timestamp
+  deletedAt DateTime? @db.Timestamptz()
+
+  @@unique([userId, deviceId])
+  @@index([token])
 }
 
-// Device model to store devices used by users (for web, iOS, Android)
 model Device {
-  id        Int        @id @default(autoincrement()) // Using Int for device ID
-  uuid      String     @default(uuid()) // Unique identifier for each device
-  userAgent String? // Optional user agent string
-  type      DeviceType @default(ANDROID) // Default device type is Android
-  userId    String // Changed to String to match User's UUID
-  user      User       @relation(fields: [userId], references: [id])
-  createdAt DateTime   @default(now()) @db.Timestamptz()
-  updatedAt DateTime   @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt DateTime?  @db.Timestamptz() // Optional deletion timestamp
+  id           Int           @id @default(autoincrement())
+  uuid         String        @default(uuid())
+  userAgent    String?
+  type         DeviceType    @default(ANDROID)
+  userId       String
+  user         User          @relation(fields: [userId], references: [id])
+  deviceTokens DeviceToken[] // Add this line
+  createdAt    DateTime      @default(now()) @db.Timestamptz()
+  updatedAt    DateTime      @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt    DateTime?     @db.Timestamptz()
 }
 
 // Token model to manage tokens for authentication (e.g., password reset)
@@ -611,7 +614,7 @@ model Order {
   discountAmount Float? // Amount discounted due to the coupon
   totalAmount    Float // Total amount for the order
   couponId       String? // Nullable coupon ID field
-  coupon         Coupon?    @relation(fields: [couponId], references: [id])
+  coupon         Coupon?               @relation(fields: [couponId], references: [id])
   services       OrderLaundryService[]
   payment        Payment? // Payment details for the order
   paymentType    PaymentType? // Payment type for the order

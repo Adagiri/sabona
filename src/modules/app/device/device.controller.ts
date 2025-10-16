@@ -1,5 +1,5 @@
-import { Body } from '@nestjs/common';
-import { ApiController, Authorized, CurrentUser, Post } from '../../../core/decorators';
+import { Body, Param } from '@nestjs/common';
+import { ApiController, Authorized, CurrentUser, Post, Delete } from '../../../core/decorators';
 import DeviceService from './device.service';
 import CreateDeviceRequestDTO, { CreateFCMTokenRequestDTO } from './dto/request/create.request';
 import CreateDeviceResponseDTO, { CreateFCMTokenResponseDTO } from './dto/response/create.response';
@@ -28,22 +28,30 @@ export default class DeviceController {
         description: 'Add FCM token to device',
         response: CreateFCMTokenResponseDTO,
     })
-    AddFCMToken(
-        @Body() data: CreateFCMTokenRequestDTO ,
-        @CurrentUser() user: User
-    ): Promise<CreateFCMTokenResponseDTO> {
-        return this._deviceService.AddFCMToken(data , user);
+    AddFCMToken(@Body() data: CreateFCMTokenRequestDTO, @CurrentUser() user: User): Promise<CreateFCMTokenResponseDTO> {
+        return this._deviceService.AddFCMToken(data, user);
     }
 
     @Authorized()
-    @Post({
-        path: '/remove-fcm-token',
-        description: 'Remove FCM token from device',
+    @Delete({
+        path: '/fcm-token',
+        description: 'Remove all FCM tokens for user',
         response: CreateFCMTokenResponseDTO,
     })
-    RemoveUserTokens(
-        @CurrentUser() user: User
-    ): Promise<CreateFCMTokenResponseDTO> {
+    RemoveUserTokens(@CurrentUser() user: User): Promise<CreateFCMTokenResponseDTO> {
         return this._deviceService.RemoveUserTokens(user);
+    }
+
+    @Authorized()
+    @Delete({
+        path: '/fcm-token/:deviceId',
+        description: 'Remove FCM token for specific device',
+        response: CreateFCMTokenResponseDTO,
+    })
+    RemoveDeviceToken(
+        @Param('deviceId') deviceId: number,
+        @CurrentUser() user: User,
+    ): Promise<CreateFCMTokenResponseDTO> {
+        return this._deviceService.RemoveDeviceToken(user, Number(deviceId));
     }
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
 import { GenerateUUID } from '../../../helpers/util.helper';
 import CreateDeviceRequestDTO, { CreateFCMTokenRequestDTO } from './dto/request/create.request';
@@ -7,7 +7,7 @@ import { User } from '@prisma/client';
 
 @Injectable()
 export default class DeviceService {
-    constructor(private _dbService: DatabaseService) { }
+    constructor(private _dbService: DatabaseService) {}
 
     async Create(data: CreateDeviceRequestDTO): Promise<CreateDeviceResponseDTO> {
         return await this._dbService.device.create({
@@ -20,68 +20,77 @@ export default class DeviceService {
         });
     }
 
-    async AddFCMToken(
-        data: CreateFCMTokenRequestDTO,
-        user: User
-    ): Promise<CreateFCMTokenResponseDTO> {
-        try {
-            const conflictingToken = await this._dbService.deviceToken.findFirst({
-                where: {
-                    deviceId: data.deviceId,
-                    userId: { not: user.id }, // Token is linked to another user
-                    user:{
-                        type: user.type
-                    }
-                },
-            });
-    
-            if (conflictingToken) {
-                // Step 2: Remove the conflicting token
-                await this._dbService.deviceToken.delete({
-                    where: { id: conflictingToken.id },
-                });
-            }
-    
-            // Step 3: Delete existing token for the current user and device
-            await this._dbService.deviceToken.deleteMany({
-                where: {
-                    userId: user.id,
-                    deviceId: data.deviceId,
-                },
-            });
-    
-            // Step 4: Create a new token
-            await this._dbService.deviceToken.create({
-                data: {
-                    userId: user.id,
-                    deviceId: data.deviceId,
-                    token: data.token,
-                },
-            });
-    
-            return { message: 'Token added successfully' };
-        } catch (error) {
-            console.error('Failed to process FCM token:', error);
-            throw new Error('An error occurred while processing the FCM token');
+    async AddFCMToken(data: CreateFCMTokenRequestDTO, user: User): Promise<CreateFCMTokenResponseDTO> {
+        // Verify device exists and belongs to user
+        const device = await this._dbService.device.findFirst({
+            where: {
+                id: data.deviceId,
+                userId: user.id,
+                deletedAt: null,
+            },
+        });
+
+        if (!device) {
+            throw new NotFoundException('Device not found or does not belong to user');
         }
+
+        // Use upsert to handle updates atomically
+        await this._dbService.deviceToken.upsert({
+            where: {
+                userId_deviceId: {
+                    userId: user.id,
+                    deviceId: data.deviceId,
+                },
+            },
+            update: {
+                token: data.token,
+                deletedAt: null, // Restore if soft-deleted
+            },
+            create: {
+                userId: user.id,
+                deviceId: data.deviceId,
+                token: data.token,
+            },
+        });
+
+        return { message: 'Token added successfully' };
     }
-    
 
     async RemoveUserTokens(user: User): Promise<CreateFCMTokenResponseDTO> {
-        const res = await this._dbService.deviceToken.deleteMany({
+        await this._dbService.deviceToken.deleteMany({
             where: { userId: user.id },
         });
 
-        if (res) {
-            return { message: 'Tokens removed successfully' };
-        }
+        return { message: 'Tokens removed successfully' };
+    }
+
+    async RemoveDeviceToken(user: User, deviceId: number): Promise<CreateFCMTokenResponseDTO> {
+        console.log(user.id, deviceId)
+        await this._dbService.deviceToken.deleteMany({
+            where: {
+                userId: user.id,
+                deviceId: deviceId,
+            },
+        });
+
+        return { message: 'Token removed successfully' };
     }
 
     async FindById(id: number): Promise<CreateDeviceResponseDTO> {
-        return await this._dbService.device.findFirst({ where: { id } });
+        return await this._dbService.device.findFirst({
+            where: {
+                id,
+                deletedAt: null,
+            },
+        });
     }
 
     async FindByUUID(uuid: string): Promise<CreateDeviceResponseDTO> {
-        return await this._dbService.device.findFirst({ where: { uuid } });
+        return await this._dbService.device.findFirst({
+            where: {
+                uuid,
+                deletedAt: null,
+            },
+        });
     }
 }
