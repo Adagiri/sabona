@@ -1103,12 +1103,12 @@ export default class CustomerService {
         let deliveryFee = 0
 
         if (input.deliveryType === DeliveryType.EXPRESS) {
-            deliveryFee = 15;
+            deliveryFee = 9.75;
             // deliveryFee *= settings.expressMultiplier;
         }
 
         if (input.deliveryType === DeliveryType.NORMAL) {
-            deliveryFee = 9;
+            deliveryFee = 6.75;
             // deliveryFee *= settings.expressMultiplier;
         }
 
