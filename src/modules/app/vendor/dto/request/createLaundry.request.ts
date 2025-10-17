@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsNotEmpty, IsOptional, IsString, IsNumber } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsNumber, IsObject } from 'class-validator';
 
 // Translation DTO for laundry name
 export class LaundryNameTranslationDTO {
@@ -61,7 +61,8 @@ export class ServiceDescriptionTranslationDTO {
 }
 
 export class LaundryServiceDTO {
-    @ApiProperty({ type: ServiceNameTranslationDTO })
+    @ApiProperty({ type: ServiceNameTranslationDTO, required: true })
+    @IsObject()
     nameLocale: ServiceNameTranslationDTO;
 
     @ApiProperty({ type: ServiceDescriptionTranslationDTO, required: false })

@@ -765,47 +765,51 @@ export default class VendorService {
     }
 
     async addLaundryService(laundryId: string, data: LaundryServiceDTO): Promise<any> {
-        const laundry = await this._dbService.laundry.findFirst({
-            where: {
-                id: laundryId,
-            },
-        });
-
-        if (!laundry) {
-            throw new BadRequestException('Laundry does not exist');
-        }
-
-        // Validate icon exists if provided
-        if (data.iconId) {
-            const icon = await this._dbService.icon.findFirst({
+        try {
+            const laundry = await this._dbService.laundry.findFirst({
                 where: {
-                    id: data.iconId,
-                    deletedAt: null,
+                    id: laundryId,
                 },
             });
 
-            if (!icon) {
-                throw new BadRequestException('Icon does not exist');
+            if (!laundry) {
+                throw new BadRequestException('Laundry does not exist');
             }
+
+            // Validate icon exists if provided
+            if (data.iconId) {
+                const icon = await this._dbService.icon.findFirst({
+                    where: {
+                        id: data.iconId,
+                        deletedAt: null,
+                    },
+                });
+
+                if (!icon) {
+                    throw new BadRequestException('Icon does not exist');
+                }
+            }
+            console.log(data);
+            const service = await this._dbService.laundryService.create({
+                data: {
+                    laundryId,
+                    nameLocale: data?.nameLocale,
+                    name: data?.nameLocale.en,
+                    descriptionLocale: data?.descriptionLocale,
+                    description: data?.descriptionLocale?.en,
+                    iconId: data?.iconId,
+                },
+            });
+
+            return {
+                data: {
+                    message: 'Service Added Successfully',
+                    service,
+                },
+            };
+        } catch (error) {
+            console.log('error adding laundry service: ', error);
         }
-
-        const service = await this._dbService.laundryService.create({
-            data: {
-                laundryId,
-                nameLocale: data?.nameLocale,
-                name: data?.nameLocale.en,
-                descriptionLocale: data?.descriptionLocale,
-                description: data?.descriptionLocale?.en,
-                iconId: data?.iconId,
-            },
-        });
-
-        return {
-            data: {
-                message: 'Service Added Successfully',
-                service,
-            },
-        };
     }
 
     async editLaundryService(
@@ -1144,6 +1148,7 @@ export default class VendorService {
             select: {
                 id: true,
                 name: true,
+                nameLocale: true,
                 createdAt: true,
                 vendorPrice: true,
                 platformPrice: true,
@@ -1152,6 +1157,7 @@ export default class VendorService {
                     select: {
                         id: true,
                         name: true,
+                        nameLocale: true,
                         icon: {
                             select: {
                                 id: true,
