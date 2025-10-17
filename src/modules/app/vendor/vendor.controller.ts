@@ -160,7 +160,7 @@ export default class VendorController {
         response: {},
     })
     async addLaundryService(@Param('laundryId') laundryId: string, @Body() data: LaundryServiceDTO): Promise<any> {
-        console.log(laundryId);
+        console.log(laundryId, data);
         return await this._vendorService.addLaundryService(laundryId, data);
     }
 
