@@ -143,6 +143,7 @@ export default class GetOrderByIdResponseDTO {
     status: string;
 
     @ApiProperty()
+    @IsString()
     createdAt: Date;
 
     @ApiProperty()

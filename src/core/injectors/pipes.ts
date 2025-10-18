@@ -5,6 +5,10 @@ export default function InjectPipes(app: INestApplication) {
         new ValidationPipe({
             validationError: { target: true, value: true },
             whitelist: true,
+            transform: true,
+            transformOptions: {
+                enableImplicitConversion: true,
+            },
             exceptionFactory: (errors) => new BadRequestException(errors),
         }),
     );

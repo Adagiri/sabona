@@ -1,7 +1,7 @@
-import { Injectable } from "@nestjs/common";
-import DatabaseService from "src/database/database.service";
-import { BadRequestException } from "src/core/exceptions/response.exception";
-import { User } from "@prisma/client";
+import { Injectable } from '@nestjs/common';
+import DatabaseService from 'src/database/database.service';
+import { BadRequestException } from 'src/core/exceptions/response.exception';
+import { User } from '@prisma/client';
 @Injectable()
 export default class OrderService {
     constructor(private _dbService: DatabaseService) {}
