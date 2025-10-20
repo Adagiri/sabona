@@ -64,7 +64,7 @@ export default class FeeCalculationService {
         const subtotalWithFees = input.subtotal + serviceCharge + deliveryFee;
 
         // Calculate VAT on total (including service charge and delivery)
-        const vatAmount = settings.vatEnabled ? Math.round(subtotalWithFees * settings.vatRate * 100) / 100 : 0;
+        const vatAmount = settings.vatEnabled ? Math.round((serviceCharge + deliveryFee) * settings.vatRate * 100) / 100 : 0;
 
         const total = subtotalWithFees + vatAmount;
 

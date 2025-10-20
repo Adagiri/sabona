@@ -1035,7 +1035,7 @@ export default class CustomerService {
         const postDiscountAmount = preDiscountAmount - discountAmount;
 
         const vatPercentage = settings.vatRate * 100;
-        const vatFee = settings.vatEnabled ? Math.round(postDiscountAmount * settings.vatRate * 100) / 100 : 0;
+        const vatFee = settings.vatEnabled ? Math.round((deliveryFee + serviceCharge) * settings.vatRate * 100) / 100 : 0;
 
         // Calculate final total
         const finalAmount = postDiscountAmount + vatFee;
