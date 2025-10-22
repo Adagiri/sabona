@@ -609,7 +609,9 @@ export default class VendorService {
                     select: {
                         id: true,
                         name: true,
+                        nameLocale: true,
                         description: true,
+                        descriptionLocale: true,
                         icon: {
                             select: {
                                 id: true,
