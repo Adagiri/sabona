@@ -178,7 +178,7 @@ export default class CronService {
             for (const chunkUsers of chunkedOrders) {
                 const cancelPromises = chunkUsers.map((order) =>
                     this._dbService.order.update({
-                        where: { id: order.id },
+                        where: { id: order.id, paymentStatus: PaymentStatus.PENDING },
                         data: {
                             status: OrderStatus.CANCELLED,
                             paymentStatus: PaymentStatus.CANCELLED,

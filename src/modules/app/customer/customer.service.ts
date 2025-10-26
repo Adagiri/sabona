@@ -10,18 +10,17 @@ import {
     OrderType,
     DeliveryType,
     ServiceChargeType,
+    PaymentStatus,
 } from '@prisma/client';
 import CreateOrderRequestDTO from './dto/request/createOrder.request';
 import AcceptOrderRequestDTO from '../vendor/dto/request/acceptOrder.request';
 import CancelOrderResponseDTO from './dto/response/cancelOrder.response';
 import { OrderListDto } from './dto/response/orderlist.response.dto';
-import { extractTokens, GetPaginationOptions } from '../../../helpers/util.helper';
-// import { extractTokens, GetPaginationOptions } from 'src/helpers/util.helper';
+import { GetPaginationOptions } from '../../../helpers/util.helper';
 import NotificationService from '../notification/notification.service';
 import CreateFeedbackDTO from './dto/request/createFeeback.request';
 import CreateFeedbackResponseDTO from './dto/response/createFeedback.response';
 import { BadRequestException } from '../../../core/exceptions/response.exception';
-// import { BadRequestException } from 'src/core/exceptions/response.exception';
 import { HasFeedBackRequestDTO } from './dto/request/hasFeedback.request';
 import { HasFeedbackResponseDTO } from './dto/response/hasFeedback.response.dto';
 import { ValidateCouponQueryRequestDTO, ValidateCouponRequestDTO } from './dto/request/validateCoupon.request';
@@ -286,18 +285,6 @@ export default class CustomerService {
             }
         }
 
-        // Get device tokens for notifications
-        const [customerDeviceTokens, vendorDeviceTokens] = await Promise.all([
-            this._dbService.deviceToken.findMany({
-                where: { userId: user.id, deletedAt: null },
-                select: { token: true },
-            }),
-            this._dbService.deviceToken.findMany({
-                where: { userId: laundry.vendorId, deletedAt: null },
-                select: { token: true },
-            }),
-        ]);
-
         // Create order with detailed fee breakdown
         const order = await this._dbService.order.create({
             data: {
@@ -359,109 +346,6 @@ export default class CustomerService {
                 },
             },
         });
-
-        await this._dbService.vendorOrder.create({
-            data: {
-                orderId: order.id,
-                vendorId: laundry.vendorId,
-            },
-        });
-
-        // Extract tokens
-        const customerTokens = extractTokens(customerDeviceTokens);
-        const vendorTokens = extractTokens(vendorDeviceTokens);
-
-        if (vendorTokens?.length) {
-            const vendorNotificationData = {
-                tokens: vendorTokens,
-                title: 'New Order!',
-                body: `New order #${order.orderNumber} - Please accept or reject`,
-                notificationData: {
-                    orderId: order.id,
-                    key: 'FETCH_ORDER_REQUESTS',
-                    route: 'Home',
-                },
-            };
-
-            await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
-
-            await this._dbService.notification.create({
-                data: {
-                    userId: laundry.vendorId,
-                    orderId: order.id,
-                    message: 'You have received a new order. Please accept or reject.',
-                    status: 'UNREAD',
-                    data: {
-                        orderId: order.id,
-                        key: 'FETCH_ORDER_REQUESTS',
-                        route: 'Home',
-                    },
-                    type: 'ORDER_PLACED',
-                },
-            });
-        }
-
-        // Notify customer
-        if (customerTokens?.length) {
-            const customerNotificationData = {
-                tokens: customerTokens,
-                title: 'Order Placed',
-                body: `Your order has been placed`,
-                notificationData: {
-                    orderId: order.id,
-                    key: 'FETCH_ORDERS',
-                    route: 'Orders',
-                },
-            };
-
-            await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
-
-            await this._dbService.notification.create({
-                data: {
-                    userId: user.id,
-                    orderId: order.id,
-                    message: 'Your order has been placed and assigned to a driver.',
-                    status: 'UNREAD',
-                    data: {
-                        orderId: order.id,
-                        key: 'FETCH_ORDERS',
-                        route: 'Orders',
-                    },
-                    type: 'ORDER_PLACED',
-                },
-            });
-        }
-
-        // Notify vendor (second notification)
-        if (vendorTokens?.length) {
-            const vendorNotificationData = {
-                tokens: vendorTokens,
-                title: 'New Order!',
-                body: `New order #${order.orderNumber} - driver assigned and on the way`,
-                notificationData: {
-                    orderId: order.id,
-                    key: 'FETCH_ORDER_REQUESTS',
-                    route: 'Home',
-                },
-            };
-
-            await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
-
-            await this._dbService.notification.create({
-                data: {
-                    userId: laundry.vendorId,
-                    orderId: order.id,
-                    message: 'You have received a new order.',
-                    status: 'UNREAD',
-                    data: {
-                        orderId: order.id,
-                        key: 'FETCH_ORDER_REQUESTS',
-                        route: 'Home',
-                    },
-                    type: 'ORDER_PLACED',
-                },
-            });
-        }
 
         return {
             data: order,
@@ -532,6 +416,7 @@ export default class CustomerService {
         const orders = await this._dbService.order.findMany({
             where: {
                 userId: user.id,
+                paymentStatus: PaymentStatus.COMPLETED,
             },
             select: {
                 id: true,
@@ -1035,7 +920,9 @@ export default class CustomerService {
         const postDiscountAmount = preDiscountAmount - discountAmount;
 
         const vatPercentage = settings.vatRate * 100;
-        const vatFee = settings.vatEnabled ? Math.round((deliveryFee + serviceCharge) * settings.vatRate * 100) / 100 : 0;
+        const vatFee = settings.vatEnabled
+            ? Math.round((deliveryFee + serviceCharge) * settings.vatRate * 100) / 100
+            : 0;
 
         // Calculate final total
         const finalAmount = postDiscountAmount + vatFee;
@@ -1100,7 +987,7 @@ export default class CustomerService {
         }
 
         // let deliveryFee = settings.deliveryBaseRate + distance * settings.deliveryPerKmRate;
-        let deliveryFee = 0
+        let deliveryFee = 0;
 
         if (input.deliveryType === DeliveryType.EXPRESS) {
             deliveryFee = 9.75;
