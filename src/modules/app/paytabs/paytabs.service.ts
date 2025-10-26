@@ -146,6 +146,37 @@ export default class PayTabsService {
      */
     private async handleRegularOrderSuccess(order: Order, webhookData: any): Promise<void> {
         try {
+            const orderWithDetails = await this._dbService.order.findUnique({
+                where: { id: order.id },
+                include: {
+                    laundry: {
+                        select: {
+                            vendorId: true,
+                            name: true,
+                            vendor: {
+                                include: {
+                                    DeviceToken: {
+                                        where: { deletedAt: null },
+                                    },
+                                },
+                            },
+                        },
+                    },
+
+                    user: {
+                        include: {
+                            DeviceToken: {
+                                where: { deletedAt: null },
+                            },
+                        },
+                    },
+                },
+            });
+
+            if (!orderWithDetails?.laundry?.vendorId) {
+                throw new BadRequestException('Laundry vendor not found for order');
+            }
+
             await this._dbService.$transaction(async (tx) => {
                 // Update order payment status
                 await tx.order.update({
@@ -154,6 +185,14 @@ export default class PayTabsService {
                         paid: true,
                         status: OrderStatus.PENDING,
                         paymentStatus: PaymentStatus.COMPLETED,
+                    },
+                });
+
+                // Create VendorOrder AFTER payment confirmation
+                await tx.vendorOrder.create({
+                    data: {
+                        orderId: order.id,
+                        vendorId: orderWithDetails.laundry.vendorId,
                     },
                 });
 
@@ -349,20 +388,14 @@ export default class PayTabsService {
      */
     private async sendRegularOrderSuccessNotifications(order: any): Promise<void> {
         try {
-            // Notify customer
-            await this.sendCustomerSuccessNotification(
-                order,
-                'Payment Successful',
-                `Payment confirmed for order #${order.orderNumber}. Your order is now being processed.`,
-            );
+            // 1. Notify Customer
+            await this.notifyCustomerPaymentSuccess(order);
 
-            // Notify vendors about new paid order
-            if (order.laundryId) {
-                await this.sendVendorNotifications(order);
-            }
+            // 2. Notify Vendor
+            await this.notifyVendorNewPaidOrder(order);
         } catch (error) {
-            console.error('Error sending regular order success notifications:', error);
-            throw error;
+            console.error('Error sending order notifications:', error);
+            // Don't throw - payment already processed, log error and continue
         }
     }
 
@@ -712,6 +745,87 @@ export default class PayTabsService {
         } catch (error) {
             console.error('Error sending refund notifications:', error);
             throw error;
+        }
+    }
+
+    /**
+     * Notify customer about successful payment
+     */
+    private async notifyCustomerPaymentSuccess(order: any): Promise<void> {
+        try {
+            if (!order.user?.DeviceToken?.length) return;
+
+            const tokens = extractTokens(order.user.DeviceToken);
+
+            await this._notificationService.SendNotificationToMultipleTokens({
+                tokens: tokens,
+                title: 'Payment Confirmed!',
+                body: `Your payment for order #${order.orderNumber} has been received. Your order is now being processed.`,
+                notificationData: {
+                    orderId: order.id,
+                    key: 'GET_ORDER_BY_ID',
+                    route: 'TrackOrder',
+                },
+            });
+
+            // Create notification record
+            await this._dbService.notification.create({
+                data: {
+                    userId: order.userId,
+                    orderId: order.id,
+                    message: 'Payment Confirmed! Your order is now being processed.',
+                    status: 'UNREAD',
+                    type: 'ORDER_PAID',
+                    data: {
+                        orderId: order.id,
+                        transactionRef: order.payTabsTransactionRef,
+                        key: 'GET_ORDER_BY_ID',
+                        route: 'TrackOrder',
+                    },
+                },
+            });
+        } catch (error) {
+            console.error('Error notifying customer:', error);
+        }
+    }
+
+    /**
+     * Notify vendor about new paid order
+     */
+    private async notifyVendorNewPaidOrder(order: any): Promise<void> {
+        try {
+            if (!order.laundry?.vendor?.DeviceToken?.length) return;
+
+            const tokens = extractTokens(order.laundry.vendor.DeviceToken);
+
+            await this._notificationService.SendNotificationToMultipleTokens({
+                tokens: tokens,
+                title: 'New Paid Order!',
+                body: `Order #${order.orderNumber} payment confirmed. Please accept or reject.`,
+                notificationData: {
+                    orderId: order.id,
+                    key: 'FETCH_VENDOR_REQUESTS',
+                    route: 'Home',
+                },
+            });
+
+            // Create notification record
+            await this._dbService.notification.create({
+                data: {
+                    userId: order.laundry.vendorId,
+                    orderId: order.id,
+                    message: `New paid order #${order.orderNumber}. Please accept or reject.`,
+                    status: 'UNREAD',
+                    type: 'ORDER_PAID',
+                    data: {
+                        orderId: order.id,
+                        key: 'FETCH_VENDOR_REQUESTS',
+                        route: 'Home',
+                    },
+                },
+            });
+        } catch (error) {
+            console.error('Error notifying vendor:', error);
         }
     }
 }
