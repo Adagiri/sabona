@@ -138,29 +138,36 @@ export class SecretLoaderService {
      * Load parameters by path
      */
     private async loadParametersByPath(path: string): Promise<void> {
+        let nextToken: string | undefined = undefined;
+
         try {
-            const command = new GetParametersByPathCommand({
-                Path: path,
-                Recursive: true,
-                WithDecryption: true,
-                MaxResults: 10,
-            });
+            do {
+                const command = new GetParametersByPathCommand({
+                    Path: path,
+                    Recursive: true,
+                    WithDecryption: true,
+                    MaxResults: 10, // AWS allows max 10 per call
+                    NextToken: nextToken,
+                });
 
-            const response = await this.ssmClient.send(command);
+                const response = await this.ssmClient.send(command);
 
-            if (response.Parameters?.length) {
-                for (const param of response.Parameters) {
-                    if (param.Name && param.Value) {
-                        const envVarName = this.pathToEnvVar(param.Name.replace(/^\//, ''));
-                        process.env[envVarName] = param.Value;
-                        this.loadedCount++;
+                if (response.Parameters?.length) {
+                    for (const param of response.Parameters) {
+                        if (param.Name && param.Value) {
+                            const envVarName = this.pathToEnvVar(param.Name.replace(/^\//, ''));
+                            console.log(param.Name, param.Value);
+                            process.env[envVarName] = param.Value;
+                            this.loadedCount++;
+                        }
                     }
                 }
-            }
-        } catch (error) {
+
+                nextToken = response.NextToken;
+            } while (nextToken);
+        } catch (error: any) {
             console.log(`  ⚠️  ${path}: ${error.message}`);
 
-            // Ignore if path doesn't exist
             if (error.name !== 'ParameterNotFound') {
                 throw error;
             }

@@ -314,7 +314,9 @@ export default class VendorService {
                 const customerOrderRejectedNotificationData = {
                     tokens: customerTokens,
                     title: 'Order Rejected!',
-                    body: this.i18n.translate('order.rejected_by_vendor', { lang: this.locale }),
+                    // body: this.i18n.translate('order.rejected_by_vendor', { lang: this.locale }),
+                    body: 'Your order has been rejected by the vendor',
+
                     notificationData: {
                         orderId: order.id,
                         key: 'FETCH_ORDERS',
@@ -351,7 +353,8 @@ export default class VendorService {
                             data: {
                                 userId: customer.userId,
                                 orderId: order.id,
-                                message: this.i18n.translate('order.rejected_by_vendor', { lang: this.locale }),
+                                // message: this.i18n.translate('order.rejected_by_vendor', { lang: this.locale }),
+                                message: 'Your order has been rejected by the vendor',
                                 status: 'UNREAD',
                                 data: {
                                     orderId: order.id,

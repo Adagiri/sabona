@@ -102,7 +102,7 @@ export default class S3Service {
                 sessionName: this._generateUniqueRoleSessionName(mediaId),
                 policy: this._generateSTSPolicy(path),
             });
-
+console.log()
              console.log('=== UPLOAD DEBUG ===');
              console.log('Upload path:', path);
              console.log('Bucket:', AppConfig.AWS.BUCKET);
