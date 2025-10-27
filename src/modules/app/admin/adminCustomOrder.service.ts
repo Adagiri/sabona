@@ -279,6 +279,8 @@ export default class AdminCustomOrderService {
                         country: 'SA',
                         zip: '00000',
                     },
+                    hide_shipping: true,
+                    payment_methods: ['creditcard', 'mada', 'applepay'],
                     callback: `http://localhost:8080/api/v1/webhook/paytabs`,
                     return: `http://localhost:8080/orders/${order.id}/payment-success`,
                 }),
