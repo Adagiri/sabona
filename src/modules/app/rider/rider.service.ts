@@ -247,7 +247,8 @@ export default class RiderService {
                         const vendorNotificationData = {
                             tokens: vendorTokens,
                             title: 'Driver Confirmed!',
-                            body: this.i18n.translate('order.driver_on_way_pickup', { lang: this.locale }),
+                            // body: this.i18n.translate('order.driver_on_way_pickup', { lang: this.locale }),
+                            body: 'Driver is on the way to pick up from customer',
                             notificationData: {
                                 orderId: params.orderId,
                                 key: 'GET_ORDER_BY_ID',
@@ -261,7 +262,7 @@ export default class RiderService {
                             data: {
                                 userId: vendorId[0].vendorId,
                                 orderId: params.orderId,
-                                message: this.i18n.translate('order.driver_on_way_pickup', { lang: this.locale }),
+                                message: 'Driver is on the way to pick up from customer',
                                 status: 'UNREAD',
                                 data: {
                                     orderId: params.orderId,
@@ -293,7 +294,8 @@ export default class RiderService {
                     // Send notifications about pickup
                     const customerNotificationData = {
                         tokens: customerTokens,
-                        title: this.i18n.translate('order.picked_up_title', { lang: this.locale }),
+                        // title: this.i18n.translate('order.picked_up_title', { lang: this.locale }),
+                        title: 'Order Picked Up!',
                         body: 'Your order has been picked up by the driver',
                         notificationData: {
                             orderId: params.orderId,
