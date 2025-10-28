@@ -74,6 +74,7 @@ export class SecretLoaderService {
             `${pathPrefix}database`,
             `${pathPrefix}redis`,
             `${pathPrefix}twilio`,
+            `${pathPrefix}authentica`,
             `${pathPrefix}firebase`,
             `${pathPrefix}oauth`,
             `${pathPrefix}paytabs`,

@@ -41,6 +41,7 @@
         "@nestjs/schedule": "^4.1.1",
         "@nestjs/swagger": "^7.4.2",
         "@prisma/client": "^5.22.0",
+        "axios": "^1.13.0",
         "bcrypt-nodejs": "^0.0.3",
         "cache-manager": "^5.7.6",
         "cache-manager-redis-store": "^3.0.1",

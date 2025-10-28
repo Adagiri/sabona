@@ -44,6 +44,10 @@ export class GetOrderRequestsDTO {
     orderNumber: number;
 
     @ApiProperty()
+    @IsString()
+    deliveryType: string;
+
+    @ApiProperty()
     @IsNumber()
     totalAmount: number;
 
