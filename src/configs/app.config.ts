@@ -77,6 +77,15 @@ const AppConfig = {
             return process.env.APP_TWILIO_PHONE_NUMBER;
         },
     },
+
+    AUTHENTICA: {
+        get API_KEY() {
+            return process.env.APP_AUTHENTICA_API_KEY;
+        },
+        get ENDPOINT() {
+            return process.env.APP_AUTHENTICA_ENDPOINT || 'https://api.authentica.sa/api/v2';
+        },
+    },
     OAUTH: {
         get GOOGLE() {
             return process.env.APP_GOOGLE_OAUTH_ENDPOINT;
