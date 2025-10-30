@@ -620,11 +620,12 @@ export default class AdminCustomOrderService {
      * Notify customer payment is required
      */
     private async notifyCustomerPaymentRequired(user: any, order: any, invoiceUrl: string): Promise<void> {
+        console.log(user, ' :user');
         const customerTokens = await this._dbService.deviceToken.findMany({
             where: { userId: user.id, deletedAt: null },
             select: { token: true },
         });
-
+        console.log(customerTokens, ' :customer tokens');
         const tokens = extractTokens(customerTokens);
 
         // Send push notification
