@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { MediaAccess, MediaStatus, MediaType, User } from '@prisma/client';
+import { Media, MediaAccess, MediaStatus, MediaType, User } from '@prisma/client';
 import AppConfig from '../../../configs/app.config';
 import DatabaseService from '../../../database/database.service';
 import {
@@ -269,5 +269,82 @@ export default class MediaService {
         if (res) {
             return { message: 'Media deleted successfully' };
         }
+    }
+
+    /**
+     * Upload Excel report buffer to S3
+     * This bypasses the normal init/finalize flow since we're uploading from backend
+     */
+    async UploadReportToS3(buffer: Buffer, fileName: string, type: MediaType = 'DOCUMENT'): Promise<Media> {
+        const extension = '.xlsx';
+
+        // Create unique file path
+        const location = this._s3Service.CreateUniqueFilePath(fileName, type);
+        const path = `${AppConfig.AWS.BUCKET_BASE_URL}/${location}`;
+
+        // Create media record
+        const media = await this._dbService.media.create({
+            data: {
+                name: fileName,
+                extension,
+                location,
+                path,
+                thumbPath: path,
+                type,
+                status: MediaStatus.UPLOADING,
+                access: MediaAccess.PRIVATE, // Reports are private
+                userId: null, // System-generated
+                size: buffer.length / 1024, // KB
+            },
+        });
+
+        try {
+            // Upload directly to S3
+            await this._s3Service.UploadBuffer(
+                location,
+                buffer,
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            );
+
+            // Update status to READY
+            await this._dbService.media.update({
+                where: { id: media.id },
+                data: { status: MediaStatus.READY },
+            });
+
+            // Update S3 tags
+            await this._s3Service.UpdateObjectIdTag(location, media.id);
+
+            return media;
+        } catch (error) {
+            // Mark as STALE if upload fails
+            await this._dbService.media.update({
+                where: { id: media.id },
+                data: { status: MediaStatus.STALE },
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Get Excel report from S3 by media ID
+     */
+    async GetReportFromS3(mediaId: number): Promise<Buffer> {
+        const media = await this._dbService.media.findUnique({
+            where: { id: mediaId },
+        });
+
+        if (!media) {
+            throw new NotFoundException('Report not found');
+        }
+
+        if (media.status !== MediaStatus.READY) {
+            throw new BadRequestException('Report is not ready');
+        }
+
+        // Download from S3
+        const buffer = await this._s3Service.DownloadFile(media.location);
+
+        return buffer;
     }
 }

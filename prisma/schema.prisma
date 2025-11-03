@@ -150,6 +150,11 @@ enum PaymentType {
   CARD
 }
 
+enum WithdrawalStatus {
+  PENDING // In Pre-Withdrawal, awaiting invoice uploads
+  COMPLETED // All invoices uploaded, moved to Withdrawals
+}
+
 model AdminSettings {
   id String @id @default(uuid())
 
@@ -169,7 +174,8 @@ model AdminSettings {
   expressMultiplier     Float @default(2.0) // Express delivery multiplier
 
   // Maximum distance for delivery
-  maxDeliveryDistance Float @default(50.0) // Maximum delivery distance in km
+  maxDeliveryDistance     Float     @default(50.0) // Maximum delivery distance in km
+  lastWithdrawalTimestamp DateTime? @db.Timestamptz() // Track last withdrawal globally
 
   createdAt DateTime  @default(now()) @db.Timestamptz()
   updatedAt DateTime  @updatedAt @db.Timestamptz()
@@ -225,7 +231,10 @@ model User {
 
   vendorRelationAsMain   VendorRelation[] @relation("MainVendor")
   vendorRelationAsBranch VendorRelation?  @relation("BranchVendor")
-  location               UserLocation?
+
+  laundryWithdrawals    WithdrawalLaundry[] @relation("LaundryWithdrawals")
+  mainVendorWithdrawals WithdrawalLaundry[] @relation("MainVendorWithdrawals")
+  location              UserLocation?
 }
 
 model UserLocation {
@@ -374,6 +383,7 @@ model Media {
   deletedAt DateTime?   @db.Timestamptz()
   user      User?       @relation("MediaOwner", fields: [userId], references: [id])
   users     User[] // Users related to this media (for example, profile pictures)
+  withdrawalReports WithdrawalLaundry[]
   Icon      Icon?
 }
 
@@ -485,7 +495,8 @@ model Laundry {
   Order          Order[]
   laundryService LaundryService[]
 
-  feedbacks Feedback[]
+  feedbacks         Feedback[]
+  WithdrawalLaundry WithdrawalLaundry[]
 }
 
 model LaundryService {
@@ -558,7 +569,14 @@ model OrderLaundryServiceItem {
   orderLaundryService   OrderLaundryService @relation(fields: [orderLaundryServiceId], references: [id])
   laundryServiceItemId  String
   laundryServiceItem    LaundryServiceItem  @relation(fields: [laundryServiceItemId], references: [id])
-  quantity              Int // Quantity of each item ordered
+  quantity              Int
+
+  // CRITICAL: Price snapshots at time of order (prevents historical data corruption)
+  vendorPriceSnapshot   Float // Vendor's earning per item at order time
+  platformPriceSnapshot Float // Platform price at order time
+  expressPriceSnapshot  Float // Express price at order time
+  itemName              String? // Item name snapshot
+  serviceName           String? // Service name snapshot
 
   createdAt DateTime @default(now()) @db.Timestamptz()
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
@@ -810,4 +828,65 @@ model TipTransaction {
 
   createdAt DateTime @default(now()) @db.Timestamptz()
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
+}
+
+// Withdrawal record - represents one withdrawal cycle
+model Withdrawal {
+  id               String           @id @default(uuid())
+  withdrawalNumber Int              @default(autoincrement())
+  status           WithdrawalStatus @default(PENDING)
+  startDate        DateTime         @db.Timestamptz() // Last withdrawal timestamp
+  endDate          DateTime         @db.Timestamptz() // Report generation time
+  completedAt      DateTime?        @db.Timestamptz()
+  
+  laundries WithdrawalLaundry[]
+  
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime? @db.Timestamptz()
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Laundry earnings for a specific withdrawal
+model WithdrawalLaundry {
+  id           String     @id @default(uuid())
+  withdrawalId String
+  withdrawal   Withdrawal @relation(fields: [withdrawalId], references: [id], onDelete: Cascade)
+  
+  laundryId  String
+  laundry    Laundry @relation(fields: [laundryId], references: [id])
+  
+  laundryName String
+  
+  vendorId String
+  vendor   User   @relation("LaundryWithdrawals", fields: [vendorId], references: [id])
+  
+  isBranch Boolean @default(false)
+  
+  mainVendorId String?
+  mainVendor   User?   @relation("MainVendorWithdrawals", fields: [mainVendorId], references: [id])
+  
+  // Earning summary
+  totalOrders   Int   @default(0)
+  totalEarnings Float @default(0)
+  
+  // Invoice upload
+  invoiceUrl        String?
+  invoiceUploadedAt DateTime? @db.Timestamptz()
+  
+  // Excel report storage on S3
+  reportUrl     String?
+  reportMediaId Int?
+  reportMedia   Media?  @relation(fields: [reportMediaId], references: [id])
+  
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt DateTime? @db.Timestamptz()
+
+  @@unique([withdrawalId, laundryId])
+  @@index([withdrawalId])
+  @@index([laundryId])
+  @@index([vendorId])
 }

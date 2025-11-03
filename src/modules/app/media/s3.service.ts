@@ -102,13 +102,13 @@ export default class S3Service {
                 sessionName: this._generateUniqueRoleSessionName(mediaId),
                 policy: this._generateSTSPolicy(path),
             });
-console.log()
-             console.log('=== UPLOAD DEBUG ===');
-             console.log('Upload path:', path);
-             console.log('Bucket:', AppConfig.AWS.BUCKET);
-             console.log('Generated ARN:', this._generateS3ResourceARN(path));
-             console.log('Complete STS Policy:');
-             console.log('===================');
+            console.log();
+            console.log('=== UPLOAD DEBUG ===');
+            console.log('Upload path:', path);
+            console.log('Bucket:', AppConfig.AWS.BUCKET);
+            console.log('Generated ARN:', this._generateS3ResourceARN(path));
+            console.log('Complete STS Policy:');
+            console.log('===================');
             return {
                 accessKeyId: Credentials.AccessKeyId,
                 secretAccessKey: Credentials.SecretAccessKey,
@@ -195,5 +195,39 @@ console.log()
             }),
         });
         await this._s3Client.send(command);
+    }
+
+    /**
+     * Upload buffer directly to S3
+     */
+    async UploadBuffer(location: string, buffer: Buffer, contentType: string): Promise<void> {
+        const command = new PutObjectCommand({
+            Bucket: AppConfig.AWS.BUCKET,
+            Key: location,
+            Body: buffer,
+            ContentType: contentType,
+        });
+
+        await this._s3Client.send(command);
+    }
+
+    /**
+     * Download file from S3 as buffer
+     */
+    async DownloadFile(location: string): Promise<Buffer> {
+        const command = new GetObjectCommand({
+            Bucket: AppConfig.AWS.BUCKET,
+            Key: location,
+        });
+
+        const response = await this._s3Client.send(command);
+
+        // Convert stream to buffer
+        const chunks: Uint8Array[] = [];
+        for await (const chunk of response.Body as any) {
+            chunks.push(chunk);
+        }
+
+        return Buffer.concat(chunks);
     }
 }
