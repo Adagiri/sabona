@@ -1,5 +1,5 @@
 import { Body, Param, Query, Res, StreamableFile } from '@nestjs/common';
-import { Response } from 'express';
+import { response, Response } from 'express';
 import WithdrawalService from './withdrawal.service';
 import { UserType } from '@prisma/client';
 import { Authorized, ApiController, Get, Post } from '../../../core/decorators';
@@ -141,26 +141,23 @@ export class WithdrawalController {
         return this.withdrawalService.cancelWithdrawal(id);
     }
 
-    /**
-     * Download laundry earning report (from S3 or generate on-demand)
-     */
-    @Authorized(UserType.ADMIN)
     @Get({
         path: '/:id/laundry/:laundryId/report',
         description: 'Download laundry earning report (Excel)',
-        response: StreamableFile,
+        response: response
     })
     async downloadLaundryReport(
         @Param('id') withdrawalId: string,
         @Param('laundryId') laundryId: string,
-        @Res({ passthrough: true }) res: Response,
-    ): Promise<StreamableFile> {
+        @Res({ passthrough: false }) res: Response,
+    ): Promise<void> {
         const result = await this.withdrawalService.getOrGenerateReport(withdrawalId, laundryId);
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename=laundry-earnings-${laundryId}.xlsx`);
+        res.setHeader('Content-Length', result.buffer.length.toString());
 
-        return new StreamableFile(result.buffer);
+        res.end(result.buffer); // ✅ no return
     }
 
     /**
