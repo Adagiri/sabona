@@ -534,7 +534,7 @@ export default class UserService {
             }
         } catch (error) {
             console.error('Error in VerifyCode:', error);
-            throw new BadRequestException(error.message || 'An error occurred during OTP verification');
+            throw new BadRequestException('Server error');
         }
     }
 

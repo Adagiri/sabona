@@ -21,45 +21,57 @@ function _prepareBadRequestValidationErrors(errors: any) {
     return Errors;
 }
 
+
+
 @Catch(HttpException, Error)
 export class HttpExceptionFilter implements ExceptionFilter {
     constructor(private readonly i18n: I18nService) {}
 
     catch(exception: HttpException | Error, host: ArgumentsHost) {
         const ctx = host.switchToHttp();
-        const response: any = ctx.getResponse<Response>();
+        const response: Response = ctx.getResponse<Response>();
         const request = ctx.getRequest<Request>();
         const locale = request.headers[LOCALE_HEADER_KEY] as string;
 
-        if (!(exception instanceof HttpException)) {
-            const ResponseToSend = {
-                message: this.i18n.translate('errors.fatal', { lang: locale }),
-            };
-            response.__ss_body = ResponseToSend;
-            response.status(HttpStatus.INTERNAL_SERVER_ERROR).json(ResponseToSend);
+        // ✅ Prevent double responses
+        if (response.headersSent) {
+            console.warn('[HttpExceptionFilter] Headers already sent — skipping response write.');
             return;
         }
 
-        const status = exception.getStatus();
-        const exceptionResponse: any = exception.getResponse();
+        try {
+            // Handle non-HttpException errors
+            if (!(exception instanceof HttpException)) {
+                const ResponseToSend = {
+                    message: this.i18n.translate('errors.fatal', { lang: locale }),
+                };
+                (response as any).__ss_body = ResponseToSend;
+                return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json(ResponseToSend);
+            }
 
-        if (
-            exception instanceof BadRequestException &&
-            exceptionResponse.message &&
-            Array.isArray(exceptionResponse.message)
-        ) {
-            const ResponseToSend = {
-                message: this.i18n.translate('errors.invalid_values', {
-                    args: {
-                        values: exceptionResponse.message.map((x) => x.property).join(', '),
-                    },
-                    lang: locale,
-                }),
-                errors: _prepareBadRequestValidationErrors(exceptionResponse.message),
-            };
-            response.__ss_body = ResponseToSend;
-            response.status(status).json(ResponseToSend);
-        } else {
+            const status = exception.getStatus();
+            const exceptionResponse: any = exception.getResponse();
+
+            // Handle validation errors
+            if (
+                exception instanceof BadRequestException &&
+                exceptionResponse.message &&
+                Array.isArray(exceptionResponse.message)
+            ) {
+                const ResponseToSend = {
+                    message: this.i18n.translate('errors.invalid_values', {
+                        args: {
+                            values: exceptionResponse.message.map((x) => x.property).join(', '),
+                        },
+                        lang: locale,
+                    }),
+                    errors: _prepareBadRequestValidationErrors(exceptionResponse.message),
+                };
+                (response as any).__ss_body = ResponseToSend;
+                return response.status(status).json(ResponseToSend);
+            }
+
+            // Default error handling
             const ResponseToSend = {
                 message: this.i18n.translate(exceptionResponse.key || 'errors.unindentified', {
                     lang: locale,
@@ -67,8 +79,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
                 }),
                 data: exceptionResponse?.data || undefined,
             };
-            response.__ss_body = ResponseToSend;
-            response.status(status).json(ResponseToSend);
+            (response as any).__ss_body = ResponseToSend;
+            return response.status(status).json(ResponseToSend);
+        } catch (err) {
+            console.error('[HttpExceptionFilter] Error while sending error response:', err);
+
+            // If still safe, send fallback
+            if (!response.headersSent) {
+                response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: 'Internal server error' });
+            }
         }
     }
 }
+
