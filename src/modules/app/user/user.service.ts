@@ -484,71 +484,82 @@ export default class UserService {
         return user;
     }
 
-    async SendVerificationCode(data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
-        const user = await this._dbService.user.findUnique({
-            where: { phone: data.phone },
-        });
-        if (user) {
-            throw new BadRequestException('Phone number is already registered');
-        }
-        if (AppConfig.APP.ENV === APP_ENV.TEST) {
-            return {
-                message: 'OTP sent successfully',
-            };
-        } else {
-            const otp = await this._smsService.sendVerificationCode(data.phone);
-            if (!otp) {
-                throw new BadRequestException('Error while sending verification code, Please try again!!!');
+    async VerifyCode(data: VerifyOtpRequestDTO): Promise<VerifyOtpResponseDTO> {
+        try {
+            if (
+                (AppConfig.APP.ENV !== APP_ENV.PROD || ['+966563651254', '+966563651244'].includes(data.phone)) &&
+                data.otp === OTP_CODE_FOR_TEST
+            ) {
+                console.log('I raaan');
+
+                const existingUser = await this._dbService.user.findFirst({
+                    where: { phone: data.phone, type: data?.type },
+                    select: { id: true, type: true, phone: true },
+                });
+
+                console.log(data.type);
+                console.log(existingUser, 'EXISTING USER');
+
+                if (existingUser) {
+                    const token = await this.Login(data);
+                    return { token };
+                } else {
+                    console.log('i AM NOW RUNNING');
+                    const token = await this.Signup(data);
+                    return { token };
+                }
+            } else if (AppConfig.APP.ENV !== APP_ENV.PROD && data.otp !== OTP_CODE_FOR_TEST) {
+                throw new BadRequestException('You have entered the wrong otp');
+            } else {
+                const otp = await this._smsService.verifyPhoneNumber(data.phone, data.otp);
+                if (!otp) {
+                    throw new BadRequestException('Error while sending verification code, Please try again!!!');
+                }
+
+                const existingUser = await this._dbService.user.findFirst({
+                    where: { phone: data.phone, type: data?.type },
+                    select: { id: true, type: true, phone: true },
+                });
+
+                console.log(data.type);
+                console.log(existingUser, 'EXISTING USER');
+
+                if (existingUser) {
+                    const token = await this.Login(data);
+                    return { token };
+                } else {
+                    const token = await this.Signup(data);
+                    return { token };
+                }
             }
-            return {
-                message: 'OTP sent successfully',
-            };
+        } catch (error) {
+            console.error('Error in VerifyCode:', error);
+            throw new BadRequestException(error.message || 'An error occurred during OTP verification');
         }
     }
 
-    async VerifyCode(data: VerifyOtpRequestDTO): Promise<VerifyOtpResponseDTO> {
-        if (
-            (AppConfig.APP.ENV !== APP_ENV.PROD || ['+966563651254', '+966563651244'].indexOf(data.phone) !== -1) &&
-            data.otp === OTP_CODE_FOR_TEST
-        ) {
-            console.log('I raaan');
-
-            const existingUser = await this._dbService.user.findFirst({
-                where: { phone: data.phone, type: data?.type },
-                select: { id: true, type: true, phone: true },
-            });
-            console.log(data.type);
-            console.log(existingUser, 'EXISTING USER');
-            if (existingUser) {
-                const token = await this.Login(data);
-                return { token };
-            } else {
-                console.log('i AM NOW RUNNING');
-                const token = await this.Signup(data);
-                return { token };
-            }
-        } else if (AppConfig.APP.ENV !== APP_ENV.PROD && data.otp !== OTP_CODE_FOR_TEST) {
-            throw new BadRequestException('You have entered the wrong otp');
-        } else {
-            const otp = await this._smsService.verifyPhoneNumber(data.phone, data.otp);
-            if (!otp) {
-                throw new BadRequestException('Error while sending verification code, Please try again!!!');
-            }
-
-            const existingUser = await this._dbService.user.findFirst({
-                where: { phone: data.phone, type: data?.type },
-                select: { id: true, type: true, phone: true },
+    async SendVerificationCode(data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
+        try {
+            const user = await this._dbService.user.findUnique({
+                where: { phone: data.phone },
             });
 
-            console.log(data.type);
-            console.log(existingUser, 'EXISTING USER');
-            if (existingUser) {
-                const token = await this.Login(data);
-                return { token };
-            } else {
-                const token = await this.Signup(data);
-                return { token };
+            if (user) {
+                throw new BadRequestException('Phone number is already registered');
             }
+
+            if (AppConfig.APP.ENV === APP_ENV.TEST) {
+                return { message: 'OTP sent successfully' };
+            } else {
+                const otp = await this._smsService.sendVerificationCode(data.phone);
+                if (!otp) {
+                    throw new BadRequestException('Error while sending verification code, Please try again!!!');
+                }
+                return { message: 'OTP sent successfully' };
+            }
+        } catch (error) {
+            console.error('Error in SendVerificationCode:', error);
+            throw new BadRequestException(error.message || 'An error occurred while sending the verification code');
         }
     }
 

@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
 import { WithdrawalStatus } from '@prisma/client';
 
 // ============================================================================
@@ -20,8 +20,8 @@ export class UploadLaundryInvoiceRequestDTO {
     withdrawalLaundryId: string;
 
     @ApiProperty({ description: 'Invoice file URL (after upload to storage)' })
-    @IsString()
-    invoiceUrl: string;
+    @IsNumber()
+    invoiceMediaId: number;
 }
 
 export class GetWithdrawalQueryDTO {
@@ -141,4 +141,12 @@ export class UploadInvoiceResponseDTO {
 
     @ApiProperty()
     withdrawalLaundryId: string;
+}
+
+export class CancelWithdrawalResponseDTO {
+    @ApiProperty()
+    message: string;
+
+    @ApiProperty()
+    withdrawalId: string;
 }

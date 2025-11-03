@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
-import { WithdrawalStatus, UserType, OrderStatus } from '@prisma/client';
+import { WithdrawalStatus, UserType, OrderStatus, DeliveryType } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
 import MediaService from '../media/media.service';
 
@@ -13,10 +13,20 @@ export default class WithdrawalService {
 
     async initiateWithdrawal() {
         try {
+            const pendingWithdrawal = await this._dbService.withdrawal.findFirst({
+                where: {
+                    status: WithdrawalStatus.PENDING,
+                    deletedAt: null,
+                },
+            });
+
+            if (pendingWithdrawal) {
+                throw new BadRequestException('Cannot initiate new withdrawal. A pending withdrawal already exists.');
+            }
             const settings = await this._dbService.adminSettings.findFirst();
 
             const now = new Date();
-            const startDate = settings?.lastWithdrawalTimestamp || new Date('2000-01-01');
+            const startDate = settings?.lastWithdrawalTimestamp || new Date('2025-06-01');
 
             const laundries = await this._dbService.laundry.findMany({
                 where: {
@@ -70,7 +80,7 @@ export default class WithdrawalService {
                             },
                         },
                     });
-
+                    console.log(orders, 'orders for report');
                     let totalEarnings = 0;
                     orders.forEach((order) => {
                         order.services.forEach((service) => {
@@ -141,7 +151,7 @@ export default class WithdrawalService {
                 completedAt: w.completedAt,
                 laundryCount: w.laundries.length,
                 totalAmount: w.laundries.reduce((sum, v) => sum + v.totalEarnings, 0),
-                uploadedInvoices: w.laundries.filter((v) => v.invoiceUrl).length,
+                uploadedInvoices: w.laundries.filter((v) => v.invoiceMediaId).length,
             }));
         } catch (error) {
             console.error(error);
@@ -169,7 +179,7 @@ export default class WithdrawalService {
             });
 
             if (!withdrawal) throw new NotFoundException('Withdrawal not found');
-
+            console.log(withdrawal);
             return {
                 id: withdrawal.id,
                 withdrawalNumber: withdrawal.withdrawalNumber,
@@ -179,16 +189,16 @@ export default class WithdrawalService {
                 completedAt: withdrawal.completedAt,
                 laundryCount: withdrawal.laundries.length,
                 totalAmount: withdrawal.laundries.reduce((sum, v) => sum + v.totalEarnings, 0),
-                uploadedInvoices: withdrawal.laundries.filter((v) => v.invoiceUrl).length,
+                uploadedInvoices: withdrawal.laundries.filter((v) => v.invoiceMediaId).length,
                 laundries: withdrawal.laundries.map((v) => ({
-                    id: v.id,
+                    id: v.laundryId,
                     laundryName: v.laundryName,
                     branchType: v.isBranch ? 'Sub' : 'Main',
                     totalOrders: v.totalOrders,
                     totalEarnings: v.totalEarnings,
-                    invoiceUrl: v.invoiceUrl,
+                    invoiceMediaId: v.invoiceMediaId,
                     invoiceUploadedAt: v.invoiceUploadedAt,
-                    hasInvoice: !!v.invoiceUrl,
+                    hasInvoice: !!v.invoiceMediaId,
                 })),
             };
         } catch (error) {
@@ -197,7 +207,7 @@ export default class WithdrawalService {
         }
     }
 
-    async uploadLaundryInvoice(withdrawalLaundryId: string, invoiceUrl: string) {
+    async uploadLaundryInvoice(withdrawalLaundryId: string, invoiceMediaId: number) {
         try {
             const withdrawalLaundry = await this._dbService.withdrawalLaundry.findUnique({
                 where: { id: withdrawalLaundryId },
@@ -211,7 +221,7 @@ export default class WithdrawalService {
             await this._dbService.withdrawalLaundry.update({
                 where: { id: withdrawalLaundryId },
                 data: {
-                    invoiceUrl,
+                    invoiceMediaId,
                     invoiceUploadedAt: new Date(),
                 },
             });
@@ -234,7 +244,7 @@ export default class WithdrawalService {
             if (withdrawal.status !== WithdrawalStatus.PENDING)
                 throw new BadRequestException('Withdrawal already completed');
 
-            const missingInvoices = withdrawal.laundries.filter((v) => !v.invoiceUrl);
+            const missingInvoices = withdrawal.laundries.filter((v) => !v.invoiceMediaId);
             if (missingInvoices.length > 0)
                 throw new BadRequestException(
                     `Cannot complete withdrawal. ${missingInvoices.length} laundries missing invoices`,
@@ -271,7 +281,7 @@ export default class WithdrawalService {
                 include: { laundry: true, vendor: true },
             });
             if (!withdrawalLaundry) throw new NotFoundException('Laundry not found in this withdrawal');
-
+            console.log(withdrawal.startDate, withdrawal.endDate);
             const orders = await this._dbService.order.findMany({
                 where: {
                     laundryId: withdrawalLaundry.laundryId,
@@ -290,16 +300,17 @@ export default class WithdrawalService {
             const worksheet = workbook.addWorksheet('Vendor Earnings');
 
             worksheet.columns = [
-                { header: 'Laundry Name', key: 'laundryName', width: 20 },
-                { header: 'Branch Type', key: 'branchType', width: 12 },
-                { header: 'Order Number', key: 'orderNumber', width: 15 },
-                { header: 'Order Date', key: 'orderDate', width: 20 },
-                { header: 'Order Amount', key: 'orderAmount', width: 15 },
-                { header: 'Service Charge', key: 'serviceCharge', width: 15 },
-                { header: 'Delivery Charge', key: 'deliveryCharge', width: 15 },
-                { header: 'Laundry (Vendor Fee)', key: 'vendorEarning', width: 20 },
-                { header: 'Service Charge', key: 'serviceChargeOrder', width: 15 },
-                { header: 'Transfer', key: 'transfer', width: 12 },
+                { header: 'Laundry', key: 'laundryName', width: 20 },
+                { header: 'Branch', key: 'branchType', width: 10 },
+                { header: 'Order Number', key: 'orderNumber', width: 8 },
+                { header: 'Order Date', key: 'orderDate', width: 22 },
+                { header: 'Delivery Type', key: 'deliveryType', width: 12 },
+                { header: 'Order Amount', key: 'orderAmount', width: 12 },
+                { header: 'Service Charge', key: 'serviceCharge', width: 12 },
+                { header: 'Delivery Charge', key: 'deliveryCharge', width: 12 },
+                { header: 'VAT Fee', key: 'vatFee', width: 12 },
+                { header: 'Laundry Earning', key: 'vendorEarning', width: 12 },
+                { header: 'Transfer (1%)', key: 'transfer', width: 12 },
             ];
 
             worksheet.getRow(1).font = { bold: true };
@@ -309,35 +320,67 @@ export default class WithdrawalService {
             let totalOrderAmount = 0;
             let totalServiceCharge = 0;
             let totalDeliveryCharge = 0;
+            let totalTransfer = 0;
+            let totalVatFee = 0;
 
             orders.forEach((order) => {
-                let orderVendorEarning = 0;
+                let orderGrossEarning = 0;
+                let orderServiceCharge = 0;
+
                 order.services.forEach((service) => {
                     service.items.forEach((item) => {
-                        orderVendorEarning += item.vendorPriceSnapshot * item.quantity;
+                        const vendorPrice = item.vendorPriceSnapshot;
+                        const platformPrice = item.platformPriceSnapshot;
+                        const expressPrice = item.expressPriceSnapshot;
+                        const quantity = item.quantity;
+
+                        orderGrossEarning += vendorPrice * quantity;
+
+                        // Service charge based on delivery type
+                        if (order.deliveryType === DeliveryType.EXPRESS) {
+                            orderServiceCharge += (expressPrice - vendorPrice) * quantity;
+                        } else {
+                            orderServiceCharge += (platformPrice - vendorPrice) * quantity;
+                        }
                     });
                 });
 
-                const serviceCharge = order.serviceCharge || 0;
                 const deliveryCharge = order.deliveryFee || 0;
                 const orderAmount = order.totalAmount || 0;
+                const transfer = orderGrossEarning * 0.01; // 1% of gross earning
+                const netVendorEarning = orderGrossEarning - transfer; // Deduct transfer from earning
+                const vatFee = order.vatAmount || 0;
 
-                totalVendorEarnings += orderVendorEarning;
+                totalVendorEarnings += netVendorEarning;
                 totalOrderAmount += orderAmount;
-                totalServiceCharge += serviceCharge;
+                totalServiceCharge += orderServiceCharge;
                 totalDeliveryCharge += deliveryCharge;
+                totalTransfer += transfer;
+                totalVatFee += vatFee;
+
+                // Format date to Saudi timezone (Asia/Riyadh)
+                const saudiDate = new Date(order.createdAt).toLocaleString('en-US', {
+                    timeZone: 'Asia/Riyadh',
+                    year: 'numeric',
+                    month: 'short',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true,
+                });
 
                 worksheet.addRow({
                     laundryName: withdrawalLaundry.laundryName,
                     branchType: withdrawalLaundry.isBranch ? 'Sub' : 'Main',
                     orderNumber: order.orderNumber,
-                    orderDate: order.createdAt.toISOString(),
+                    orderDate: saudiDate,
+                    deliveryType: order.deliveryType === DeliveryType.EXPRESS ? 'Express' : 'Normal',
                     orderAmount: orderAmount.toFixed(2),
-                    serviceCharge: serviceCharge.toFixed(2),
+                    serviceCharge: orderServiceCharge.toFixed(2),
                     deliveryCharge: deliveryCharge.toFixed(2),
-                    vendorEarning: orderVendorEarning.toFixed(2),
-                    serviceChargeOrder: serviceCharge.toFixed(2),
-                    transfer: 0,
+                    vatFee: vatFee.toFixed(2),
+                    vendorEarning: netVendorEarning.toFixed(2),
+                    transfer: transfer.toFixed(2),
                 });
             });
 
@@ -346,12 +389,13 @@ export default class WithdrawalService {
                 branchType: '',
                 orderNumber: '',
                 orderDate: '',
+                deliveryType: '',
                 orderAmount: totalOrderAmount.toFixed(2),
                 serviceCharge: totalServiceCharge.toFixed(2),
                 deliveryCharge: totalDeliveryCharge.toFixed(2),
+                vatFee: totalVatFee.toFixed(2),
                 vendorEarning: totalVendorEarnings.toFixed(2),
-                serviceChargeOrder: totalServiceCharge.toFixed(2),
-                transfer: 0,
+                transfer: totalTransfer.toFixed(2),
             });
 
             totalRow.font = { bold: true };
@@ -398,22 +442,88 @@ export default class WithdrawalService {
                 where: { withdrawalId, laundryId },
             });
 
-            if (!withdrawalLaundry) throw new NotFoundException('Laundry not found in this withdrawal');
+            if (!withdrawalLaundry) {
+                throw new NotFoundException('Laundry not found in this withdrawal');
+            }
 
             if (withdrawalLaundry.reportUrl && withdrawalLaundry.reportMediaId) {
                 try {
                     const buffer = await this._mediaService.GetReportFromS3(withdrawalLaundry.reportMediaId);
                     return { buffer, fromS3: true };
                 } catch (error) {
-                    console.error('Failed to fetch from S3, regenerating:', error);
+                    console.error('Failed to fetch from S3, generating new report:', error);
                 }
             }
 
             const buffer = await this.generateLaundryEarningReport(withdrawalId, laundryId);
             return { buffer, fromS3: false };
         } catch (error) {
+            console.error('Error in getOrGenerateReport:', error);
+            throw error; // ✅ Let the controller or global filter handle it
+        }
+    }
+
+    async cancelWithdrawal(withdrawalId: string) {
+        try {
+            const withdrawal = await this._dbService.withdrawal.findUnique({
+                where: { id: withdrawalId },
+            });
+
+            if (!withdrawal) throw new NotFoundException('Withdrawal not found');
+
+            if (withdrawal.status !== WithdrawalStatus.PENDING) {
+                throw new BadRequestException('Can only cancel pending withdrawals');
+            }
+
+            // Soft delete the withdrawal and all associated withdrawal laundries
+            await this._dbService.$transaction(async (tx) => {
+                await tx.withdrawal.delete({
+                    where: { id: withdrawalId },
+                });
+
+                await tx.withdrawalLaundry.deleteMany({
+                    where: { withdrawalId },
+                });
+            });
+
+            return {
+                message: 'Withdrawal cancelled successfully',
+                withdrawalId,
+            };
+        } catch (error) {
             console.error(error);
-            throw new InternalServerErrorException('Failed to get or generate report');
+            if (error instanceof NotFoundException || error instanceof BadRequestException) {
+                throw error;
+            }
+            throw new InternalServerErrorException('Failed to cancel withdrawal');
+        }
+    }
+
+    async getWithdrawalLaundryInvoice(withdrawalLaundryId: string) {
+        try {
+            const withdrawalLaundry = await this._dbService.withdrawalLaundry.findUnique({
+                where: { id: withdrawalLaundryId },
+                include: { invoiceMedia: true },
+            });
+
+            if (!withdrawalLaundry) {
+                throw new NotFoundException('Withdrawal laundry not found');
+            }
+
+            if (!withdrawalLaundry.invoiceMedia) {
+                throw new NotFoundException('Invoice not found');
+            }
+
+            return {
+                mediaId: withdrawalLaundry.invoiceMediaId,
+                url: withdrawalLaundry.invoiceMedia.path,
+            };
+        } catch (error) {
+            console.error(error);
+            if (error instanceof NotFoundException) {
+                throw error;
+            }
+            throw new InternalServerErrorException('Failed to get invoice');
         }
     }
 }

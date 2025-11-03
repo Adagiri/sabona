@@ -1,4 +1,4 @@
-import { Body, HttpStatus, Param, Query, Res } from '@nestjs/common';
+import { Body, Param, Query, Res, StreamableFile } from '@nestjs/common';
 import { Response } from 'express';
 import WithdrawalService from './withdrawal.service';
 import { UserType } from '@prisma/client';
@@ -99,7 +99,7 @@ export class WithdrawalController {
         response: UploadInvoiceResponseDTO,
     })
     async uploadLaundryInvoice(@Body() body: UploadLaundryInvoiceRequestDTO): Promise<UploadInvoiceResponseDTO> {
-        return this.withdrawalService.uploadLaundryInvoice(body.withdrawalLaundryId, body.invoiceUrl);
+        return this.withdrawalService.uploadLaundryInvoice(body.withdrawalLaundryId, body.invoiceMediaId);
     }
 
     /**
@@ -129,24 +129,52 @@ export class WithdrawalController {
     }
 
     /**
+     * Cancel withdrawal
+     */
+    @Authorized(UserType.ADMIN)
+    @Post({
+        path: '/:id/cancel',
+        description: 'Cancel a pending withdrawal',
+        response: CompleteWithdrawalResponseDTO,
+    })
+    async cancelWithdrawal(@Param('id') id: string): Promise<CompleteWithdrawalResponseDTO> {
+        return this.withdrawalService.cancelWithdrawal(id);
+    }
+
+    /**
      * Download laundry earning report (from S3 or generate on-demand)
      */
     @Authorized(UserType.ADMIN)
     @Get({
         path: '/:id/laundry/:laundryId/report',
         description: 'Download laundry earning report (Excel)',
-        response: Object,
+        response: StreamableFile,
     })
     async downloadLaundryReport(
         @Param('id') withdrawalId: string,
         @Param('laundryId') laundryId: string,
-        @Res() res: Response,
-    ) {
+        @Res({ passthrough: true }) res: Response,
+    ): Promise<StreamableFile> {
         const result = await this.withdrawalService.getOrGenerateReport(withdrawalId, laundryId);
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename=laundry-earnings-${laundryId}.xlsx`);
 
-        res.status(HttpStatus.OK).send(result.buffer);
+        return new StreamableFile(result.buffer);
+    }
+
+    /**
+     * Get invoice for withdrawal laundry
+     */
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/laundry/:withdrawalLaundryId/invoice',
+        description: 'Get invoice for withdrawal laundry',
+        response: Object,
+    })
+    async getWithdrawalLaundryInvoice(
+        @Param('withdrawalLaundryId') withdrawalLaundryId: string,
+    ): Promise<{ mediaId: number; url: string }> {
+        return this.withdrawalService.getWithdrawalLaundryInvoice(withdrawalLaundryId);
     }
 }
