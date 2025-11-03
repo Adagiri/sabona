@@ -27,6 +27,7 @@ import CustomOrderModule from './modules/app/customOrder/customOrder.module';
 import PayTabsModule from './modules/app/paytabs/paytabs.module';
 import AdminCustomOrderModule from './modules/app/admin/adminCustomOrder.module';
 import IconModule from './modules/app/icon/icon.module';
+import { WithdrawalModule } from './modules/app/withdrawal/withdrawal.module';
 
 @Module({
     imports: [
@@ -59,6 +60,7 @@ import IconModule from './modules/app/icon/icon.module';
         PayTabsModule,
         AdminCustomOrderModule,
         IconModule,
+        WithdrawalModule
     ],
     controllers: [AppController],
     providers: [

@@ -265,6 +265,37 @@ export default class CustomerService {
 
         const feeData = feeCalculation.data;
 
+        const itemPricesMap = new Map();
+
+        for (const service of data.services) {
+            for (const item of service.items) {
+                const itemData = await this._dbService.laundryServiceItem.findUnique({
+                    where: { id: item.id },
+                    select: {
+                        vendorPrice: true,
+                        platformPrice: true,
+                        expressPrice: true,
+                        name: true,
+                        laundryService: {
+                            select: { name: true },
+                        },
+                    },
+                });
+
+                if (!itemData) {
+                    throw new BadRequestException(`Item ${item.id} not found`);
+                }
+
+                itemPricesMap.set(item.id, {
+                    vendorPrice: itemData.vendorPrice,
+                    platformPrice: itemData.platformPrice,
+                    expressPrice: itemData.expressPrice,
+                    itemName: itemData.name,
+                    serviceName: itemData.laundryService.name,
+                });
+            }
+        }
+
         // Create coupon usage record if coupon was applied
         let couponId: string | undefined;
         if (data.couponCode && feeData.discountAmount > 0) {
@@ -337,10 +368,19 @@ export default class CustomerService {
                     create: data.services.map((service) => ({
                         laundryServiceId: service.serviceId,
                         items: {
-                            create: service.items.map((item) => ({
-                                laundryServiceItemId: item.id,
-                                quantity: item.quantity,
-                            })),
+                            create: service.items.map((item) => {
+                                const priceSnapshot = itemPricesMap.get(item.id);
+
+                                return {
+                                    laundryServiceItemId: item.id,
+                                    quantity: item.quantity,
+                                    vendorPriceSnapshot: priceSnapshot.vendorPrice,
+                                    platformPriceSnapshot: priceSnapshot.platformPrice,
+                                    expressPriceSnapshot: priceSnapshot.expressPrice,
+                                    itemName: priceSnapshot.itemName,
+                                    serviceName: priceSnapshot.serviceName,
+                                };
+                            }),
                         },
                     })),
                 },

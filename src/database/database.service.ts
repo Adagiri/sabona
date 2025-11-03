@@ -48,6 +48,7 @@ export default class DatabaseService extends PrismaClient implements OnModuleIni
                     if (!params.args.where) params.args['where'] = {};
                 }
 
+                if (!params.args.where) params.args.where = {};
                 if (!params.args.where.deletedAt) {
                     params.args.where['deletedAt'] = null;
                 }
