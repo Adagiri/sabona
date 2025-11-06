@@ -50,6 +50,8 @@ export default class WithdrawalService {
                 },
             });
 
+            console.log(laundries, "laundries")
+
             const withdrawal = await this._dbService.withdrawal.create({
                 data: {
                     startDate,
@@ -80,7 +82,6 @@ export default class WithdrawalService {
                             },
                         },
                     });
-                    console.log(orders, 'orders for report');
                     let totalEarnings = 0;
                     orders.forEach((order) => {
                         order.services.forEach((service) => {
@@ -179,7 +180,6 @@ export default class WithdrawalService {
             });
 
             if (!withdrawal) throw new NotFoundException('Withdrawal not found');
-            console.log(withdrawal);
             return {
                 id: withdrawal.id,
                 withdrawalNumber: withdrawal.withdrawalNumber,
@@ -281,7 +281,6 @@ export default class WithdrawalService {
                 include: { laundry: true, vendor: true },
             });
             if (!withdrawalLaundry) throw new NotFoundException('Laundry not found in this withdrawal');
-            console.log(withdrawal.startDate, withdrawal.endDate);
             const orders = await this._dbService.order.findMany({
                 where: {
                     laundryId: withdrawalLaundry.laundryId,
