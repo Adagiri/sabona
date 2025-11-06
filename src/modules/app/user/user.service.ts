@@ -57,7 +57,6 @@ export default class UserService {
         const user = await this._dbService.user.findUnique({
             where: { phone: data.phone },
         });
-        console.log(user, 'user');
         if (!user) {
             throw new BadRequestException('auth.phone_not_registered');
         }
@@ -263,8 +262,6 @@ export default class UserService {
             select: { id: true, email: true },
         });
 
-        console.log('USER', user);
-
         const token = await this._authService.CreateSession(user.id);
 
         return token;
@@ -469,7 +466,6 @@ export default class UserService {
             where: { id },
             select: { id: true },
         });
-        console.log(id, 'I ran here');
         if (!basicUser) {
             throw new NotFoundException('user.not_found');
         }
@@ -484,90 +480,69 @@ export default class UserService {
         return user;
     }
 
-    async VerifyCode(data: VerifyOtpRequestDTO): Promise<VerifyOtpResponseDTO> {
-        try {
-            if (
-                (AppConfig.APP.ENV !== APP_ENV.PROD || ['+966563651254', '+966563651244'].includes(data.phone)) &&
-                data.otp === OTP_CODE_FOR_TEST
-            ) {
-                console.log('I raaan');
-
-                const existingUser = await this._dbService.user.findFirst({
-                    where: { phone: data.phone, type: data?.type },
-                    select: { id: true, type: true, phone: true },
-                });
-
-                console.log(data.type);
-                console.log(existingUser, 'EXISTING USER');
-
-                if (existingUser) {
-                    const token = await this.Login(data);
-                    return { token };
-                } else {
-                    console.log('i AM NOW RUNNING');
-                    const token = await this.Signup(data);
-                    return { token };
-                }
-            } else if (AppConfig.APP.ENV !== APP_ENV.PROD && data.otp !== OTP_CODE_FOR_TEST) {
-                throw new BadRequestException('You have entered the wrong otp');
-            } else {
-                const otp = await this._smsService.verifyPhoneNumber(data.phone, data.otp);
-                if (!otp) {
-                    throw new BadRequestException('Error while sending verification code, Please try again!!!');
-                }
-
-                const existingUser = await this._dbService.user.findFirst({
-                    where: { phone: data.phone, type: data?.type },
-                    select: { id: true, type: true, phone: true },
-                });
-
-                console.log(data.type);
-                console.log(existingUser, 'EXISTING USER');
-
-                if (existingUser) {
-                    const token = await this.Login(data);
-                    return { token };
-                } else {
-                    const token = await this.Signup(data);
-                    return { token };
-                }
+    async SendVerificationCode(data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
+        const user = await this._dbService.user.findUnique({
+            where: { phone: data.phone },
+        });
+        if (user) {
+            throw new BadRequestException('Phone number is already registered');
+        }
+        if (AppConfig.APP.ENV === APP_ENV.TEST) {
+            return {
+                message: 'OTP sent successfully',
+            };
+        } else {
+            const otp = await this._smsService.sendVerificationCode(data.phone);
+            if (!otp) {
+                throw new BadRequestException('Error while sending verification code, Please try again!!!');
             }
-        } catch (error) {
-            console.error('Error in VerifyCode:', error);
-            throw new BadRequestException('Server error');
+            return {
+                message: 'OTP sent successfully',
+            };
         }
     }
 
-    async SendVerificationCode(data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
-        try {
-            const user = await this._dbService.user.findUnique({
-                where: { phone: data.phone },
+    async VerifyCode(data: VerifyOtpRequestDTO): Promise<VerifyOtpResponseDTO> {
+        if (
+            (AppConfig.APP.ENV !== APP_ENV.PROD || ['+966563651254', '+966563651244'].indexOf(data.phone) !== -1) &&
+            data.otp === OTP_CODE_FOR_TEST
+        ) {
+            const existingUser = await this._dbService.user.findFirst({
+                where: { phone: data.phone, type: data?.type },
+                select: { id: true, type: true, phone: true },
+            });
+            if (existingUser) {
+                const token = await this.Login(data);
+                return { token };
+            } else {
+                const token = await this.Signup(data);
+                return { token };
+            }
+        } else if (AppConfig.APP.ENV !== APP_ENV.PROD && data.otp !== OTP_CODE_FOR_TEST) {
+            throw new BadRequestException('You have entered the wrong otp');
+        } else {
+            const otp = await this._smsService.verifyPhoneNumber(data.phone, data.otp);
+            if (!otp) {
+                throw new BadRequestException('Error while sending verification code, Please try again!!!');
+            }
+
+            const existingUser = await this._dbService.user.findFirst({
+                where: { phone: data.phone, type: data?.type },
+                select: { id: true, type: true, phone: true },
             });
 
-            if (user) {
-                throw new BadRequestException('Phone number is already registered');
-            }
-
-            if (AppConfig.APP.ENV === APP_ENV.TEST) {
-                return { message: 'OTP sent successfully' };
+            if (existingUser) {
+                const token = await this.Login(data);
+                return { token };
             } else {
-                const otp = await this._smsService.sendVerificationCode(data.phone);
-                if (!otp) {
-                    throw new BadRequestException('Error while sending verification code, Please try again!!!');
-                }
-                return { message: 'OTP sent successfully' };
+                const token = await this.Signup(data);
+                return { token };
             }
-        } catch (error) {
-            console.error('Error in SendVerificationCode:', error);
-            throw new BadRequestException(error.message || 'An error occurred while sending the verification code');
         }
     }
 
     async socialVerification(data: SocialVerificationRequestDTO): Promise<VerifyOtpResponseDTO> {
-        console.log(1);
         const decodedToken = await this._firebaseService.verifyToken(data.token);
-        console.log(2);
-        console.log(decodedToken);
 
         if (decodedToken) {
             const existingUser = await this._dbService.user.findFirst({
@@ -660,9 +635,6 @@ export default class UserService {
             }).filter(([, value]) => value != null && value !== ''),
         );
 
-        console.log(filteredUserData);
-        console.log(filteredSettingsData);
-
         if (Object.keys(filteredUserData).length > 0) {
             await this._dbService.user.update({
                 where: { id: userDetails.id },
@@ -714,7 +686,6 @@ export default class UserService {
     }
 
     async GetAllAddresses(user: User): Promise<getAllAddressesResponseDTO> {
-        console.log('I ran....');
         const addresses = await this._dbService.userAddress.findMany({
             where: {
                 userId: user.id,
@@ -730,8 +701,6 @@ export default class UserService {
                 updatedAt: true,
             },
         });
-
-        console.log('addresses: ', addresses);
 
         return { data: addresses };
     }

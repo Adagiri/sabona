@@ -1,4 +1,4 @@
-import { Body, Param, Query, Res, StreamableFile } from '@nestjs/common';
+import { Body, Param, Query, Res } from '@nestjs/common';
 import { response, Response } from 'express';
 import WithdrawalService from './withdrawal.service';
 import { UserType } from '@prisma/client';

@@ -1,59 +1,96 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
-import { Twilio } from 'twilio';
+import { Injectable } from '@nestjs/common';
 import AppConfig from '../../configs/app.config';
-import { VerificationStatus } from 'src/constants';
+import axios from 'axios';
 
 @Injectable()
 export default class SMSService {
-    private _smsClient: Twilio = null;
-    constructor() {
-        if (AppConfig.TWILIO.ACCOUNT_SID && AppConfig.TWILIO.AUTH_TOKEN) {
-            this._smsClient = new Twilio(AppConfig.TWILIO.ACCOUNT_SID, AppConfig.TWILIO.AUTH_TOKEN);
-        }
-    }
+  private _apiUrl = 'https://api.authentica.sa/api/v2';
 
-    async sendVerificationCode(phone: string) {
-        try {
-            const verification = await this._smsClient.verify.v2
-                .services(AppConfig.TWILIO.VERIFY_SERVICE_SID)
-                .verifications.create({
-                    to: phone,
-                    channel: 'sms',
-                });
-            return verification.sid;
-        } catch (error) {
-            console.log('EROROORORORR', error);
-            throw error;
-        }
+  constructor() {
+    if (!AppConfig.AUTHENTICA.API_KEY) {
+      console.warn('AUTHENTICA API_KEY not configured');
     }
+  }
 
-    async verifyPhoneNumber(phoneNumber: string, verificationCode: string): Promise<any> {
-        let verificationCheck;
-        try {
-            verificationCheck = await this._smsClient.verify.v2
-                .services(AppConfig.TWILIO.VERIFY_SERVICE_SID)
-                .verificationChecks.create({ to: phoneNumber, code: verificationCode });
-        } catch (error) {
-            let errorMessage;
-            switch (error?.status) {
-                case 404:
-                    errorMessage = 'Code not found, try to request a new one';
-                    break;
-                case 400:
-                    errorMessage = 'Invalid code';
-                    break;
-                case 429:
-                    errorMessage = 'Max check attempts reached, please wait 10 minutes before retrying';
-                    break;
-                default:
-                    errorMessage = error.message;
-                    break;
-            }
-            return errorMessage;
-        }
-        if (verificationCheck?.status == VerificationStatus.PENDING) {
-            throw new ForbiddenException('Invalid code');
-        }
-        return verificationCheck;
+  async sendVerificationCode(phone: string) {
+    try {
+      const response = await axios.post(
+          `${this._apiUrl}/send-otp`,
+          {
+              phone: phone,
+              method: 'sms',
+              template_id: "8",
+              sender_name: "Soapss",
+              otp_format: 'numeric',
+          },
+          {
+              headers: {
+                  'Content-Type': 'application/json',
+                  Accept: 'application/json',
+                  'X-Authorization': AppConfig.AUTHENTICA.API_KEY,
+              },
+          },
+      );
+
+      console.log(response, 'response');
+      return response.data.success;
+    } catch (error) {
+      console.log('AUTHENTICA ERROR', error.response?.data || error);
+      throw error;
     }
+  }
+
+  async verifyPhoneNumber(
+    phoneNumber: string,
+    verificationCode: string
+  ): Promise<any> {
+    try {
+      const response = await axios.post(
+        `${this._apiUrl}/verify-otp`,
+        {
+          phone: phoneNumber,
+          otp: verificationCode,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-Authorization': AppConfig.AUTHENTICA.API_KEY,
+          },
+        }
+      );
+      if (response.data.status === true) {
+        return { success: true, message: response.data.message };
+      }
+
+      return { success: false, message: 'Invalid code' };
+    } catch (error) {
+      console.log(error);
+      let errorMessage;
+      const status = error.response?.statusCode;
+
+      switch (status) {
+        case 404:
+          errorMessage = 'Code not found, try to request a new one';
+          break;
+        case 400:
+          errorMessage = 'Invalid code';
+          break;
+        case 429:
+          errorMessage =
+            'Max check attempts reached, please wait 10 minutes before retrying';
+          break;
+        case 403:
+          errorMessage = 'Invalid code';
+          break;
+        case 422:
+          errorMessage = 'Failed to verify OTP';
+          break;
+        default:
+          errorMessage = error.response?.data?.message || error.message;
+          break;
+      }
+      return { success: false, message: errorMessage };
+    }
+  }
 }
