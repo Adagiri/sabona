@@ -388,7 +388,7 @@ export default class CustomerService {
                 },
             },
         });
-
+        console.log(user, "user");
         await this.emailService
             .sendRegularOrderAlert(
                 order.id,

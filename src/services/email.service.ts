@@ -49,7 +49,7 @@ New regular order created:
 Order ID: ${orderId}
 Customer: ${customerName}
 Laundry: ${orderDetails.laundryName}
-Total Amount: ${orderDetails.totalAmount} ${orderDetails.currency || 'AED'}
+Total Amount: ${orderDetails.totalAmount} ${orderDetails.currency || 'SAR'}
 
 Pickup: ${orderDetails.pickupAddress}
 Pickup Date: ${orderDetails.pickupDate} at ${orderDetails.pickupTime}
