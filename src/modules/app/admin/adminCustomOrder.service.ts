@@ -150,6 +150,7 @@ export default class AdminCustomOrderService {
             include: {
                 user: {
                     select: {
+                        id: true,
                         firstName: true,
                         lastName: true,
                         phone: true,
@@ -621,8 +622,9 @@ export default class AdminCustomOrderService {
      */
     private async notifyCustomerPaymentRequired(user: any, order: any, invoiceUrl: string): Promise<void> {
         console.log(user, ' :user');
+        console.log(order.userId, ' :userId');
         const customerTokens = await this._dbService.deviceToken.findMany({
-            where: { userId: user.id, deletedAt: null },
+            where: { userId: order.userId || user.id, deletedAt: null },
             select: { token: true },
         });
         console.log(customerTokens, ' :customer tokens');
