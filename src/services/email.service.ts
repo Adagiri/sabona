@@ -41,6 +41,29 @@ View order in admin panel: ${AppConfig.APP.ADMIN_PANEL_URL}/custom-order/${order
         return this.sendEmail(this.adminEmails, subject, body);
     }
 
+    async sendRegularOrderAlert(orderId: string, customerName: string, orderDetails: any) {
+        const subject = `🆕 New Regular Order - ${orderId}`;
+        const body = `
+New regular order created:
+
+Order ID: ${orderId}
+Customer: ${customerName}
+Laundry: ${orderDetails.laundryName}
+Total Amount: ${orderDetails.totalAmount} ${orderDetails.currency || 'AED'}
+
+Pickup: ${orderDetails.pickupAddress}
+Pickup Date: ${orderDetails.pickupDate} at ${orderDetails.pickupTime}
+
+Delivery: ${orderDetails.deliveryAddress}
+
+${orderDetails.assignedDriverName ? `Assigned Driver: ${orderDetails.assignedDriverName} (${orderDetails.assignedDriverDistance}km away)` : 'Driver assignment pending'}
+
+View order in admin panel: ${AppConfig.APP.ADMIN_PANEL_URL}/order-details/${orderId}
+    `.trim();
+
+        return this.sendEmail(this.adminEmails, subject, body);
+    }
+
     private async sendEmail(toAddresses: string[], subject: string, body: string) {
         if (!toAddresses.length) {
             console.warn('No admin emails configured');

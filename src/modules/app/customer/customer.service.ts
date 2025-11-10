@@ -34,6 +34,7 @@ import LocationService from '../location/location.service';
 import { CalculateFeesRequestDTO } from './dto/request/calculateFees.request';
 import { CalculateFeesResponseDTO } from './dto/response/calculateFees.response';
 import { BooleanResponseDTO } from '../../../core/response/response.schema';
+import { EmailService } from 'src/services/email.service';
 // import { BooleanResponseDTO } from 'src/core/response/response.schema';
 
 export interface FeeCalculationInput {
@@ -55,6 +56,7 @@ export default class CustomerService {
         private _dbService: DatabaseService,
         private _notificationService: NotificationService,
         private _locationService: LocationService,
+        private emailService: EmailService,
     ) {}
 
     async calculateOrderFees(data: CalculateFeesRequestDTO, userId?: string): Promise<CalculateFeesResponseDTO> {
@@ -386,6 +388,25 @@ export default class CustomerService {
                 },
             },
         });
+
+        await this.emailService
+            .sendRegularOrderAlert(
+                order.id,
+                `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown Customer',
+                {
+                    laundryName: laundry.name,
+                    totalAmount: order.totalAmount,
+                    pickupAddress: data.pickupAddress,
+                    pickupDate: data.pickupDate,
+                    pickupTime: data.pickupTime,
+                    deliveryAddress: data.deliveryAddress,
+                    assignedDriverName: closestDriver ? `${closestDriver.firstName} ${closestDriver.lastName}` : null,
+                    assignedDriverDistance: closestDriver ? Math.round(closestDriver.distance * 100) / 100 : null,
+                },
+            )
+            .catch((err) => {
+                console.error('Failed to send admin email alert for regular order:', err);
+            });
 
         return {
             data: order,
