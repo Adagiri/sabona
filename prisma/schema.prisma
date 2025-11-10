@@ -148,6 +148,7 @@ enum LEVEL {
 enum PaymentType {
   CASH
   CARD
+  APPLEPAY
 }
 
 enum WithdrawalStatus {
