@@ -219,14 +219,11 @@ export default class UserService {
         ) {
             isValidOtp = true;
         } else if (AppConfig.APP.ENV !== APP_ENV.TEST) {
-            try {
-                const verification = await this._smsService.verifyPhoneNumber(data.phone, data.otp);
-                if (verification && verification.status === 'approved') {
-                    isValidOtp = true;
-                }
-            } catch (error) {
-                console.error('OTP verification error:', error);
-                throw new BadRequestException('auth.invalid_otp');
+            const response = await this._smsService.verifyPhoneNumber(data.phone, data.otp);
+            if (!response.success) {
+                throw new BadRequestException(response.message);
+            } else {
+                isValidOtp = true;
             }
         }
 
@@ -521,9 +518,9 @@ export default class UserService {
         } else if (AppConfig.APP.ENV !== APP_ENV.PROD && data.otp !== OTP_CODE_FOR_TEST) {
             throw new BadRequestException('You have entered the wrong otp');
         } else {
-            const otp = await this._smsService.verifyPhoneNumber(data.phone, data.otp);
-            if (!otp) {
-                throw new BadRequestException('Error while sending verification code, Please try again!!!');
+            const response = await this._smsService.verifyPhoneNumber(data.phone, data.otp);
+            if (!response.success) {
+                throw new BadRequestException(response.message);
             }
 
             const existingUser = await this._dbService.user.findFirst({

@@ -398,12 +398,6 @@ export default class PayTabsService {
      */
     private async sendRegularOrderSuccessNotifications(order: any): Promise<void> {
         try {
-            // 1. Notify Customer
-            await this.notifyCustomerPaymentSuccess(order);
-
-            // 2. Notify Vendor
-            await this.notifyVendorNewPaidOrder(order);
-
             await this.emailService
                 .sendRegularOrderAlert(order.id, order.user?.name || order.user?.email || 'N/A', {
                     laundryName: order.laundry?.name || 'N/A',
@@ -419,6 +413,14 @@ export default class PayTabsService {
                 .catch((err) => {
                     console.error('Failed to send admin email alert for regular order payment:', err);
                 });
+                
+            // 1. Notify Customer
+            await this.notifyCustomerPaymentSuccess(order);
+
+            // 2. Notify Vendor
+            await this.notifyVendorNewPaidOrder(order);
+
+            console.log('I ran up til here');
         } catch (error) {
             console.error('Error sending order notifications:', error);
             // Don't throw - payment already processed, log error and continue
