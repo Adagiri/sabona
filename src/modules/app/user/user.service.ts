@@ -68,8 +68,10 @@ export default class UserService {
         if (AppConfig.APP.ENV === APP_ENV.TEST || ['+966563651254', '+966563651244'].indexOf(data.phone) !== -1) {
             return { message: 'auth.login_code_sent' };
         } else {
-            const otp = await this._smsService.sendVerificationCode(data.phone);
-            if (!otp) {
+            const response = await this._smsService.sendVerificationCode(data.phone);
+
+            console.log(response);
+            if (!response) {
                 throw new BadRequestException('auth.error_sending_code');
             }
             return {
@@ -501,7 +503,8 @@ export default class UserService {
 
     async VerifyCode(data: VerifyOtpRequestDTO): Promise<VerifyOtpResponseDTO> {
         if (
-            (AppConfig.APP.ENV !== APP_ENV.PROD || ['+966563651254', '+966563651244'].indexOf(data.phone) !== -1) &&
+            (AppConfig.APP.ENV !== APP_ENV.PROD ||
+                ['+966563651254', '+966563651244', '+966572922070'].indexOf(data.phone) !== -1) &&
             data.otp === OTP_CODE_FOR_TEST
         ) {
             const existingUser = await this._dbService.user.findFirst({
