@@ -5,6 +5,7 @@ import { extractTokens } from 'src/helpers/util.helper';
 import * as crypto from 'crypto';
 import { Order, OrderStatus, OrderType, PaymentStatus, PaymentTransactionType } from '@prisma/client';
 import AppConfig from 'src/configs/app.config';
+import { EmailService } from 'src/services/email.service';
 
 export interface PayTabsWebhookData {
     cart_id?: string;
@@ -33,6 +34,7 @@ export default class PayTabsService {
     constructor(
         private _dbService: DatabaseService,
         private _notificationService: NotificationService,
+        private emailService: EmailService,
     ) {}
 
     /**
@@ -58,6 +60,7 @@ export default class PayTabsService {
                 include: {
                     user: {
                         select: {
+                            name: true,
                             firstName: true,
                             lastName: true,
                             email: true,
@@ -66,6 +69,13 @@ export default class PayTabsService {
                     },
                     laundry: {
                         select: { name: true },
+                    },
+
+                    pickup: {
+                        select: { pickupAddress: true, pickupTime: true, pickupDate: true },
+                    },
+                    delivery: {
+                        select: { deliveryAddress: true },
                     },
                 },
             });
@@ -388,11 +398,29 @@ export default class PayTabsService {
      */
     private async sendRegularOrderSuccessNotifications(order: any): Promise<void> {
         try {
+            await this.emailService
+                .sendRegularOrderAlert(order.id, order.user?.name || order.user?.email || 'N/A', {
+                    laundryName: order.laundry?.name || 'N/A',
+                    paymentType: order.paymentType,
+                    totalAmount: order.totalAmount,
+                    pickupAddress: order.pickup?.pickupAddress || 'N/A',
+                    pickupDate: order.pickup?.pickupDate || 'N/A',
+                    pickupTime: order.pickup?.pickupTime || 'N/A',
+                    deliveryAddress: order.delivery?.deliveryAddress || 'N/A',
+                    assignedDriverName: null,
+                    assignedDriverDistance: null,
+                })
+                .catch((err) => {
+                    console.error('Failed to send admin email alert for regular order payment:', err);
+                });
+                
             // 1. Notify Customer
             await this.notifyCustomerPaymentSuccess(order);
 
             // 2. Notify Vendor
             await this.notifyVendorNewPaidOrder(order);
+
+            console.log('I ran up til here');
         } catch (error) {
             console.error('Error sending order notifications:', error);
             // Don't throw - payment already processed, log error and continue

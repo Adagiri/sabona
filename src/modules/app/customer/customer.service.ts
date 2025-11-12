@@ -17,7 +17,6 @@ import AcceptOrderRequestDTO from '../vendor/dto/request/acceptOrder.request';
 import CancelOrderResponseDTO from './dto/response/cancelOrder.response';
 import { OrderListDto } from './dto/response/orderlist.response.dto';
 import { GetPaginationOptions } from '../../../helpers/util.helper';
-import NotificationService from '../notification/notification.service';
 import CreateFeedbackDTO from './dto/request/createFeeback.request';
 import CreateFeedbackResponseDTO from './dto/response/createFeedback.response';
 import { BadRequestException } from '../../../core/exceptions/response.exception';
@@ -53,7 +52,6 @@ export interface FeeCalculationInput {
 export default class CustomerService {
     constructor(
         private _dbService: DatabaseService,
-        private _notificationService: NotificationService,
         private _locationService: LocationService,
     ) {}
 
@@ -386,6 +384,8 @@ export default class CustomerService {
                 },
             },
         });
+        console.log(user, "user");
+ 
 
         return {
             data: order,
