@@ -27,6 +27,7 @@ import EditLaundryServiceRequestDTO from './dto/request/laundryServiceEdit.reque
 import LocationService from '../location/location.service';
 import { BooleanResponseDTO } from 'src/core/response/response.schema';
 import { I18nContext, I18nService } from 'nestjs-i18n';
+import { CATEGORY_SORT_ORDER } from 'src/constants/laundry-template';
 
 @Injectable()
 export default class VendorService {
@@ -944,7 +945,7 @@ export default class VendorService {
             throw new BadRequestException('Service does not exist');
         }
 
-        // Validate categories if provided
+        // Validate categories and subcategories if provided
         for (const item of data.items) {
             if (item.categoryId) {
                 const category = await this._dbService.laundryItemCategory.findFirst({
@@ -958,6 +959,19 @@ export default class VendorService {
                     throw new BadRequestException(`Category ${item.categoryId} does not exist`);
                 }
             }
+
+            if (item.subCategoryId) {
+                const subCategory = await this._dbService.laundryItemSubCategory.findFirst({
+                    where: {
+                        id: item.subCategoryId,
+                        deletedAt: null,
+                    },
+                });
+
+                if (!subCategory) {
+                    throw new BadRequestException(`Subcategory ${item.subCategoryId} does not exist`);
+                }
+            }
         }
 
         const items = data.items.map((item) => ({
@@ -967,6 +981,8 @@ export default class VendorService {
             platformPrice: item.platformPrice,
             expressPrice: item.expressPrice,
             categoryId: item.categoryId,
+            subCategoryId: item.subCategoryId,
+            sortOrder: item.sortOrder,
             laundryServiceId: serviceId,
         }));
 
@@ -1038,6 +1054,20 @@ export default class VendorService {
             }
         }
 
+        // Validate subcategory if provided
+        if (data.subCategoryId) {
+            const subCategory = await this._dbService.laundryItemSubCategory.findFirst({
+                where: {
+                    id: data.subCategoryId,
+                    deletedAt: null,
+                },
+            });
+
+            if (!subCategory) {
+                throw new BadRequestException('Subcategory does not exist');
+            }
+        }
+
         const updateData: any = {};
 
         // Handle name translation
@@ -1060,6 +1090,14 @@ export default class VendorService {
 
         if (data.categoryId !== undefined) {
             updateData.categoryId = data.categoryId;
+        }
+
+        if (data.subCategoryId !== undefined) {
+            updateData.subCategoryId = data.subCategoryId;
+        }
+
+        if (data.sortOrder !== undefined) {
+            updateData.sortOrder = data.sortOrder;
         }
 
         const updatedItem = await this._dbService.laundryServiceItem.update({
@@ -1359,12 +1397,16 @@ export default class VendorService {
                     },
                 },
             },
-            orderBy: {
-                createdAt: 'desc',
-            },
         });
 
-        return { data: categories };
+        // Sort categories by custom sort order
+        const sortedCategories = categories.sort((a, b) => {
+            const orderA = CATEGORY_SORT_ORDER[a.name] || 999;
+            const orderB = CATEGORY_SORT_ORDER[b.name] || 999;
+            return orderA - orderB;
+        });
+
+        return { data: sortedCategories };
     }
 
     async getLaundryItemCategoryById(categoryId: string): Promise<LaundryItemCategoryResponseDTO> {
@@ -1598,5 +1640,62 @@ export default class VendorService {
         });
 
         return { data: true };
+    }
+
+    async getItemsByCategory(categoryId: string): Promise<any> {
+        // Verify category exists
+        const category = await this._dbService.laundryItemCategory.findFirst({
+            where: {
+                id: categoryId,
+                deletedAt: null,
+            },
+        });
+
+        if (!category) {
+            throw new BadRequestException('Category not found');
+        }
+
+        // Fetch all items under this category
+        const items = await this._dbService.laundryServiceItem.findMany({
+            where: {
+                categoryId: categoryId,
+                deletedAt: null,
+            },
+            include: {
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                        nameLocale: true,
+                        icon: {
+                            select: {
+                                id: true,
+                                name: true,
+                                type: true,
+                                media: {
+                                    select: {
+                                        id: true,
+                                        path: true,
+                                        name: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+                subCategory: {
+                    select: {
+                        id: true,
+                        name: true,
+                        nameLocale: true,
+                    },
+                },
+            },
+            orderBy: {
+                sortOrder: 'asc',
+            },
+        });
+
+        return { data: items };
     }
 }
