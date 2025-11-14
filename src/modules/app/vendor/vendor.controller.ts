@@ -276,6 +276,15 @@ export default class VendorController {
         return await this._vendorService.getLaundryItemCategoryById(categoryId);
     }
 
+    @Get({
+        path: '/category/:categoryId/items',
+        description: 'Get all items under a specific category (sorted)',
+        response: {},
+    })
+    async getItemsByCategory(@Param('categoryId') categoryId: string): Promise<any> {
+        return await this._vendorService.getItemsByCategory(categoryId);
+    }
+
     @Authorized(UserType.ADMIN)
     @Patch({
         path: '/category/:categoryId/edit',
