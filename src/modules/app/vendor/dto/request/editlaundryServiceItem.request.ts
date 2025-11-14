@@ -28,4 +28,14 @@ export class EditLaundryServiceItemRequestDTO {
     @IsString()
     @IsOptional()
     categoryId?: string;
+
+    @ApiProperty({ description: 'Subcategory ID for this item', required: false })
+    @IsString()
+    @IsOptional()
+    subCategoryId?: string;
+
+    @ApiProperty({ description: 'Sort order for this item within its category', required: false })
+    @IsNumber()
+    @IsOptional()
+    sortOrder?: number;
 }
