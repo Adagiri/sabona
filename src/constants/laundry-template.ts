@@ -426,13 +426,26 @@ export const DEFAULT_LAUNDRY_TEMPLATE: Record<string, CategoryTemplate> = {
   },
 };
 
-// Default service name for the laundry
-export const DEFAULT_SERVICE_NAME = {
-  en: 'Wash & Fold',
-  ar: 'غسيل وطي',
-};
-
-export const DEFAULT_SERVICE_DESCRIPTION = {
-  en: 'Professional washing and folding service',
-  ar: 'خدمة غسيل وطي احترافية',
-};
+// Default services for the laundry
+export const DEFAULT_SERVICES = [
+  {
+    nameLocale: {
+      en: 'Wash & Iron',
+      ar: 'غسيل وكوي',
+    },
+    descriptionLocale: {
+      en: 'Professional washing and ironing service',
+      ar: 'خدمة غسيل وكوي احترافية',
+    },
+  },
+  {
+    nameLocale: {
+      en: 'Ironing',
+      ar: 'كوي',
+    },
+    descriptionLocale: {
+      en: 'Professional ironing service',
+      ar: 'خدمة كوي احترافية',
+    },
+  },
+];

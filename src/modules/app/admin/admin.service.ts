@@ -43,8 +43,7 @@ import { DeleteUserRequestDTO } from './dto/request/deleteUser.request';
 import { DeleteUserResponseDTO } from './dto/response/deleteUser.response';
 import {
     DEFAULT_LAUNDRY_TEMPLATE,
-    DEFAULT_SERVICE_NAME,
-    DEFAULT_SERVICE_DESCRIPTION,
+    DEFAULT_SERVICES,
 } from '../../../constants/laundry-template';
 
 @Injectable()
@@ -386,7 +385,7 @@ export default class AdminService {
             }
 
             if (user.type === UserType.VENDOR) {
-                // Create laundry with default service and items
+                // Create laundry with default services and items
                 const laundry = await tx.laundry.create({
                     data: {
                         name: user.settings?.laundryName || 'Default Laundry Name',
@@ -398,17 +397,6 @@ export default class AdminService {
                     },
                 });
 
-                // Create default laundry service
-                const service = await tx.laundryService.create({
-                    data: {
-                        laundryId: laundry.id,
-                        name: DEFAULT_SERVICE_NAME.en,
-                        nameLocale: DEFAULT_SERVICE_NAME,
-                        description: DEFAULT_SERVICE_DESCRIPTION.en,
-                        descriptionLocale: DEFAULT_SERVICE_DESCRIPTION,
-                    },
-                });
-
                 // Fetch all categories to map items
                 const categories = await tx.laundryItemCategory.findMany({
                     where: { deletedAt: null },
@@ -417,34 +405,48 @@ export default class AdminService {
                 // Create a map of category names to their IDs
                 const categoryMap = new Map(categories.map((cat) => [cat.name, cat.id]));
 
-                // Create all items from the template
-                const itemsToCreate = [];
-                let sortOrderCounter = 1;
+                // Create both default services with their items
+                for (const serviceTemplate of DEFAULT_SERVICES) {
+                    // Create the service
+                    const service = await tx.laundryService.create({
+                        data: {
+                            laundryId: laundry.id,
+                            name: serviceTemplate.nameLocale.en,
+                            nameLocale: serviceTemplate.nameLocale,
+                            description: serviceTemplate.descriptionLocale.en,
+                            descriptionLocale: serviceTemplate.descriptionLocale,
+                        },
+                    });
 
-                for (const [categoryName, categoryTemplate] of Object.entries(DEFAULT_LAUNDRY_TEMPLATE)) {
-                    const categoryId = categoryMap.get(categoryName);
+                    // Create all items for this service from the template
+                    const itemsToCreate = [];
+                    let sortOrderCounter = 1;
 
-                    if (categoryId) {
-                        for (const item of categoryTemplate.items) {
-                            itemsToCreate.push({
-                                laundryServiceId: service.id,
-                                categoryId: categoryId,
-                                name: item.nameLocale.en,
-                                nameLocale: item.nameLocale,
-                                vendorPrice: item.vendorPrice,
-                                platformPrice: item.platformPrice,
-                                expressPrice: item.expressPrice,
-                                sortOrder: sortOrderCounter++,
-                            });
+                    for (const [categoryName, categoryTemplate] of Object.entries(DEFAULT_LAUNDRY_TEMPLATE)) {
+                        const categoryId = categoryMap.get(categoryName);
+
+                        if (categoryId) {
+                            for (const item of categoryTemplate.items) {
+                                itemsToCreate.push({
+                                    laundryServiceId: service.id,
+                                    categoryId: categoryId,
+                                    name: item.nameLocale.en,
+                                    nameLocale: item.nameLocale,
+                                    vendorPrice: item.vendorPrice,
+                                    platformPrice: item.platformPrice,
+                                    expressPrice: item.expressPrice,
+                                    sortOrder: sortOrderCounter++,
+                                });
+                            }
                         }
                     }
-                }
 
-                // Batch create all items
-                if (itemsToCreate.length > 0) {
-                    await tx.laundryServiceItem.createMany({
-                        data: itemsToCreate,
-                    });
+                    // Batch create all items for this service
+                    if (itemsToCreate.length > 0) {
+                        await tx.laundryServiceItem.createMany({
+                            data: itemsToCreate,
+                        });
+                    }
                 }
             }
         });
