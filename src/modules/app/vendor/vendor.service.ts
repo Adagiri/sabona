@@ -1691,9 +1691,14 @@ export default class VendorService {
                     },
                 },
             },
-            orderBy: {
-                sortOrder: 'asc',
-            },
+            orderBy: [
+                {
+                    sortOrder: { sort: 'asc', nulls: 'last' },
+                },
+                {
+                    name: 'asc',
+                },
+            ],
         });
 
         return { data: items };
