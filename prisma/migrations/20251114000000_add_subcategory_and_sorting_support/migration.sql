@@ -1,6 +1,9 @@
 -- Add sortOrder to LaundryItemCategory
 ALTER TABLE "LaundryItemCategory" ADD COLUMN "sortOrder" INTEGER;
 
+-- Add sortOrder to LaundryService
+ALTER TABLE "LaundryService" ADD COLUMN "sortOrder" INTEGER;
+
 -- Create LaundryItemSubCategory table
 CREATE TABLE "LaundryItemSubCategory" (
     "id" TEXT NOT NULL,

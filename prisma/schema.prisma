@@ -511,6 +511,7 @@ model LaundryService {
   descriptionLocale   Json?                 @db.JsonB
   iconId              Int?
   icon                Icon?                 @relation("ServiceIcon", fields: [iconId], references: [id])
+  sortOrder           Int?                  // For custom sorting of services
   laundryServiceItems LaundryServiceItem[] // Relation to LaundryServiceItem model
   createdAt           DateTime              @default(now()) @db.Timestamptz()
   updatedAt           DateTime              @default(now()) @updatedAt @db.Timestamptz()

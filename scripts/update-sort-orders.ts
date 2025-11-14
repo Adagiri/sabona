@@ -32,6 +32,32 @@ async function updateCategorySortOrders() {
   console.log('Category sort orders updated successfully!\n');
 }
 
+async function updateServiceSortOrders() {
+  console.log('Updating service sort orders...');
+
+  // Update "Wash & Iron" services to sortOrder 1
+  const washIronResult = await prisma.$executeRaw`
+    UPDATE "LaundryService"
+    SET "sortOrder" = 1
+    WHERE (LOWER("name") LIKE '%wash%' AND LOWER("name") LIKE '%iron%')
+      AND "deletedAt" IS NULL
+      AND "sortOrder" IS NULL
+  `;
+  console.log(`  ✓ Updated "Wash & Iron" services to sortOrder 1 (${washIronResult} records)`);
+
+  // Update "Ironing" (only) services to sortOrder 2
+  const ironingResult = await prisma.$executeRaw`
+    UPDATE "LaundryService"
+    SET "sortOrder" = 2
+    WHERE (LOWER("name") LIKE '%iron%' OR LOWER("name") LIKE '%كوي%')
+      AND "deletedAt" IS NULL
+      AND "sortOrder" IS NULL
+  `;
+  console.log(`  ✓ Updated "Ironing" services to sortOrder 2 (${ironingResult} records)`);
+
+  console.log('Service sort orders updated successfully!\n');
+}
+
 async function updateItemSortOrders() {
   console.log('Updating item sort orders...');
 
@@ -40,7 +66,8 @@ async function updateItemSortOrders() {
   const notFoundItems: string[] = [];
 
   for (const [itemName, sortOrder] of Object.entries(ITEM_SORT_ORDER_BY_NAME)) {
-    const result = await prisma.laundryServiceItem.updateMany({
+    // Try exact match first
+    let result = await prisma.laundryServiceItem.updateMany({
       where: {
         name: itemName,
         deletedAt: null,
@@ -51,6 +78,17 @@ async function updateItemSortOrders() {
       },
     });
 
+    // If no exact match, try case-insensitive match
+    if (result.count === 0) {
+      result = await prisma.$executeRaw`
+        UPDATE "LaundryServiceItem"
+        SET "sortOrder" = ${sortOrder}
+        WHERE LOWER("name") = LOWER(${itemName})
+          AND "deletedAt" IS NULL
+          AND "sortOrder" IS NULL
+      `;
+    }
+
     if (result.count > 0) {
       updatedCount += result.count;
       console.log(`  ✓ Updated "${itemName}" to sortOrder ${sortOrder} (${result.count} records)`);
@@ -58,7 +96,10 @@ async function updateItemSortOrders() {
       // Check if item exists but already has sortOrder
       const existingCount = await prisma.laundryServiceItem.count({
         where: {
-          name: itemName,
+          OR: [
+            { name: itemName },
+            { name: { equals: itemName, mode: 'insensitive' } },
+          ],
           deletedAt: null,
         },
       });
@@ -118,6 +159,7 @@ async function main() {
 
   try {
     await updateCategorySortOrders();
+    await updateServiceSortOrders();
     await updateItemSortOrders();
     await updateItemsWithoutMapping();
 

@@ -415,6 +415,7 @@ export default class AdminService {
                             nameLocale: serviceTemplate.nameLocale,
                             description: serviceTemplate.descriptionLocale.en,
                             descriptionLocale: serviceTemplate.descriptionLocale,
+                            sortOrder: serviceTemplate.sortOrder,
                         },
                     });
 

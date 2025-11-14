@@ -633,6 +633,10 @@ export default class VendorService {
                             },
                         },
                     },
+                    orderBy: [
+                        { sortOrder: { sort: 'asc', nulls: 'last' } },
+                        { name: 'asc' },
+                    ],
                 },
             },
         });

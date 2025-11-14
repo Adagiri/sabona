@@ -437,6 +437,7 @@ export const DEFAULT_SERVICES = [
       en: 'Professional washing and ironing service',
       ar: 'خدمة غسيل وكوي احترافية',
     },
+    sortOrder: 1,
   },
   {
     nameLocale: {
@@ -447,5 +448,6 @@ export const DEFAULT_SERVICES = [
       en: 'Professional ironing service',
       ar: 'خدمة كوي احترافية',
     },
+    sortOrder: 2,
   },
 ];
