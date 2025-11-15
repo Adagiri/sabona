@@ -191,7 +191,7 @@ model User {
   firstName        String? // Optional first name
   lastName         String? // Optional last name
   password         String? // Optional password field
-  phone            String?    @unique // Unique phone number for each user
+  phone            String? // Phone number for each user
   type             UserType   @default(USER) // Defines if user is USER, VENDOR, RIDER, etc.
   status           UserStatus @default(ACTIVE) // Active or inactive status
   profilePictureId Int? // Optional relation to user's profile picture
