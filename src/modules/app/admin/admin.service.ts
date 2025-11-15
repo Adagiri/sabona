@@ -41,6 +41,10 @@ import { BooleanResponseDTO } from 'src/core/response/response.schema';
 import { GetAdminSettingsResponseDTO } from './dto/response/adminSettings.response';
 import { DeleteUserRequestDTO } from './dto/request/deleteUser.request';
 import { DeleteUserResponseDTO } from './dto/response/deleteUser.response';
+import {
+    DEFAULT_LAUNDRY_TEMPLATE,
+    DEFAULT_SERVICES,
+} from '../../../constants/laundry-template';
 
 @Injectable()
 export default class AdminService {
@@ -381,7 +385,8 @@ export default class AdminService {
             }
 
             if (user.type === UserType.VENDOR) {
-                await tx.laundry.create({
+                // Create laundry with default services and items
+                const laundry = await tx.laundry.create({
                     data: {
                         name: user.settings?.laundryName || 'Default Laundry Name',
                         long: user.settings?.long || 0,
@@ -391,6 +396,59 @@ export default class AdminService {
                         vendorId: user.id,
                     },
                 });
+
+                // Fetch all categories to map items
+                const categories = await tx.laundryItemCategory.findMany({
+                    where: { deletedAt: null },
+                });
+
+                // Create a map of category names to their IDs
+                const categoryMap = new Map(categories.map((cat) => [cat.name, cat.id]));
+
+                // Create both default services with their items
+                for (const serviceTemplate of DEFAULT_SERVICES) {
+                    // Create the service
+                    const service = await tx.laundryService.create({
+                        data: {
+                            laundryId: laundry.id,
+                            name: serviceTemplate.nameLocale.en,
+                            nameLocale: serviceTemplate.nameLocale,
+                            description: serviceTemplate.descriptionLocale.en,
+                            descriptionLocale: serviceTemplate.descriptionLocale,
+                            sortOrder: serviceTemplate.sortOrder,
+                        },
+                    });
+
+                    // Create all items for this service from the template
+                    const itemsToCreate = [];
+                    let sortOrderCounter = 1;
+
+                    for (const [categoryName, categoryTemplate] of Object.entries(DEFAULT_LAUNDRY_TEMPLATE)) {
+                        const categoryId = categoryMap.get(categoryName);
+
+                        if (categoryId) {
+                            for (const item of categoryTemplate.items) {
+                                itemsToCreate.push({
+                                    laundryServiceId: service.id,
+                                    categoryId: categoryId,
+                                    name: item.nameLocale.en,
+                                    nameLocale: item.nameLocale,
+                                    vendorPrice: item.vendorPrice,
+                                    platformPrice: item.platformPrice,
+                                    expressPrice: item.expressPrice,
+                                    sortOrder: sortOrderCounter++,
+                                });
+                            }
+                        }
+                    }
+
+                    // Batch create all items for this service
+                    if (itemsToCreate.length > 0) {
+                        await tx.laundryServiceItem.createMany({
+                            data: itemsToCreate,
+                        });
+                    }
+                }
             }
         });
 

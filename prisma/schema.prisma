@@ -367,25 +367,25 @@ enum IconType {
 
 // Media model to store media files uploaded by users
 model Media {
-  id                Int                 @id @default(autoincrement()) // Using Int for media ID
-  name              String // Media name
-  extension         String // File extension (e.g., jpg, png)
-  type              MediaType // Media type (image, video, etc.)
-  access            MediaAccess // Access level (public/private)
-  size              Float?
-  location          String? // Optional location URL
-  path              String // Path to the file
-  thumbPath         String? // Optional thumbnail path
-  status            MediaStatus         @default(UPLOADING) // Upload status
-  meta              Json?               @db.JsonB
-  userId            String?
-  createdAt         DateTime            @default(now()) @db.Timestamptz()
-  updatedAt         DateTime            @default(now()) @updatedAt @db.Timestamptz()
-  deletedAt         DateTime?           @db.Timestamptz()
-  user              User?               @relation("MediaOwner", fields: [userId], references: [id])
-  users             User[] // Users related to this media (for example, profile pictures)
-  Icon              Icon?
-    withdrawalInvoices WithdrawalLaundry[] @relation("WithdrawalInvoice")
+  id                 Int                 @id @default(autoincrement()) // Using Int for media ID
+  name               String // Media name
+  extension          String // File extension (e.g., jpg, png)
+  type               MediaType // Media type (image, video, etc.)
+  access             MediaAccess // Access level (public/private)
+  size               Float?
+  location           String? // Optional location URL
+  path               String // Path to the file
+  thumbPath          String? // Optional thumbnail path
+  status             MediaStatus         @default(UPLOADING) // Upload status
+  meta               Json?               @db.JsonB
+  userId             String?
+  createdAt          DateTime            @default(now()) @db.Timestamptz()
+  updatedAt          DateTime            @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt          DateTime?           @db.Timestamptz()
+  user               User?               @relation("MediaOwner", fields: [userId], references: [id])
+  users              User[] // Users related to this media (for example, profile pictures)
+  Icon               Icon?
+  withdrawalInvoices WithdrawalLaundry[] @relation("WithdrawalInvoice")
   withdrawalReports  WithdrawalLaundry[] @relation("WithdrawalReport")
 }
 
@@ -511,6 +511,7 @@ model LaundryService {
   descriptionLocale   Json?                 @db.JsonB
   iconId              Int?
   icon                Icon?                 @relation("ServiceIcon", fields: [iconId], references: [id])
+  sortOrder           Int?                  // For custom sorting of services
   laundryServiceItems LaundryServiceItem[] // Relation to LaundryServiceItem model
   createdAt           DateTime              @default(now()) @db.Timestamptz()
   updatedAt           DateTime              @default(now()) @updatedAt @db.Timestamptz()
@@ -519,13 +520,30 @@ model LaundryService {
 }
 
 model LaundryItemCategory {
+  id                  String                   @id @default(uuid())
+  name                String                   @unique
+  nameLocale          Json?                    @db.JsonB
+  description         String?
+  descriptionLocale   Json?                    @db.JsonB
+  iconId              Int?
+  icon                Icon?                    @relation("CategoryIcon", fields: [iconId], references: [id])
+  sortOrder           Int? // For custom sorting of categories
+  laundryServiceItems LaundryServiceItem[] // Relation to LaundryServiceItem
+  subcategories       LaundryItemSubCategory[] // Relation to subcategories
+  createdAt           DateTime                 @default(now()) @db.Timestamptz()
+  updatedAt           DateTime                 @default(now()) @updatedAt @db.Timestamptz()
+  deletedAt           DateTime?                @db.Timestamptz()
+}
+
+model LaundryItemSubCategory {
   id                  String               @id @default(uuid())
-  name                String               @unique
+  name                String
   nameLocale          Json?                @db.JsonB
   description         String?
   descriptionLocale   Json?                @db.JsonB
-  iconId              Int?
-  icon                Icon?                @relation("CategoryIcon", fields: [iconId], references: [id])
+  categoryId          String
+  category            LaundryItemCategory  @relation(fields: [categoryId], references: [id])
+  sortOrder           Int? // For custom sorting of subcategories
   laundryServiceItems LaundryServiceItem[] // Relation to LaundryServiceItem
   createdAt           DateTime             @default(now()) @db.Timestamptz()
   updatedAt           DateTime             @default(now()) @updatedAt @db.Timestamptz()
@@ -533,13 +551,16 @@ model LaundryItemCategory {
 }
 
 model LaundryServiceItem {
-  id               String               @id @default(uuid())
+  id               String                  @id @default(uuid())
   laundryServiceId String
-  laundryService   LaundryService       @relation(fields: [laundryServiceId], references: [id])
+  laundryService   LaundryService          @relation(fields: [laundryServiceId], references: [id])
   categoryId       String?
-  category         LaundryItemCategory? @relation(fields: [categoryId], references: [id])
+  category         LaundryItemCategory?    @relation(fields: [categoryId], references: [id])
+  subCategoryId    String?
+  subCategory      LaundryItemSubCategory? @relation(fields: [subCategoryId], references: [id])
   name             String
   nameLocale       Json?
+  sortOrder        Int? // For custom sorting of items within a category
 
   vendorPrice             Float // What vendor receives
   platformPrice           Float // What user pays (vendor price + platform markup)
@@ -855,40 +876,40 @@ model WithdrawalLaundry {
   id           String     @id @default(uuid())
   withdrawalId String
   withdrawal   Withdrawal @relation(fields: [withdrawalId], references: [id], onDelete: Cascade)
-  
-  laundryId  String
-  laundry    Laundry @relation(fields: [laundryId], references: [id])
-  
+
+  laundryId String
+  laundry   Laundry @relation(fields: [laundryId], references: [id])
+
   laundryName String
-  
+
   vendorId String
   vendor   User   @relation("LaundryWithdrawals", fields: [vendorId], references: [id])
-  
+
   isBranch Boolean @default(false)
-  
+
   mainVendorId String?
   mainVendor   User?   @relation("MainVendorWithdrawals", fields: [mainVendorId], references: [id])
-  
+
   // Earning summary
   totalOrders   Int   @default(0)
   totalEarnings Float @default(0)
-  
+
   // Invoice upload - CHANGED FROM URL TO MEDIA ID
   invoiceMediaId    Int?
   invoiceMedia      Media?    @relation("WithdrawalInvoice", fields: [invoiceMediaId], references: [id])
   invoiceUploadedAt DateTime? @db.Timestamptz()
-  
+
   // Excel report storage on S3
   reportUrl     String?
   reportMediaId Int?
   reportMedia   Media?  @relation("WithdrawalReport", fields: [reportMediaId], references: [id])
-  
+
   createdAt DateTime  @default(now()) @db.Timestamptz()
   updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz()
   deletedAt DateTime? @db.Timestamptz()
 
+  @@unique([withdrawalId, laundryId])
   @@index([withdrawalId])
   @@index([laundryId])
   @@index([vendorId])
-  @@unique([withdrawalId, laundryId])
 }
