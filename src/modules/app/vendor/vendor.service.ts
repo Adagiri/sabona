@@ -1588,6 +1588,14 @@ export default class VendorService {
 
         // Handle name translation
         if (data.nameLocale) {
+            // Validate category name against allowed names
+            const allowedCategoryNames = Object.keys(CATEGORY_SORT_ORDER);
+            if (!allowedCategoryNames.includes(data.nameLocale.en)) {
+                throw new BadRequestException(
+                    `Category name must be one of: ${allowedCategoryNames.join(', ')}`
+                );
+            }
+
             updateData.nameLocale = data.nameLocale;
             updateData.name = data.nameLocale.en; // Auto-populate from English
         }
