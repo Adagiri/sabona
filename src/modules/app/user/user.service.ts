@@ -54,7 +54,7 @@ export default class UserService {
     ) {}
 
     async SendLoginCode(data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
-        const user = await this._dbService.user.findUnique({
+        const user = await this._dbService.user.findFirst({
             where: { phone: data.phone },
         });
         if (!user) {
@@ -480,7 +480,7 @@ export default class UserService {
     }
 
     async SendVerificationCode(data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
-        const user = await this._dbService.user.findUnique({
+        const user = await this._dbService.user.findFirst({
             where: { phone: data.phone },
         });
         if (user) {
@@ -563,7 +563,7 @@ export default class UserService {
     }
 
     async LoginWithEmailPassword(data: LoginRequestDTO): Promise<LoginResponseDTO> {
-        const user = await this._dbService.user.findUnique({
+        const user = await this._dbService.user.findFirst({
             where: {
                 phone: data.phone,
             },
