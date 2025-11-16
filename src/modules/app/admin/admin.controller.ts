@@ -425,6 +425,20 @@ export default class AdminController {
         return await this._vendorService.reorderLaundryServices(laundryId, data.serviceIds);
     }
 
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/laundry/:laundryId/service/:serviceId/change-order',
+        description: 'Change a single service order position',
+        response: {},
+    })
+    async changeLaundryServiceOrder(
+        @Param('laundryId') laundryId: string,
+        @Param('serviceId') serviceId: string,
+        @Body() data: { newPosition: number },
+    ): Promise<any> {
+        return await this._vendorService.changeLaundryServiceOrder(laundryId, serviceId, data.newPosition);
+    }
+
     // Laundry Service Item Management
 
     @Authorized(UserType.ADMIN)
@@ -497,6 +511,28 @@ export default class AdminController {
         @Body() data: { itemIds: string[] },
     ): Promise<any> {
         return await this._vendorService.reorderLaundryServiceItems(laundryId, serviceId, categoryId, data.itemIds);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/laundry/:laundryId/service/:serviceId/category/:categoryId/item/:itemId/change-order',
+        description: 'Change a single item order position within its category',
+        response: {},
+    })
+    async changeLaundryServiceItemOrder(
+        @Param('laundryId') laundryId: string,
+        @Param('serviceId') serviceId: string,
+        @Param('categoryId') categoryId: string,
+        @Param('itemId') itemId: string,
+        @Body() data: { newPosition: number },
+    ): Promise<any> {
+        return await this._vendorService.changeLaundryServiceItemOrder(
+            laundryId,
+            serviceId,
+            categoryId,
+            itemId,
+            data.newPosition
+        );
     }
 
     // Laundry Item Category Management
