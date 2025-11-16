@@ -5,10 +5,13 @@ RUN dnf update -y && \
     dnf install -y nodejs npm && \
     dnf clean all
 
+# Install pnpm globally
+RUN npm install -g pnpm
+
 WORKDIR /app/
 COPY . .
-RUN npm install
-RUN npm run db:generate
-RUN npm run build
+RUN pnpm install
+RUN pnpm run db:generate
+RUN pnpm run build
 EXPOSE 8080
-CMD ["npm", "run", "start"]
+CMD ["pnpm", "run", "start"]
