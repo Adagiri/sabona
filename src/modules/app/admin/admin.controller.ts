@@ -470,6 +470,21 @@ export default class AdminController {
     }
 
     @Authorized(UserType.ADMIN)
+    @IgnoreTranslation()
+    @Get({
+        path: '/laundry/:laundryId/service/:serviceId/category/:categoryId/items',
+        description: 'Get laundry service items filtered by category',
+        response: {},
+    })
+    async getLaundryServiceItemsByCategory(
+        @Param('laundryId') laundryId: string,
+        @Param('serviceId') serviceId: string,
+        @Param('categoryId') categoryId: string,
+    ): Promise<any> {
+        return await this._vendorService.getLaundryServiceItemsByCategory(laundryId, serviceId, categoryId);
+    }
+
+    @Authorized(UserType.ADMIN)
     @Patch({
         path: '/laundry/:laundryId/service/:serviceId/item/:itemId/edit',
         description: 'Edit laundry service item',

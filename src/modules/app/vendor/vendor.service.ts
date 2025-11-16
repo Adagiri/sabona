@@ -978,20 +978,47 @@ export default class VendorService {
             }
         }
 
-        const items = data.items.map((item) => ({
-            nameLocale: item.nameLocale,
-            name: item.nameLocale.en, // Auto-populate from English
-            vendorPrice: item.vendorPrice,
-            platformPrice: item.platformPrice,
-            expressPrice: item.expressPrice,
-            categoryId: item.categoryId,
-            subCategoryId: item.subCategoryId,
-            sortOrder: item.sortOrder,
-            laundryServiceId: serviceId,
-        }));
+        // Auto-calculate sortOrder for items that don't have it (category-scoped)
+        const itemsWithSortOrder = await Promise.all(
+            data.items.map(async (item) => {
+                let sortOrder = item.sortOrder;
+
+                // If sortOrder not provided, auto-calculate based on service + category
+                if (sortOrder === undefined || sortOrder === null) {
+                    const maxSortOrderResult = await this._dbService.laundryServiceItem.findFirst({
+                        where: {
+                            laundryServiceId: serviceId,
+                            categoryId: item.categoryId,
+                            deletedAt: null,
+                        },
+                        orderBy: {
+                            sortOrder: 'desc',
+                        },
+                        select: {
+                            sortOrder: true,
+                        },
+                    });
+
+                    // Set sortOrder to max + 1, or 1 if no items exist in this service+category
+                    sortOrder = (maxSortOrderResult?.sortOrder ?? 0) + 1;
+                }
+
+                return {
+                    nameLocale: item.nameLocale,
+                    name: item.nameLocale.en, // Auto-populate from English
+                    vendorPrice: item.vendorPrice,
+                    platformPrice: item.platformPrice,
+                    expressPrice: item.expressPrice,
+                    categoryId: item.categoryId,
+                    subCategoryId: item.subCategoryId,
+                    sortOrder: sortOrder,
+                    laundryServiceId: serviceId,
+                };
+            }),
+        );
 
         const createdItems = await this._dbService.laundryServiceItem.createMany({
-            data: items,
+            data: itemsWithSortOrder,
         });
 
         if (!createdItems) {
@@ -1200,6 +1227,85 @@ export default class VendorService {
                 vendorPrice: true,
                 platformPrice: true,
                 expressPrice: true,
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                        nameLocale: true,
+                        icon: {
+                            select: {
+                                id: true,
+                                name: true,
+                                type: true,
+                                media: {
+                                    select: {
+                                        id: true,
+                                        path: true,
+                                        name: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            orderBy: {
+                sortOrder: 'asc',
+            },
+        });
+
+        return { data: items };
+    }
+
+    async getLaundryServiceItemsByCategory(laundryId: string, serviceId: string, categoryId: string): Promise<any> {
+        const laundry = await this._dbService.laundry.findFirst({
+            where: {
+                id: laundryId,
+            },
+        });
+
+        if (!laundry) {
+            throw new BadRequestException('Laundry does not exist');
+        }
+
+        const service = await this._dbService.laundryService.findFirst({
+            where: {
+                id: serviceId,
+                laundryId: laundryId,
+            },
+        });
+
+        if (!service) {
+            throw new BadRequestException('Service does not exist');
+        }
+
+        const category = await this._dbService.laundryItemCategory.findFirst({
+            where: {
+                id: categoryId,
+                deletedAt: null,
+            },
+        });
+
+        if (!category) {
+            throw new BadRequestException('Category does not exist');
+        }
+
+        const items = await this._dbService.laundryServiceItem.findMany({
+            where: {
+                laundryServiceId: serviceId,
+                categoryId: categoryId,
+                deletedAt: null,
+            },
+            select: {
+                id: true,
+                name: true,
+                nameLocale: true,
+                createdAt: true,
+                vendorPrice: true,
+                platformPrice: true,
+                expressPrice: true,
+                sortOrder: true,
+                categoryId: true,
                 category: {
                     select: {
                         id: true,
