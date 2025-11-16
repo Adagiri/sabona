@@ -412,6 +412,19 @@ export default class AdminController {
         return await this._vendorService.deleteLaundryService(laundryId, serviceId);
     }
 
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/laundry/:laundryId/services/reorder',
+        description: 'Reorder laundry services',
+        response: {},
+    })
+    async reorderLaundryServices(
+        @Param('laundryId') laundryId: string,
+        @Body() data: { serviceIds: string[] },
+    ): Promise<any> {
+        return await this._vendorService.reorderLaundryServices(laundryId, data.serviceIds);
+    }
+
     // Laundry Service Item Management
 
     @Authorized(UserType.ADMIN)
@@ -469,6 +482,21 @@ export default class AdminController {
         @Param('itemId') itemId: string,
     ): Promise<any> {
         return await this._vendorService.deleteLaundryServiceItem(laundryId, serviceId, itemId);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/laundry/:laundryId/service/:serviceId/category/:categoryId/items/reorder',
+        description: 'Reorder laundry service items within a category',
+        response: {},
+    })
+    async reorderLaundryServiceItems(
+        @Param('laundryId') laundryId: string,
+        @Param('serviceId') serviceId: string,
+        @Param('categoryId') categoryId: string,
+        @Body() data: { itemIds: string[] },
+    ): Promise<any> {
+        return await this._vendorService.reorderLaundryServiceItems(laundryId, serviceId, categoryId, data.itemIds);
     }
 
     // Laundry Item Category Management
