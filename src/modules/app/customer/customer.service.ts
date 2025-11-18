@@ -384,8 +384,6 @@ export default class CustomerService {
                 },
             },
         });
-        console.log(user, "user");
- 
 
         return {
             data: order,
@@ -1016,12 +1014,6 @@ export default class CustomerService {
     }
 
     private calculateDeliveryFee(input: FeeCalculationInput, distance: number, settings: any): number {
-        const useFixed = false;
-
-        if (useFixed) {
-            return 15;
-        }
-
         if (input.subtotal >= settings.freeDeliveryThreshold) {
             return 0;
         }
