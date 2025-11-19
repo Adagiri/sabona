@@ -66,8 +66,8 @@ export default class RiderService {
                                         laundryServiceItem: {
                                             select: {
                                                 name: true,
-                                                platformPrice: true, // Use new dual pricing
-                                                expressPrice: true, // Use new dual pricing
+                                                platformPrice: true,
+                                                expressPlatformPrice: true
                                             },
                                         },
                                     },

@@ -1269,7 +1269,8 @@ export default class VendorService {
                 createdAt: true,
                 vendorPrice: true,
                 platformPrice: true,
-                expressPrice: true,
+                expressVendorPrice: true,
+                expressPlatformPrice: true,
                 category: {
                     select: {
                         id: true,
@@ -1346,7 +1347,8 @@ export default class VendorService {
                 createdAt: true,
                 vendorPrice: true,
                 platformPrice: true,
-                expressPrice: true,
+                expressVendorPrice: true,
+                expressPlatformPrice: true,
                 sortOrder: true,
                 categoryId: true,
                 category: {

@@ -12,6 +12,7 @@ export interface LaundryItemTemplate {
   platformPrice: number;
   expressVendorPrice: number;
   expressPlatformPrice: number;
+  sortOrder?: number;
 }
 
 export interface CategoryTemplate {

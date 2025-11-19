@@ -330,14 +330,14 @@ export default class WithdrawalService {
                     service.items.forEach((item) => {
                         const vendorPrice = item.vendorPriceSnapshot;
                         const platformPrice = item.platformPriceSnapshot;
-                        const expressPrice = item.expressPriceSnapshot;
+                        const expressPlatformPrice = item.expressPlatformPriceSnapshot ?? item.platformPriceSnapshot;
                         const quantity = item.quantity;
 
                         orderGrossEarning += vendorPrice * quantity;
 
                         // Service charge based on delivery type
                         if (order.deliveryType === DeliveryType.EXPRESS) {
-                            orderServiceCharge += (expressPrice - vendorPrice) * quantity;
+                            orderServiceCharge += (expressPlatformPrice - vendorPrice) * quantity;
                         } else {
                             orderServiceCharge += (platformPrice - vendorPrice) * quantity;
                         }
