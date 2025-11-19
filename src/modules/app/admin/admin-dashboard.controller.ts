@@ -19,6 +19,7 @@ export class AdminDashboardController {
     @Get({
         path: '/metrics',
         description: 'Get dashboard metrics and statistics',
+        response: Object,
     })
     async getDashboardMetrics() {
         return this.dashboardService.getDashboardMetrics();
@@ -28,6 +29,7 @@ export class AdminDashboardController {
     @Get({
         path: '/trends',
         description: 'Get order trends over time',
+        response: Object,
     })
     async getOrderTrends(@Query('days') days?: string) {
         return this.dashboardService.getOrderTrends(days ? parseInt(days) : 30);
@@ -37,6 +39,7 @@ export class AdminDashboardController {
     @Get({
         path: '/finance/overview',
         description: 'Get finance overview with inflow/outflow',
+        response: Object,
     })
     async getFinanceOverview(
         @Query('startDate') startDate?: string,
@@ -52,6 +55,7 @@ export class AdminDashboardController {
     @Get({
         path: '/finance/monthly',
         description: 'Get monthly finance report',
+        response: Object,
     })
     async getMonthlyFinanceReport(@Query('year') year?: string) {
         return this.financeService.getMonthlyFinanceReport(year ? parseInt(year) : undefined);
@@ -61,6 +65,7 @@ export class AdminDashboardController {
     @Get({
         path: '/finance/vendor-earnings',
         description: 'Get vendor earnings report',
+        response: Object,
     })
     async getVendorEarningsReport(
         @Query('startDate') startDate?: string,
@@ -76,6 +81,7 @@ export class AdminDashboardController {
     @Get({
         path: '/finance/daily-revenue',
         description: 'Get daily revenue breakdown',
+        response: Object,
     })
     async getDailyRevenue(@Query('days') days?: string) {
         return this.financeService.getDailyRevenue(days ? parseInt(days) : 30);
