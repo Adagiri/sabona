@@ -1,14 +1,11 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Query } from '@nestjs/common';
+import { ApiOperation } from '@nestjs/swagger';
+import { ApiController, Authorized, Get } from '../../../core/decorators';
 import DashboardService from './dashboard.service';
 import FinanceService from './finance.service';
-import { JwtAuthGuard } from '../../../guards/jwt.guard';
-import { AdminGuard } from '../../../guards/admin.guard';
 
-@ApiTags('Admin Dashboard')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, AdminGuard)
-@Controller('admin/dashboard')
+@ApiController('admin/dashboard')
+@Authorized()
 export class AdminDashboardController {
     constructor(
         private readonly dashboardService: DashboardService,
