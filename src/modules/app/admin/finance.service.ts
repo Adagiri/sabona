@@ -50,7 +50,7 @@ export default class FinanceService {
                         : item.vendorPriceSnapshot;
 
                     const platformPrice = order.deliveryType === DeliveryType.EXPRESS
-                        ? (item.expressPlatformPriceSnapshot || item.expressPriceSnapshot)
+                        ? item.expressPlatformPriceSnapshot
                         : item.platformPriceSnapshot;
 
                     const itemVendorTotal = vendorPrice * item.quantity;
@@ -265,11 +265,8 @@ export default class FinanceService {
                     });
 
                     totalEarning += orderEarning;
-                    if (order.vendorEarningDisbursed) {
-                        disbursedEarning += orderEarning;
-                    } else {
-                        pendingEarning += orderEarning;
-                    }
+                    // TODO: Add vendorEarningDisbursed tracking after schema migration
+                    pendingEarning += orderEarning;
                 });
 
                 return {

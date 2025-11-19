@@ -108,7 +108,7 @@ export default class DashboardService {
             this._dbService.user.count({ where: { deletedAt: null, type: UserType.VENDOR } }),
             this._dbService.user.count({ where: { deletedAt: null, type: UserType.VENDOR, status: 'ACTIVE' } }),
             this._dbService.laundry.count({ where: { deletedAt: null } }),
-            this._dbService.laundry.count({ where: { deletedAt: null, status: 'ACTIVE' } }),
+            this._dbService.laundry.count({ where: { deletedAt: null } }), // Active laundries (all non-deleted)
 
             // Drivers
             this._dbService.user.count({ where: { deletedAt: null, type: UserType.RIDER } }),
