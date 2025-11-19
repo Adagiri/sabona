@@ -758,13 +758,68 @@ export default class VendorService {
             throw new BadRequestException('Laundry does not exist');
         }
 
-        // delete all laundry services, laundry service items, laundry
+        // Check for active orders (not completed, cancelled, or rejected)
+        const activeOrders = await this._dbService.order.count({
+            where: {
+                laundryId: laundryId,
+                deletedAt: null,
+                status: {
+                    in: ['PENDING_PAYMENT', 'PENDING', 'ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
+                },
+            },
+        });
+
+        if (activeOrders > 0) {
+            throw new BadRequestException(
+                `Cannot delete laundry - it has ${activeOrders} active order(s). Complete or cancel them first.`
+            );
+        }
+
+        // Check for pending withdrawals
+        const pendingWithdrawals = await this._dbService.withdrawalLaundry.count({
+            where: {
+                laundryId: laundryId,
+                deletedAt: null,
+                withdrawal: {
+                    status: 'PENDING',
+                },
+            },
+        });
+
+        if (pendingWithdrawals > 0) {
+            throw new BadRequestException(
+                `Cannot delete laundry - it has ${pendingWithdrawals} pending withdrawal(s). Complete them first.`
+            );
+        }
+
+        // Cascade soft-delete: Services and their Items
+        const services = await this._dbService.laundryService.findMany({
+            where: {
+                laundryId: laundryId,
+                deletedAt: null,
+            },
+            select: { id: true },
+        });
+
+        const serviceIds = services.map(s => s.id);
+
+        // Soft delete all items in these services
+        if (serviceIds.length > 0) {
+            await this._dbService.laundryServiceItem.deleteMany({
+                where: {
+                    laundryServiceId: { in: serviceIds },
+                },
+            });
+        }
+
+        // Soft delete all services
         await this._dbService.laundryService.deleteMany({
             where: {
                 laundryId: laundryId,
             },
         });
 
+        // Soft delete the laundry
         await this._dbService.laundry.delete({
             where: {
                 id: laundryId,
@@ -914,26 +969,33 @@ export default class VendorService {
             throw new BadRequestException('Service does not exist');
         }
 
-        // Check if any items in this service are part of pending/active orders
-        const serviceItemsInActiveOrders = await this._dbService.orderLaundryServiceItem.findFirst({
+        // Check for active orders using this service
+        const activeOrderServices = await this._dbService.orderLaundryService.count({
             where: {
-                laundryServiceItem: {
-                    laundryServiceId: serviceId,
-                },
-                orderLaundryService: {
-                    order: {
-                        status: {
-                            in: ['PENDING', 'ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
-                        },
+                laundryServiceId: serviceId,
+                order: {
+                    deletedAt: null,
+                    status: {
+                        in: ['PENDING_PAYMENT', 'PENDING', 'ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
                     },
                 },
             },
         });
 
-        if (serviceItemsInActiveOrders) {
-            throw new BadRequestException('Cannot delete service - it has items in pending or active orders');
+        if (activeOrderServices > 0) {
+            throw new BadRequestException(
+                `Cannot delete service - it is used in ${activeOrderServices} active order(s). Complete or cancel them first.`
+            );
         }
 
+        // Cascade soft-delete: Items in this service
+        await this._dbService.laundryServiceItem.deleteMany({
+            where: {
+                laundryServiceId: serviceId,
+            },
+        });
+
+        // Soft delete the service
         await this._dbService.laundryService.delete({
             where: {
                 id: serviceId,
@@ -1208,24 +1270,28 @@ export default class VendorService {
             throw new BadRequestException('Item does not exist');
         }
 
-        // Check if item is part of any pending/active orders
-        const itemInActiveOrders = await this._dbService.orderLaundryServiceItem.findFirst({
+        // Check for active orders containing this item
+        const activeOrderItems = await this._dbService.orderLaundryServiceItem.count({
             where: {
                 laundryServiceItemId: itemId,
                 orderLaundryService: {
                     order: {
+                        deletedAt: null,
                         status: {
-                            in: ['PENDING', 'ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
+                            in: ['PENDING_PAYMENT', 'PENDING', 'ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
                         },
                     },
                 },
             },
         });
 
-        if (itemInActiveOrders) {
-            throw new BadRequestException('Cannot delete item - it is part of pending or active orders');
+        if (activeOrderItems > 0) {
+            throw new BadRequestException(
+                `Cannot delete item - it is in ${activeOrderItems} active order(s). Complete or cancel them first.`
+            );
         }
 
+        // Safe to soft delete
         await this._dbService.laundryServiceItem.delete({
             where: {
                 id: itemId,
@@ -1691,18 +1757,35 @@ export default class VendorService {
             throw new BadRequestException('Category does not exist');
         }
 
-        // Check if any items are using this category
-        const itemsUsingCategory = await this._dbService.laundryServiceItem.findFirst({
+        // Check if any active items are using this category
+        const itemsUsingCategory = await this._dbService.laundryServiceItem.count({
             where: {
                 categoryId: categoryId,
                 deletedAt: null,
             },
         });
 
-        if (itemsUsingCategory) {
-            throw new BadRequestException('Cannot delete category - items are still using it');
+        if (itemsUsingCategory > 0) {
+            throw new BadRequestException(
+                `Cannot delete category - ${itemsUsingCategory} item(s) are still using it.`
+            );
         }
 
+        // Check for active subcategories
+        const activeSubcategories = await this._dbService.laundryItemSubCategory.count({
+            where: {
+                categoryId: categoryId,
+                deletedAt: null,
+            },
+        });
+
+        if (activeSubcategories > 0) {
+            throw new BadRequestException(
+                `Cannot delete category - it has ${activeSubcategories} active subcategory/subcategories. Delete subcategories first.`
+            );
+        }
+
+        // Safe to soft delete
         await this._dbService.laundryItemCategory.update({
             where: {
                 id: categoryId,
