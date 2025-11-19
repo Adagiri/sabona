@@ -435,7 +435,8 @@ export default class AdminService {
                                     nameLocale: item.nameLocale,
                                     vendorPrice: item.vendorPrice,
                                     platformPrice: item.platformPrice,
-                                    expressPrice: item.expressPrice,
+                                    expressVendorPrice: item.expressVendorPrice,
+                                    expressPlatformPrice: item.expressPlatformPrice,
                                     sortOrder: sortOrderCounter++,
                                 });
                             }

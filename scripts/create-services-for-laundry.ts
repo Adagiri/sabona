@@ -56,6 +56,7 @@ async function createServicesForLaundry() {
                 continue;
             }
 
+            let itemSortOrder = 1;
             for (const itemTemplate of categoryTemplate.items) {
                 itemsToCreate.push({
                     laundryServiceId: service.id,
@@ -64,8 +65,9 @@ async function createServicesForLaundry() {
                     name: itemTemplate.nameLocale.en,
                     vendorPrice: itemTemplate.vendorPrice,
                     platformPrice: itemTemplate.platformPrice,
-                    expressPrice: itemTemplate.expressPrice,
-                    sortOrder: itemTemplate.sortOrder,
+                    expressVendorPrice: itemTemplate.expressVendorPrice,
+                    expressPlatformPrice: itemTemplate.expressPlatformPrice,
+                    sortOrder: itemTemplate.sortOrder ?? itemSortOrder++,
                 });
             }
         }

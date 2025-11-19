@@ -49,9 +49,10 @@ export default class OrderService {
                                     select: {
                                         id: true,
                                         name: true,
-                                        vendorPrice: true, // NEW: Use dual pricing
-                                        platformPrice: true, // NEW: Use dual pricing
-                                        expressPrice: true, // NEW: Use dual pricing
+                                        vendorPrice: true,
+                                        platformPrice: true,
+                                        expressVendorPrice: true,
+                                        expressPlatformPrice: true,
                                         price: true, // DEPRECATED: Keep for backward compatibility
                                     },
                                 },
