@@ -1,31 +1,43 @@
 import { Query } from '@nestjs/common';
-import { ApiOperation } from '@nestjs/swagger';
+import { UserType } from '@prisma/client';
 import { ApiController, Authorized, Get } from '../../../core/decorators';
 import DashboardService from './dashboard.service';
 import FinanceService from './finance.service';
 
-@ApiController('admin/dashboard')
-@Authorized()
+@ApiController({
+    path: '/admin/dashboard',
+    tag: 'Admin Dashboard',
+    version: '1',
+})
 export class AdminDashboardController {
     constructor(
         private readonly dashboardService: DashboardService,
         private readonly financeService: FinanceService,
     ) {}
 
-    @Get('metrics')
-    @ApiOperation({ summary: 'Get dashboard metrics and statistics' })
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/metrics',
+        description: 'Get dashboard metrics and statistics',
+    })
     async getDashboardMetrics() {
         return this.dashboardService.getDashboardMetrics();
     }
 
-    @Get('trends')
-    @ApiOperation({ summary: 'Get order trends over time' })
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/trends',
+        description: 'Get order trends over time',
+    })
     async getOrderTrends(@Query('days') days?: string) {
         return this.dashboardService.getOrderTrends(days ? parseInt(days) : 30);
     }
 
-    @Get('finance/overview')
-    @ApiOperation({ summary: 'Get finance overview with inflow/outflow' })
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/finance/overview',
+        description: 'Get finance overview with inflow/outflow',
+    })
     async getFinanceOverview(
         @Query('startDate') startDate?: string,
         @Query('endDate') endDate?: string,
@@ -36,14 +48,20 @@ export class AdminDashboardController {
         );
     }
 
-    @Get('finance/monthly')
-    @ApiOperation({ summary: 'Get monthly finance report' })
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/finance/monthly',
+        description: 'Get monthly finance report',
+    })
     async getMonthlyFinanceReport(@Query('year') year?: string) {
         return this.financeService.getMonthlyFinanceReport(year ? parseInt(year) : undefined);
     }
 
-    @Get('finance/vendor-earnings')
-    @ApiOperation({ summary: 'Get vendor earnings report' })
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/finance/vendor-earnings',
+        description: 'Get vendor earnings report',
+    })
     async getVendorEarningsReport(
         @Query('startDate') startDate?: string,
         @Query('endDate') endDate?: string,
@@ -54,8 +72,11 @@ export class AdminDashboardController {
         );
     }
 
-    @Get('finance/daily-revenue')
-    @ApiOperation({ summary: 'Get daily revenue breakdown' })
+    @Authorized(UserType.ADMIN)
+    @Get({
+        path: '/finance/daily-revenue',
+        description: 'Get daily revenue breakdown',
+    })
     async getDailyRevenue(@Query('days') days?: string) {
         return this.financeService.getDailyRevenue(days ? parseInt(days) : 30);
     }
