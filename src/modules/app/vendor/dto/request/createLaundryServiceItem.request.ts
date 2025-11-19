@@ -29,9 +29,13 @@ export class CreateLaundryServiceItemRequestDTO {
     @IsNumber()
     vendorPrice: number;
 
-    @ApiProperty()
+    @ApiProperty({ description: 'What vendor receives for express delivery' })
     @IsNumber()
-    expressPrice: number;
+    expressVendorPrice: number;
+
+    @ApiProperty({ description: 'What user pays for express delivery' })
+    @IsNumber()
+    expressPlatformPrice: number;
 
     @ApiProperty()
     @IsOptional()

@@ -120,7 +120,7 @@ export default class CustomerService {
                     },
                     select: {
                         platformPrice: true,
-                        expressPrice: true,
+                        expressPlatformPrice: true,
                         name: true,
                     },
                 });
@@ -133,7 +133,7 @@ export default class CustomerService {
 
                 // Choose price based on delivery type
                 const priceToUse =
-                    deliveryType === DeliveryType.EXPRESS ? serviceItem.expressPrice : serviceItem.platformPrice;
+                    deliveryType === DeliveryType.EXPRESS ? serviceItem.expressPlatformPrice : serviceItem.platformPrice;
 
                 subtotal += priceToUse * item.quantity;
             }
@@ -272,7 +272,8 @@ export default class CustomerService {
                     select: {
                         vendorPrice: true,
                         platformPrice: true,
-                        expressPrice: true,
+                        expressVendorPrice: true,
+                        expressPlatformPrice: true,
                         name: true,
                         laundryService: {
                             select: { name: true },
@@ -287,7 +288,8 @@ export default class CustomerService {
                 itemPricesMap.set(item.id, {
                     vendorPrice: itemData.vendorPrice,
                     platformPrice: itemData.platformPrice,
-                    expressPrice: itemData.expressPrice,
+                    expressVendorPrice: itemData.expressVendorPrice,
+                    expressPlatformPrice: itemData.expressPlatformPrice,
                     itemName: itemData.name,
                     serviceName: itemData.laundryService.name,
                 });
@@ -374,7 +376,8 @@ export default class CustomerService {
                                     quantity: item.quantity,
                                     vendorPriceSnapshot: priceSnapshot.vendorPrice,
                                     platformPriceSnapshot: priceSnapshot.platformPrice,
-                                    expressPriceSnapshot: priceSnapshot.expressPrice,
+                                    expressVendorPriceSnapshot: priceSnapshot.expressVendorPrice,
+                                    expressPlatformPriceSnapshot: priceSnapshot.expressPlatformPrice,
                                     itemName: priceSnapshot.itemName,
                                     serviceName: priceSnapshot.serviceName,
                                 };
