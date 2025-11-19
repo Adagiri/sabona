@@ -1,8 +1,11 @@
-# Updates-1: Express Vendor Pricing & Deletion Protection
+# Updates-1: Express Vendor Pricing, Withdrawal Improvements & Admin Dashboard
 
 This update adds:
 1. Separate pricing for normal and express delivery types
 2. Deletion protection for resources with dependencies
+3. Improved withdrawal calculations with configurable transfer charges
+4. Rich admin dashboard with metrics and statistics
+5. Finance page with inflow/outflow tracking
 
 ## Summary of Changes
 
@@ -129,3 +132,156 @@ When deletion is blocked, users see clear messages like:
 - [ ] Test order creation captures all snapshots
 - [ ] Test order details displays snapshot values
 - [ ] Verify mobile app still works (backward compatibility)
+
+---
+
+## Withdrawal System Improvements
+
+### New Features
+
+1. **Configurable Transfer Charge**
+   - Can be PERCENTAGE (e.g., 1%) or FIXED (e.g., 1 SAR)
+   - Configured from Admin Panel → Admin Settings
+
+2. **Express/Normal Pricing Support**
+   - Vendor earnings now use correct price based on delivery type
+   - Express orders use `expressVendorPriceSnapshot`
+   - Normal orders use `vendorPriceSnapshot`
+
+3. **Disbursement Tracking**
+   - New `vendorEarningDisbursed` field on Order
+   - Orders marked as disbursed when invoice uploaded
+
+### New Database Fields
+
+**AdminSettings**:
+- `transferChargeType` - PERCENTAGE or FIXED
+- `transferChargeRate` - Rate value (default 1.0)
+
+**Order**:
+- `vendorEarningDisbursed` - Boolean (default false)
+- `disbursedAt` - Timestamp when marked disbursed
+- `withdrawalId` - Link to withdrawal
+
+**WithdrawalLaundry**:
+- `grossEarnings` - Gross vendor earning
+- `serviceCharge` - Platform's service charge
+- `transferCharge` - Transfer fee deducted
+
+### Files to Apply
+
+1. Run migration: `prisma/migrations/20241119_withdrawal_improvements/migration.sql`
+2. Apply withdrawal service changes: `src/modules/app/withdrawal/withdrawal-improvements.changes.md`
+
+---
+
+## Admin Dashboard
+
+### Features
+
+- **Key Metrics**: Total revenue, orders, customers, active laundries
+- **Platform Earnings**: Service charges, delivery fees, VAT collected
+- **Order Statistics**: Completion rate, cancellation rate, delivery types
+- **Revenue Trends**: 30-day line chart
+- **Order Status Distribution**: Pie chart
+- **Top Performing Laundries**: Table with order count and revenue
+- **Recent Orders**: Latest 10 orders with status
+
+### Backend Files
+
+- `src/modules/app/admin/dashboard.service.ts`
+- `src/modules/app/admin/admin-dashboard.controller.ts`
+
+### Admin Panel Files
+
+- `src/pages/Dashboard.tsx` (replaces empty Home.tsx)
+
+### API Endpoints
+
+- `GET /admin/dashboard/metrics` - All dashboard data
+- `GET /admin/dashboard/trends?days=30` - Order trends
+
+---
+
+## Finance Page
+
+### Features
+
+- **Summary Cards**: Total inflow, outflow, net cashflow, platform profit
+- **Inflow Breakdown**: Revenue, service charges, delivery fees, VAT, transfer charges
+- **Outflow Breakdown**: Vendor earnings, completed/pending withdrawals
+- **Platform Gains**: Item markup, service charges, delivery fees, net profit
+- **Monthly Breakdown**: Bar chart and table with yearly data
+- **Vendor Earnings Report**: Per-laundry earnings with disbursement status
+- **Daily Revenue**: 30-day trend with breakdown
+
+### Backend Files
+
+- `src/modules/app/admin/finance.service.ts`
+
+### Admin Panel Files
+
+- `src/pages/Finance.tsx`
+
+### API Endpoints
+
+- `GET /admin/dashboard/finance/overview?startDate=&endDate=`
+- `GET /admin/dashboard/finance/monthly?year=`
+- `GET /admin/dashboard/finance/vendor-earnings?startDate=&endDate=`
+- `GET /admin/dashboard/finance/daily-revenue?days=30`
+
+---
+
+## Admin Settings Updates
+
+### New Transfer Charge Configuration
+
+Added to Admin Settings page:
+- Transfer Charge Type (Percentage/Fixed)
+- Transfer Charge Rate
+
+### Files to Apply
+
+- `src/pages/AdminSettings.tsx` (updated version)
+
+Also update the mutation/query hooks to include new fields:
+- `transferChargeType`
+- `transferChargeRate`
+
+---
+
+## Complete File List
+
+### Backend
+
+| File | Action |
+|------|--------|
+| `prisma/migrations/20241118_add_express_pricing/migration.sql` | Run |
+| `prisma/migrations/20241119_withdrawal_improvements/migration.sql` | Run |
+| `src/modules/app/vendor/dto/request/*.ts` | Copy |
+| `src/modules/app/order/dto/response/getOrderById.response.ts` | Copy |
+| `src/constants/laundry-template.ts` | Copy |
+| `src/modules/app/admin/dashboard.service.ts` | Copy (new) |
+| `src/modules/app/admin/finance.service.ts` | Copy (new) |
+| `src/modules/app/admin/admin-dashboard.controller.ts` | Copy (new) |
+| `src/modules/app/withdrawal/withdrawal-improvements.changes.md` | Apply |
+| `src/modules/app/vendor/deletion-protection.changes.md` | Apply |
+
+### Admin Panel
+
+| File | Action |
+|------|--------|
+| `src/pages/LaundryServiceItems.tsx` | Copy |
+| `src/pages/OrderDetails.tsx` | Copy |
+| `src/pages/AdminSettings.tsx` | Copy |
+| `src/pages/Dashboard.tsx` | Copy (new) |
+| `src/pages/Finance.tsx` | Copy (new) |
+| `deletion-error-handling.changes.md` | Apply |
+
+### Integration Notes
+
+1. Add Dashboard and Finance routes to router
+2. Update navigation menu with Dashboard and Finance links
+3. Register dashboard and finance services in module
+4. Install recharts for charts: `npm install recharts`
+5. Install date-pickers if not present: `npm install @mui/x-date-pickers date-fns`
