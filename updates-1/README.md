@@ -73,22 +73,38 @@ This ensures the mobile app continues to work without changes.
 
 ### Protected Resources
 
-Resources cannot be deleted if they have active (non-soft-deleted) dependencies:
+Resources cannot be deleted if they have **active** dependencies:
 
 | Resource | Cannot Delete If Has |
 |----------|---------------------|
-| **Laundry** | Active orders, services, feedbacks, withdrawals |
-| **LaundryService** | Active items, order references |
-| **LaundryServiceItem** | Order item references |
+| **Laundry** | Active orders (not completed/cancelled/rejected), pending withdrawals |
+| **LaundryService** | Active orders using this service |
+| **LaundryServiceItem** | Active orders containing this item |
 | **LaundryItemCategory** | Active items using it, active subcategories |
 | **User** | Active orders (customer), active assignments (rider), active laundries (vendor) |
+
+### Active Order Statuses (Block Deletion)
+- `PENDING_PAYMENT`
+- `PENDING`
+- `ACCEPTED`
+- `IN_PROGRESS`
+- `READY_FOR_PICKUP`
+
+### Final Statuses (Allow Deletion)
+- `COMPLETED`
+- `CANCELLED`
+- `REJECTED`
+
+### Cascade Deletions
+- **Laundry** → Soft-deletes services → Soft-deletes items
+- **Service** → Soft-deletes items
 
 ### Error Messages
 
 When deletion is blocked, users see clear messages like:
-- "Cannot delete laundry - it has 3 order(s). Orders must be deleted first."
-- "Cannot delete service - it has 5 active item(s). Delete items first."
-- "Cannot delete item - it is referenced by 2 order(s)."
+- "Cannot delete laundry - it has 3 active order(s). Complete or cancel them first."
+- "Cannot delete service - it is used in 2 active order(s). Complete or cancel them first."
+- "Cannot delete item - it is in 1 active order(s). Complete or cancel them first."
 
 ### Files to Apply
 
