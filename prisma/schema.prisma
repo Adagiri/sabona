@@ -562,9 +562,10 @@ model LaundryServiceItem {
   nameLocale       Json?
   sortOrder        Int? // For custom sorting of items within a category
 
-  vendorPrice             Float // What vendor receives
-  platformPrice           Float // What user pays (vendor price + platform markup)
-  expressPrice            Float // What user pays if express delivery is selected
+  vendorPrice             Float // What vendor receives (normal delivery)
+  platformPrice           Float // What user pays (normal delivery)
+  expressVendorPrice      Float // What vendor receives (express delivery)
+  expressPlatformPrice    Float // What user pays (express delivery)
   price                   Float?
   createdAt               DateTime                  @default(now()) @db.Timestamptz()
   updatedAt               DateTime                  @default(now()) @updatedAt @db.Timestamptz()
@@ -595,11 +596,12 @@ model OrderLaundryServiceItem {
   quantity              Int
 
   // CRITICAL: Price snapshots at time of order (prevents historical data corruption)
-  vendorPriceSnapshot   Float // Vendor's earning per item at order time
-  platformPriceSnapshot Float // Platform price at order time
-  expressPriceSnapshot  Float // Express price at order time
-  itemName              String? // Item name snapshot
-  serviceName           String? // Service name snapshot
+  vendorPriceSnapshot           Float // Vendor's earning per item at order time (normal)
+  platformPriceSnapshot         Float // Platform price at order time (normal)
+  expressVendorPriceSnapshot    Float? // Vendor's earning per item at order time (express)
+  expressPlatformPriceSnapshot  Float? // Platform price at order time (express)
+  itemName                      String? // Item name snapshot
+  serviceName                   String? // Service name snapshot
 
   createdAt DateTime @default(now()) @db.Timestamptz()
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()

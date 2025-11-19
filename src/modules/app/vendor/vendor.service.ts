@@ -914,6 +914,26 @@ export default class VendorService {
             throw new BadRequestException('Service does not exist');
         }
 
+        // Check if any items in this service are part of pending/active orders
+        const serviceItemsInActiveOrders = await this._dbService.orderLaundryServiceItem.findFirst({
+            where: {
+                laundryServiceItem: {
+                    laundryServiceId: serviceId,
+                },
+                orderLaundryService: {
+                    order: {
+                        status: {
+                            in: ['PENDING', 'ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
+                        },
+                    },
+                },
+            },
+        });
+
+        if (serviceItemsInActiveOrders) {
+            throw new BadRequestException('Cannot delete service - it has items in pending or active orders');
+        }
+
         await this._dbService.laundryService.delete({
             where: {
                 id: serviceId,
@@ -1008,7 +1028,8 @@ export default class VendorService {
                     name: item.nameLocale.en, // Auto-populate from English
                     vendorPrice: item.vendorPrice,
                     platformPrice: item.platformPrice,
-                    expressPrice: item.expressPrice,
+                    expressVendorPrice: item.expressVendorPrice,
+                    expressPlatformPrice: item.expressPlatformPrice,
                     categoryId: item.categoryId,
                     subCategoryId: item.subCategoryId,
                     sortOrder: sortOrder,
@@ -1115,8 +1136,12 @@ export default class VendorService {
             updateData.platformPrice = data.platformPrice;
         }
 
-        if (data.expressPrice !== undefined) {
-            updateData.expressPrice = data.expressPrice;
+        if (data.expressVendorPrice !== undefined) {
+            updateData.expressVendorPrice = data.expressVendorPrice;
+        }
+
+        if (data.expressPlatformPrice !== undefined) {
+            updateData.expressPlatformPrice = data.expressPlatformPrice;
         }
 
         if (data.categoryId !== undefined) {
@@ -1181,6 +1206,24 @@ export default class VendorService {
 
         if (!item) {
             throw new BadRequestException('Item does not exist');
+        }
+
+        // Check if item is part of any pending/active orders
+        const itemInActiveOrders = await this._dbService.orderLaundryServiceItem.findFirst({
+            where: {
+                laundryServiceItemId: itemId,
+                orderLaundryService: {
+                    order: {
+                        status: {
+                            in: ['PENDING', 'ACCEPTED', 'IN_PROGRESS', 'READY_FOR_PICKUP'],
+                        },
+                    },
+                },
+            },
+        });
+
+        if (itemInActiveOrders) {
+            throw new BadRequestException('Cannot delete item - it is part of pending or active orders');
         }
 
         await this._dbService.laundryServiceItem.delete({

@@ -9,20 +9,28 @@ export class EditLaundryServiceItemRequestDTO {
 
     @ApiProperty()
     @IsNumber()
-    platformPrice: number;
+    @IsOptional()
+    platformPrice?: number;
 
     @ApiProperty()
     @IsNumber()
-    vendorPrice: number;
+    @IsOptional()
+    vendorPrice?: number;
 
-    @ApiProperty()
+    @ApiProperty({ description: 'What vendor receives for express delivery' })
     @IsNumber()
-    expressPrice: number;
+    @IsOptional()
+    expressVendorPrice?: number;
+
+    @ApiProperty({ description: 'What user pays for express delivery' })
+    @IsNumber()
+    @IsOptional()
+    expressPlatformPrice?: number;
 
     @ApiProperty()
     @IsOptional()
     @IsNumber()
-    price: number;
+    price?: number;
 
     @ApiProperty({ description: 'Category ID for this item', required: false })
     @IsString()

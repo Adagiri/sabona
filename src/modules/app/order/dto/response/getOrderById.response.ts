@@ -13,6 +13,26 @@ class LaundryServiceItem {
     @ApiProperty()
     @IsNumber()
     price: number;
+
+    @ApiProperty()
+    @IsNumber()
+    vendorPrice: number;
+
+    @ApiProperty()
+    @IsNumber()
+    platformPrice: number;
+
+    @ApiProperty()
+    @IsNumber()
+    expressVendorPrice: number;
+
+    @ApiProperty()
+    @IsNumber()
+    expressPlatformPrice: number;
+
+    @ApiProperty({ description: 'Backward compatibility - same as expressPlatformPrice' })
+    @IsNumber()
+    expressPrice: number;
 }
 
 class LaundryService {
@@ -32,7 +52,7 @@ class LaundryService {
     laundryServiceItems: LaundryServiceItem[];
 }
 
-class Items {
+class OrderServiceItem {
     @ApiProperty()
     @IsString()
     id: string;
@@ -40,6 +60,34 @@ class Items {
     @ApiProperty()
     @IsNumber()
     quantity: number;
+
+    @ApiProperty()
+    @IsNumber()
+    vendorPriceSnapshot: number;
+
+    @ApiProperty()
+    @IsNumber()
+    platformPriceSnapshot: number;
+
+    @ApiProperty()
+    @IsNumber()
+    expressVendorPriceSnapshot: number;
+
+    @ApiProperty()
+    @IsNumber()
+    expressPlatformPriceSnapshot: number;
+
+    @ApiProperty({ description: 'Backward compatibility - same as expressPlatformPriceSnapshot' })
+    @IsNumber()
+    expressPriceSnapshot: number;
+
+    @ApiProperty()
+    @IsString()
+    itemName: string;
+
+    @ApiProperty()
+    @IsString()
+    serviceName: string;
 
     @ApiProperty({ type: LaundryServiceItem })
     laundryServiceItem: LaundryServiceItem;
@@ -125,8 +173,8 @@ class Service {
     @IsString()
     id: string;
 
-    @ApiProperty({ type: Items })
-    items: Items[];
+    @ApiProperty({ type: [OrderServiceItem] })
+    items: OrderServiceItem[];
 }
 
 export default class GetOrderByIdResponseDTO {
