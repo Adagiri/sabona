@@ -1298,7 +1298,13 @@ export default class VendorService {
             },
         });
 
-        return { data: items };
+        // Add expressPrice for backward compatibility
+        const itemsWithExpressPrice = items.map(item => ({
+            ...item,
+            expressPrice: item.expressVendorPrice,
+        }));
+
+        return { data: itemsWithExpressPrice };
     }
 
     async getLaundryServiceItemsByCategory(laundryId: string, serviceId: string, categoryId: string): Promise<any> {
@@ -1378,7 +1384,13 @@ export default class VendorService {
             },
         });
 
-        return { data: items };
+        // Add expressPrice for backward compatibility
+        const itemsWithExpressPrice = items.map(item => ({
+            ...item,
+            expressPrice: item.expressVendorPrice,
+        }));
+
+        return { data: itemsWithExpressPrice };
     }
 
     async cancelOrder(params: CancelOrderRequestDTO, user: User): Promise<UpdateStatusResponseDTO> {
@@ -1869,7 +1881,13 @@ export default class VendorService {
             ],
         });
 
-        return { data: items };
+        // Add expressPrice for backward compatibility
+        const itemsWithExpressPrice = items.map(item => ({
+            ...item,
+            expressPrice: item.expressVendorPrice,
+        }));
+
+        return { data: itemsWithExpressPrice };
     }
 
     // Reorder Laundry Services

@@ -95,7 +95,22 @@ export default class OrderService {
             throw new BadRequestException('Order not found');
         }
 
-        return { data: order };
+        // Add expressPrice for backward compatibility
+        const transformedOrder = {
+            ...order,
+            services: order.services.map(service => ({
+                ...service,
+                items: service.items.map(item => ({
+                    ...item,
+                    laundryServiceItem: {
+                        ...item.laundryServiceItem,
+                        expressPrice: item.laundryServiceItem.expressVendorPrice,
+                    },
+                })),
+            })),
+        };
+
+        return { data: transformedOrder };
     }
 
     async getOrderStatusProgress(orderId: string, user: User): Promise<any> {

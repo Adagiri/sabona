@@ -30,7 +30,7 @@ class LaundryServiceItem {
     @IsNumber()
     expressPlatformPrice: number;
 
-    @ApiProperty({ description: 'Backward compatibility - same as expressPlatformPrice' })
+    @ApiProperty({ description: 'Backward compatibility - same as expressVendorPrice' })
     @IsNumber()
     expressPrice: number;
 }
@@ -77,7 +77,7 @@ class OrderServiceItem {
     @IsNumber()
     expressPlatformPriceSnapshot: number;
 
-    @ApiProperty({ description: 'Backward compatibility - same as expressPlatformPriceSnapshot' })
+    @ApiProperty({ description: 'Backward compatibility - same as expressVendorPriceSnapshot' })
     @IsNumber()
     expressPriceSnapshot: number;
 
