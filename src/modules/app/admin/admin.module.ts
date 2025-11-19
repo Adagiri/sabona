@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import DatabaseModule from '../../../database/database.module';
 import AdminService from './admin.service';
 import AdminController from './admin.controller';
+import DashboardService from './dashboard.service';
+import FinanceService from './finance.service';
+import { AdminDashboardController } from './admin-dashboard.controller';
 import OrderModule from '../order/order.module';
 import { NotificationModule } from '../notification/notification.module';
 import MediaModule from '../media/media.module';
@@ -24,8 +27,8 @@ import SMSModule from 'src/modules/sms/sms.module';
         AdminCustomOrderModule,
         SMSModule
     ],
-    exports: [AdminService],
-    providers: [AdminService, S3Service],
-    controllers: [AdminController],
+    exports: [AdminService, DashboardService, FinanceService],
+    providers: [AdminService, DashboardService, FinanceService, S3Service],
+    controllers: [AdminController, AdminDashboardController],
 })
 export default class AdminModule {}
