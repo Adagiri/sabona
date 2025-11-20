@@ -250,7 +250,7 @@ export default class FinanceService {
                 });
 
                 let totalEarning = 0;
-                let disbursedEarning = 0;
+                const disbursedEarning = 0;
                 let pendingEarning = 0;
 
                 orders.forEach(order => {

@@ -133,7 +133,9 @@ export default class CustomerService {
 
                 // Choose price based on delivery type
                 const priceToUse =
-                    deliveryType === DeliveryType.EXPRESS ? serviceItem.expressPlatformPrice : serviceItem.platformPrice;
+                    deliveryType === DeliveryType.EXPRESS
+                        ? serviceItem.expressPlatformPrice
+                        : serviceItem.platformPrice;
 
                 subtotal += priceToUse * item.quantity;
             }
@@ -220,177 +222,186 @@ export default class CustomerService {
      * Custom orders handled by CustomOrderService
      */
     async CreateOrder(data: CreateOrderRequestDTO, user: User): Promise<any> {
-        if (data.orderType !== OrderType.REGISTERED_LAUNDRY) {
-            throw new BadRequestException(
-                'This endpoint only handles registered laundry orders. Use /custom-order/create for custom orders.',
-            );
-        }
-
-        if (!data.laundryId || !data.services || data.services.length === 0) {
-            throw new BadRequestException('laundryId and services are required for registered laundry orders');
-        }
-
-        const laundry = await this._dbService.laundry.findUnique({
-            where: { id: data.laundryId },
-            select: { vendorId: true, name: true },
-        });
-
-        if (!laundry) {
-            throw new BadRequestException('Laundry not found');
-        }
-
-        // Find closest available driver
-        const closestDriver = await this._locationService.findClosestAvailableDriver(data.pickupLat, data.pickupLong);
-        if (!closestDriver) {
-            throw new BadRequestException('No available drivers in your area at the moment. Please try again later.');
-        }
-
-        const subtotal = await this.calculateSubtotalFromServices(data.services, data.deliveryType);
-
-        // Calculate fees using the new system (includes coupon validation)
-        const feeCalculation = await this.calculateOrderFeez({
-            subtotal: subtotal,
-            orderType: data.orderType,
-            deliveryType: data.deliveryType,
-            pickupLat: data.pickupLat,
-            pickupLong: data.pickupLong,
-            deliveryLat: data.deliveryLat,
-            deliveryLong: data.deliveryLong,
-            couponCode: data.couponCode,
-            customServiceCharge: data.adminServiceCharge,
-            userId: user.id,
-        });
-
-        const feeData = feeCalculation.data;
-
-        const itemPricesMap = new Map();
-
-        for (const service of data.services) {
-            for (const item of service.items) {
-                const itemData = await this._dbService.laundryServiceItem.findUnique({
-                    where: { id: item.id },
-                    select: {
-                        vendorPrice: true,
-                        platformPrice: true,
-                        expressVendorPrice: true,
-                        expressPlatformPrice: true,
-                        name: true,
-                        laundryService: {
-                            select: { name: true },
-                        },
-                    },
-                });
-
-                if (!itemData) {
-                    throw new BadRequestException(`Item ${item.id} not found`);
-                }
-
-                itemPricesMap.set(item.id, {
-                    vendorPrice: itemData.vendorPrice,
-                    platformPrice: itemData.platformPrice,
-                    expressVendorPrice: itemData.expressVendorPrice,
-                    expressPlatformPrice: itemData.expressPlatformPrice,
-                    itemName: itemData.name,
-                    serviceName: itemData.laundryService.name,
-                });
+        try {
+            if (data.orderType !== OrderType.REGISTERED_LAUNDRY) {
+                throw new BadRequestException(
+                    'This endpoint only handles registered laundry orders. Use /custom-order/create for custom orders.',
+                );
             }
-        }
 
-        // Create coupon usage record if coupon was applied
-        let couponId: string | undefined;
-        if (data.couponCode && feeData.discountAmount > 0) {
-            const coupon = await this._dbService.coupon.findFirst({
-                where: { code: data.couponCode.toUpperCase() },
-                select: { id: true },
+            if (!data.laundryId || !data.services || data.services.length === 0) {
+                throw new BadRequestException('laundryId and services are required for registered laundry orders');
+            }
+
+            const laundry = await this._dbService.laundry.findUnique({
+                where: { id: data.laundryId },
+                select: { vendorId: true, name: true },
             });
 
-            if (coupon) {
-                couponId = coupon.id;
-                // Create usage record
-                await this._dbService.couponUsage.create({
-                    data: {
-                        userId: user.id,
-                        couponId: coupon.id,
-                    },
-                });
+            if (!laundry) {
+                throw new BadRequestException('Laundry not found');
             }
-        }
 
-        // Create order with detailed fee breakdown
-        const order = await this._dbService.order.create({
-            data: {
-                userId: user.id,
-                orderType: OrderType.REGISTERED_LAUNDRY,
-                laundryId: data.laundryId,
+            // Find closest available driver
+            const closestDriver = await this._locationService.findClosestAvailableDriver(
+                data.pickupLat,
+                data.pickupLong,
+            );
+            if (!closestDriver) {
+                throw new BadRequestException(
+                    'No available drivers in your area at the moment. Please try again later.',
+                );
+            }
 
-                // Detailed fee breakdown
-                subtotalAmount: feeData.subtotal,
-                serviceCharge: feeData.serviceCharge,
-                deliveryFee: feeData.deliveryFee,
-                preDiscountAmount: feeData.preDiscountAmount,
-                discountAmount: feeData.discountAmount,
-                postDiscountAmount: feeData.postDiscountAmount,
-                vatAmount: feeData.vatFee,
-                vatPercentage: feeData.vatPercentage / 100, // Store as decimal
-                totalAmount: feeData.finalAmount,
-                distanceKm: feeData.breakdown.distance,
+            const subtotal = await this.calculateSubtotalFromServices(data.services, data.deliveryType);
 
-                // Legacy fields for backward compatibility
-                baseAmount: feeData.subtotal,
-
-                // Coupon
-                couponId: couponId,
-
-                // Order details
-                paymentType: data.paymentType,
-                status: data.paymentType === PaymentType.CASH ? OrderStatus.PENDING : OrderStatus.PENDING_PAYMENT,
+            // Calculate fees using the new system (includes coupon validation)
+            const feeCalculation = await this.calculateOrderFeez({
+                subtotal: subtotal,
+                orderType: data.orderType,
                 deliveryType: data.deliveryType,
+                pickupLat: data.pickupLat,
+                pickupLong: data.pickupLong,
+                deliveryLat: data.deliveryLat,
+                deliveryLong: data.deliveryLong,
+                couponCode: data.couponCode,
+                customServiceCharge: data.adminServiceCharge,
+                userId: user.id,
+            });
 
-                // Create related records
-                pickup: {
-                    create: {
-                        pickupAddress: data.pickupAddress,
-                        pickupLat: data.pickupLat,
-                        pickupLong: data.pickupLong,
-                        pickupDate: data.pickupDate,
-                        pickupTime: data.pickupTime,
-                    },
-                },
-                delivery: {
-                    create: {
-                        deliveryAddress: data.deliveryAddress,
-                        deliveryLat: data.deliveryLat,
-                        deliveryLong: data.deliveryLong,
-                        deliveryDate: data.deliveryDate,
-                    },
-                },
-                services: {
-                    create: data.services.map((service) => ({
-                        laundryServiceId: service.serviceId,
-                        items: {
-                            create: service.items.map((item) => {
-                                const priceSnapshot = itemPricesMap.get(item.id);
+            const feeData = feeCalculation.data;
 
-                                return {
-                                    laundryServiceItemId: item.id,
-                                    quantity: item.quantity,
-                                    vendorPriceSnapshot: priceSnapshot.vendorPrice,
-                                    platformPriceSnapshot: priceSnapshot.platformPrice,
-                                    expressVendorPriceSnapshot: priceSnapshot.expressVendorPrice,
-                                    expressPlatformPriceSnapshot: priceSnapshot.expressPlatformPrice,
-                                    itemName: priceSnapshot.itemName,
-                                    serviceName: priceSnapshot.serviceName,
-                                };
-                            }),
+            const itemPricesMap = new Map();
+
+            for (const service of data.services) {
+                for (const item of service.items) {
+                    const itemData = await this._dbService.laundryServiceItem.findUnique({
+                        where: { id: item.id },
+                        select: {
+                            vendorPrice: true,
+                            platformPrice: true,
+                            expressVendorPrice: true,
+                            expressPlatformPrice: true,
+                            name: true,
+                            laundryService: {
+                                select: { name: true },
+                            },
                         },
-                    })),
-                },
-            },
-        });
+                    });
 
-        return {
-            data: order,
-        };
+                    if (!itemData) {
+                        throw new BadRequestException(`Item ${item.id} not found`);
+                    }
+
+                    itemPricesMap.set(item.id, {
+                        vendorPrice: itemData.vendorPrice,
+                        platformPrice: itemData.platformPrice,
+                        expressVendorPrice: itemData.expressVendorPrice,
+                        expressPlatformPrice: itemData.expressPlatformPrice,
+                        itemName: itemData.name,
+                        serviceName: itemData.laundryService.name,
+                    });
+                }
+            }
+
+            // Create coupon usage record if coupon was applied
+            let couponId: string | undefined;
+            if (data.couponCode && feeData.discountAmount > 0) {
+                const coupon = await this._dbService.coupon.findFirst({
+                    where: { code: data.couponCode.toUpperCase() },
+                    select: { id: true },
+                });
+
+                if (coupon) {
+                    couponId = coupon.id;
+                    // Create usage record
+                    await this._dbService.couponUsage.create({
+                        data: {
+                            userId: user.id,
+                            couponId: coupon.id,
+                        },
+                    });
+                }
+            }
+
+            // Create order with detailed fee breakdown
+            const order = await this._dbService.order.create({
+                data: {
+                    userId: user.id,
+                    orderType: OrderType.REGISTERED_LAUNDRY,
+                    laundryId: data.laundryId,
+
+                    // Detailed fee breakdown
+                    subtotalAmount: feeData.subtotal,
+                    serviceCharge: feeData.serviceCharge,
+                    deliveryFee: feeData.deliveryFee,
+                    preDiscountAmount: feeData.preDiscountAmount,
+                    discountAmount: feeData.discountAmount,
+                    postDiscountAmount: feeData.postDiscountAmount,
+                    vatAmount: feeData.vatFee,
+                    vatPercentage: feeData.vatPercentage / 100, // Store as decimal
+                    totalAmount: feeData.finalAmount,
+                    distanceKm: feeData.breakdown.distance,
+
+                    // Legacy fields for backward compatibility
+                    baseAmount: feeData.subtotal,
+
+                    // Coupon
+                    couponId: couponId,
+
+                    // Order details
+                    paymentType: data.paymentType,
+                    status: data.paymentType === PaymentType.CASH ? OrderStatus.PENDING : OrderStatus.PENDING_PAYMENT,
+                    deliveryType: data.deliveryType,
+
+                    // Create related records
+                    pickup: {
+                        create: {
+                            pickupAddress: data.pickupAddress,
+                            pickupLat: data.pickupLat,
+                            pickupLong: data.pickupLong,
+                            pickupDate: data.pickupDate,
+                            pickupTime: data.pickupTime,
+                        },
+                    },
+                    delivery: {
+                        create: {
+                            deliveryAddress: data.deliveryAddress,
+                            deliveryLat: data.deliveryLat,
+                            deliveryLong: data.deliveryLong,
+                            deliveryDate: data.deliveryDate,
+                        },
+                    },
+                    services: {
+                        create: data.services.map((service) => ({
+                            laundryServiceId: service.serviceId,
+                            items: {
+                                create: service.items.map((item) => {
+                                    const priceSnapshot = itemPricesMap.get(item.id);
+
+                                    return {
+                                        laundryServiceItemId: item.id,
+                                        quantity: item.quantity,
+                                        vendorPriceSnapshot: priceSnapshot.vendorPrice,
+                                        platformPriceSnapshot: priceSnapshot.platformPrice,
+                                        expressVendorPriceSnapshot: priceSnapshot.expressVendorPrice,
+                                        expressPlatformPriceSnapshot: priceSnapshot.expressPlatformPrice,
+                                        itemName: priceSnapshot.itemName,
+                                        serviceName: priceSnapshot.serviceName,
+                                    };
+                                }),
+                            },
+                        })),
+                    },
+                },
+            });
+
+            return {
+                data: order,
+            };
+        } catch (error) {
+            console.log(error, 'Error while creating order');
+        }
     }
 
     async CancelOrder(params: AcceptOrderRequestDTO, user: User): Promise<CancelOrderResponseDTO> {
@@ -961,10 +972,8 @@ export default class CustomerService {
         const postDiscountAmount = preDiscountAmount - discountAmount;
 
         const vatPercentage = settings.vatRate * 100;
-        const vatFee = settings.vatEnabled
-            ? Math.round((deliveryFee + serviceCharge) * settings.vatRate * 100) / 100
-            : 0;
-
+        let vatFee = settings.vatEnabled ? ((deliveryFee + serviceCharge) * settings.vatRate * 100) / 100 : 0;
+        vatFee = Number(vatFee.toFixed(2));
         // Calculate final total
         const finalAmount = postDiscountAmount + vatFee;
 
