@@ -50,7 +50,7 @@ export default class WithdrawalService {
                 },
             });
 
-            console.log(laundries, "laundries")
+            console.log(laundries, 'laundries');
 
             const withdrawal = await this._dbService.withdrawal.create({
                 data: {
@@ -324,23 +324,14 @@ export default class WithdrawalService {
 
             orders.forEach((order) => {
                 let orderGrossEarning = 0;
-                let orderServiceCharge = 0;
+                const orderServiceCharge = order.serviceCharge
 
                 order.services.forEach((service) => {
                     service.items.forEach((item) => {
                         const vendorPrice = item.vendorPriceSnapshot;
-                        const platformPrice = item.platformPriceSnapshot;
-                        const expressPlatformPrice = item.expressPlatformPriceSnapshot ?? item.platformPriceSnapshot;
                         const quantity = item.quantity;
 
                         orderGrossEarning += vendorPrice * quantity;
-
-                        // Service charge based on delivery type
-                        if (order.deliveryType === DeliveryType.EXPRESS) {
-                            orderServiceCharge += (expressPlatformPrice - vendorPrice) * quantity;
-                        } else {
-                            orderServiceCharge += (platformPrice - vendorPrice) * quantity;
-                        }
                     });
                 });
 
@@ -458,7 +449,7 @@ export default class WithdrawalService {
             return { buffer, fromS3: false };
         } catch (error) {
             console.error('Error in getOrGenerateReport:', error);
-            throw error; // ✅ Let the controller or global filter handle it
+            throw error;
         }
     }
 
