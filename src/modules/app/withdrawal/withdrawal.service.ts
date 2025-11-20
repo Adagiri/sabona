@@ -305,6 +305,7 @@ export default class WithdrawalService {
                 { header: 'Order Date', key: 'orderDate', width: 22 },
                 { header: 'Delivery Type', key: 'deliveryType', width: 12 },
                 { header: 'Order Amount', key: 'orderAmount', width: 12 },
+                { header: 'Platform Markup', key: 'platformMarkup', width: 14 },
                 { header: 'Service Charge', key: 'serviceCharge', width: 12 },
                 { header: 'Delivery Charge', key: 'deliveryCharge', width: 12 },
                 { header: 'VAT Fee', key: 'vatFee', width: 12 },
@@ -317,6 +318,7 @@ export default class WithdrawalService {
 
             let totalVendorEarnings = 0;
             let totalOrderAmount = 0;
+            let totalPlatformMarkup = 0;
             let totalServiceCharge = 0;
             let totalDeliveryCharge = 0;
             let totalTransfer = 0;
@@ -324,7 +326,7 @@ export default class WithdrawalService {
 
             orders.forEach((order) => {
                 let orderGrossEarning = 0;
-                let orderServiceCharge = 0;
+                let orderPlatformMarkup = 0;
 
                 order.services.forEach((service) => {
                     service.items.forEach((item) => {
@@ -335,24 +337,26 @@ export default class WithdrawalService {
 
                         orderGrossEarning += vendorPrice * quantity;
 
-                        // Service charge based on delivery type
+                        // Platform markup (price difference) based on delivery type
                         if (order.deliveryType === DeliveryType.EXPRESS) {
-                            orderServiceCharge += (expressPlatformPrice - vendorPrice) * quantity;
+                            orderPlatformMarkup += (expressPlatformPrice - vendorPrice) * quantity;
                         } else {
-                            orderServiceCharge += (platformPrice - vendorPrice) * quantity;
+                            orderPlatformMarkup += (platformPrice - vendorPrice) * quantity;
                         }
                     });
                 });
 
                 const deliveryCharge = order.deliveryFee || 0;
                 const orderAmount = order.totalAmount || 0;
+                const serviceCharge = order.serviceCharge || 0;
                 const transfer = orderGrossEarning * 0.01; // 1% of gross earning
                 const netVendorEarning = orderGrossEarning - transfer; // Deduct transfer from earning
                 const vatFee = order.vatAmount || 0;
 
                 totalVendorEarnings += netVendorEarning;
                 totalOrderAmount += orderAmount;
-                totalServiceCharge += orderServiceCharge;
+                totalPlatformMarkup += orderPlatformMarkup;
+                totalServiceCharge += serviceCharge;
                 totalDeliveryCharge += deliveryCharge;
                 totalTransfer += transfer;
                 totalVatFee += vatFee;
@@ -375,7 +379,8 @@ export default class WithdrawalService {
                     orderDate: saudiDate,
                     deliveryType: order.deliveryType === DeliveryType.EXPRESS ? 'Express' : 'Normal',
                     orderAmount: orderAmount.toFixed(2),
-                    serviceCharge: orderServiceCharge.toFixed(2),
+                    platformMarkup: orderPlatformMarkup.toFixed(2),
+                    serviceCharge: serviceCharge.toFixed(2),
                     deliveryCharge: deliveryCharge.toFixed(2),
                     vatFee: vatFee.toFixed(2),
                     vendorEarning: netVendorEarning.toFixed(2),
@@ -390,6 +395,7 @@ export default class WithdrawalService {
                 orderDate: '',
                 deliveryType: '',
                 orderAmount: totalOrderAmount.toFixed(2),
+                platformMarkup: totalPlatformMarkup.toFixed(2),
                 serviceCharge: totalServiceCharge.toFixed(2),
                 deliveryCharge: totalDeliveryCharge.toFixed(2),
                 vatFee: totalVatFee.toFixed(2),
