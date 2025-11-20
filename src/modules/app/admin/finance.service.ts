@@ -39,8 +39,11 @@ export default class FinanceService {
 
         orders.forEach(order => {
             let orderVendorEarning = 0;
-            let orderPlatformEarning = 0;
+            let orderPlatformMarkup = 0;
             let orderItemTotal = 0;
+
+            // Build item-level details with platform markup
+            const itemDetails: any[] = [];
 
             order.services.forEach(service => {
                 service.items.forEach(item => {
@@ -53,12 +56,26 @@ export default class FinanceService {
                         ? item.expressPlatformPriceSnapshot
                         : item.platformPriceSnapshot;
 
+                    const platformMarkupPerUnit = platformPrice - vendorPrice;
                     const itemVendorTotal = vendorPrice * item.quantity;
                     const itemPlatformTotal = platformPrice * item.quantity;
+                    const totalPlatformMarkup = platformMarkupPerUnit * item.quantity;
 
                     orderVendorEarning += itemVendorTotal;
-                    orderPlatformEarning += itemPlatformTotal - itemVendorTotal;
+                    orderPlatformMarkup += totalPlatformMarkup;
                     orderItemTotal += itemPlatformTotal;
+
+                    itemDetails.push({
+                        itemId: item.id,
+                        itemName: item.name,
+                        quantity: item.quantity,
+                        vendorPricePerUnit: Math.round(vendorPrice * 100) / 100,
+                        platformPricePerUnit: Math.round(platformPrice * 100) / 100,
+                        platformMarkupPerUnit: Math.round(platformMarkupPerUnit * 100) / 100,
+                        totalVendorAmount: Math.round(itemVendorTotal * 100) / 100,
+                        totalPlatformAmount: Math.round(itemPlatformTotal * 100) / 100,
+                        totalPlatformMarkup: Math.round(totalPlatformMarkup * 100) / 100,
+                    });
                 });
             });
 
@@ -74,11 +91,12 @@ export default class FinanceService {
                 orderNumber: order.orderNumber,
                 deliveryType: order.deliveryType,
                 totalAmount: order.totalAmount,
-                vendorEarning: orderVendorEarning,
-                platformEarning: orderPlatformEarning,
+                vendorEarning: Math.round(orderVendorEarning * 100) / 100,
+                platformMarkup: Math.round(orderPlatformMarkup * 100) / 100,
                 serviceCharge: order.serviceCharge,
                 deliveryFee: order.deliveryFee,
                 vatAmount: order.vatAmount,
+                items: itemDetails,
                 createdAt: order.createdAt,
             });
         });
@@ -161,6 +179,7 @@ export default class FinanceService {
                 netCashflow: Math.round((totalRevenue - totalWithdrawn) * 100) / 100,
                 pendingPayables: Math.round((totalVendorEarnings - totalWithdrawn) * 100) / 100,
             },
+            orderBreakdown,
         };
     }
 
