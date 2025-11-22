@@ -635,11 +635,12 @@ model Order {
   adminServiceCharge  Float? // Admin-set service charge for custom orders
 
   // Custom order - PayTabs customer payment
-  payTabsInvoiceId      String? // PayTabs invoice ID
-  payTabsInvoiceUrl     String? // Invoice link admin sends to customer
-  customerPaid          Boolean?  @default(false) // Customer payment status via PayTabs
-  customerPaymentDate   DateTime? // When customer paid the invoice
-  payTabsTransactionRef String? // PayTabs transaction reference
+  payTabsInvoiceId           String? // PayTabs invoice ID
+  payTabsInvoiceUrl          String? // Invoice link admin sends to customer
+  payTabsInvoiceDateCreated  DateTime? @db.Timestamptz() // When payment link was generated
+  customerPaid               Boolean?  @default(false) // Customer payment status via PayTabs
+  customerPaymentDate        DateTime? // When customer paid the invoice
+  payTabsTransactionRef      String? // PayTabs transaction reference
 
   // Fee breakdown fields
   subtotalAmount     Float? // Total of all service items only

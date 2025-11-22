@@ -200,6 +200,7 @@ export default class AdminCustomOrderService {
                 payTabsInvoiceId: payTabsInvoice.invoiceId,
                 payTabsInvoiceUrl: payTabsInvoice.invoiceUrl,
                 payTabsTransactionRef: payTabsInvoice.transactionRef,
+                payTabsInvoiceDateCreated: new Date(),
             },
         });
 
@@ -476,6 +477,102 @@ export default class AdminCustomOrderService {
 
             return { success: false, message: 'Payment failed' };
         }
+    }
+
+    /**
+     * Regenerate payment link for custom order
+     * Can only regenerate if:
+     * - Previous link is older than 20 minutes
+     * - Payment has not been received yet
+     */
+    async regeneratePaymentLink(orderId: string, adminUser: User): Promise<any> {
+        const order = await this._dbService.order.findUnique({
+            where: {
+                id: orderId,
+                orderType: OrderType.CUSTOM_LAUNDRY,
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        phone: true,
+                        email: true,
+                    },
+                },
+            },
+        });
+
+        if (!order) {
+            throw new BadRequestException('Custom order not found');
+        }
+
+        // Check if payment has already been received
+        if (order.customerPaid) {
+            throw new BadRequestException('Payment has already been received for this order');
+        }
+
+        // Check if payment link exists
+        if (!order.payTabsInvoiceUrl || !order.payTabsInvoiceDateCreated) {
+            throw new BadRequestException('No payment link exists for this order');
+        }
+
+        // Check if payment link is older than 20 minutes
+        const now = new Date();
+        const linkCreatedAt = new Date(order.payTabsInvoiceDateCreated);
+        const timeDifferenceInMinutes = (now.getTime() - linkCreatedAt.getTime()) / (1000 * 60);
+
+        if (timeDifferenceInMinutes < 20) {
+            const remainingMinutes = Math.ceil(20 - timeDifferenceInMinutes);
+            throw new BadRequestException(
+                `Payment link can only be regenerated after 20 minutes. Please wait ${remainingMinutes} more minute(s)`,
+            );
+        }
+
+        // Generate new PayTabs invoice
+        const payTabsInvoice = await this.generatePayTabsInvoice(order, order.totalAmount);
+
+        // Update order with new PayTabs info
+        await this._dbService.order.update({
+            where: { id: orderId },
+            data: {
+                payTabsInvoiceId: payTabsInvoice.invoiceId,
+                payTabsInvoiceUrl: payTabsInvoice.invoiceUrl,
+                payTabsTransactionRef: payTabsInvoice.transactionRef,
+                payTabsInvoiceDateCreated: new Date(),
+            },
+        });
+
+        // Notify customer with new payment link
+        await this.notifyCustomerPaymentRequired(order.user, order, payTabsInvoice.invoiceUrl);
+
+        // Create admin activity log
+        await this._dbService.notification.create({
+            data: {
+                userId: adminUser.id,
+                orderId: orderId,
+                message: `Payment link regenerated for custom order #${order.orderNumber}`,
+                status: 'UNREAD',
+                data: {
+                    orderId: orderId,
+                    action: 'PAYMENT_LINK_REGENERATED',
+                    newInvoiceUrl: payTabsInvoice.invoiceUrl,
+                },
+                type: 'ORDER_PROCESSING',
+            },
+        });
+
+        return {
+            data: {
+                orderId: orderId,
+                payTabsInvoice: {
+                    invoiceId: payTabsInvoice.invoiceId,
+                    invoiceUrl: payTabsInvoice.invoiceUrl,
+                },
+            },
+            message: 'Payment link regenerated successfully and sent to customer',
+        };
     }
 
     /**

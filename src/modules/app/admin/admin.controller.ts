@@ -724,6 +724,16 @@ export default class AdminController {
 
     @Authorized(UserType.ADMIN)
     @Post({
+        path: '/custom-order/:orderId/regenerate-payment-link',
+        description: 'Regenerate payment link for custom order (only after 20 minutes and if not paid)',
+        response: {},
+    })
+    async regeneratePaymentLink(@Param('orderId') orderId: string, @CurrentUser() adminUser: User): Promise<any> {
+        return await this._adminCustomOrderService.regeneratePaymentLink(orderId, adminUser);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Post({
         path: '/custom-order/:orderId/mark-ready-for-delivery',
         description: 'Mark custom order as ready for delivery and optionally assign delivery driver',
         response: {},
