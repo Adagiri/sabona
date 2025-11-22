@@ -1,0 +1,69 @@
+PAYMENT LINK REGENERATION FEATURE - FILES MANIFEST
+===================================================
+
+All files are organized in the /home/user/soaps/updates/ directory
+
+DOCUMENTATION FILES
+-------------------
+README.md                    - Complete feature overview and implementation guide
+QUICK_REFERENCE.md          - Fast lookup for file copying and basic commands  
+FEATURE_FLOW.md             - Visual diagrams showing system flow and logic
+FILES_MANIFEST.txt          - This file - complete list of all files
+
+BACKEND FILES (updates/backend/)
+--------------------------------
+IMPLEMENTATION_INSTRUCTIONS.md
+  - Detailed step-by-step backend setup guide
+  - Migration instructions
+  - Testing procedures
+  
+schema.prisma
+  - Updated Prisma schema with payTabsInvoiceDateCreated field
+  - Copy to: backend/prisma/schema.prisma
+
+admin.controller.ts
+  - Updated controller with regenerate endpoint
+  - Copy to: backend/src/modules/app/admin/admin.controller.ts
+
+adminCustomOrder.service.ts
+  - Updated service with regeneratePaymentLink() method
+  - Copy to: backend/src/modules/app/admin/adminCustomOrder.service.ts
+
+20251122000000_add_payment_link_date_created/migration.sql
+  - Database migration for new timestamp field
+  - Copy to: backend/prisma/migrations/20251122000000_add_payment_link_date_created/
+
+FRONTEND FILES (updates/admin-panel/)
+-------------------------------------
+IMPLEMENTATION_INSTRUCTIONS.md
+  - Detailed step-by-step frontend setup guide
+  - UI component details
+  - Testing procedures
+
+customOrders.ts
+  - Updated mutations hook with useRegeneratePaymentLink()
+  - Copy to: admin-panel/src/hooks/Admin/mutations/customOrders.ts
+
+CustomOrderDetails.tsx
+  - Updated details page with regenerate button UI
+  - Copy to: admin-panel/src/pages/CustomOrderDetails.tsx
+
+FILE COUNT
+----------
+Total Documentation Files: 4
+Total Backend Files: 5 (4 code files + 1 migration)
+Total Frontend Files: 3
+Total Files: 12
+
+QUICK START
+-----------
+1. Read: README.md (overview)
+2. Read: QUICK_REFERENCE.md (fast setup)
+3. Backend: Follow backend/IMPLEMENTATION_INSTRUCTIONS.md
+4. Frontend: Follow admin-panel/IMPLEMENTATION_INSTRUCTIONS.md
+5. Reference: FEATURE_FLOW.md (understand the logic)
+
+SUPPORT
+-------
+All documentation is self-contained in this updates folder.
+Each implementation guide includes troubleshooting sections.
