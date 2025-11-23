@@ -315,19 +315,7 @@ export default class VendorService {
                 return { message: 'SUCCESS' };
 
             case OrderStatus.REJECTED:
-                const customerOrderRejectedNotificationData = {
-                    tokens: customerTokens,
-                    title: 'Order Rejected!',
-                    // body: this.i18n.translate('order.rejected_by_vendor', { lang: this.locale }),
-                    body: 'Your order has been rejected by the vendor',
-
-                    notificationData: {
-                        orderId: order.id,
-                        key: 'FETCH_ORDERS',
-                        route: 'Orders',
-                    },
-                };
-
+                // Check if already rejected
                 const isOrderRejected = await this._dbService.order.findFirst({
                     where: {
                         id: params.orderId,
@@ -339,14 +327,94 @@ export default class VendorService {
                     throw new BadRequestException('order.already_rejected');
                 }
 
-                await this._dbService.order.update({
-                    where: {
-                        id: params.orderId,
-                    },
-                    data: {
-                        status: OrderStatus.REJECTED,
+                // Get order with payment details for refund
+                const orderToReject = await this._dbService.order.findUnique({
+                    where: { id: params.orderId },
+                    include: {
+                        payment: true,
+                        user: true,
                     },
                 });
+
+                if (!orderToReject) {
+                    throw new BadRequestException('Order not found');
+                }
+
+                // Process refund BEFORE updating order status if order was paid
+                let refundProcessed = false;
+                if (orderToReject.paid && orderToReject.payment?.transactionRef) {
+                    try {
+                        await this._payTabsService.processRefund(
+                            orderToReject.payment.transactionRef,
+                            orderToReject.totalAmount,
+                            params.orderId,
+                            'Vendor rejected order',
+                        );
+                        refundProcessed = true;
+                        console.log(`Refund processed for rejected order ${params.orderId}`);
+                    } catch (error) {
+                        console.error(`Failed to process refund for rejected order ${params.orderId}:`, error);
+                        throw new BadRequestException(
+                            `Failed to process refund: ${error.message}. Order rejection aborted.`,
+                        );
+                    }
+                }
+
+                // Update order status and payment in transaction
+                await this._dbService.$transaction(async (tx) => {
+                    await tx.order.update({
+                        where: { id: params.orderId },
+                        data: {
+                            status: OrderStatus.REJECTED,
+                            ...(refundProcessed && {
+                                paid: false,
+                                paymentStatus: PaymentStatus.REFUNDED,
+                            }),
+                        },
+                    });
+
+                    // Update payment record if refund was processed
+                    if (refundProcessed && orderToReject.payment) {
+                        await tx.payment.update({
+                            where: { orderId: params.orderId },
+                            data: {
+                                status: 'REFUNDED',
+                                type: 'Refund',
+                            },
+                        });
+                    }
+
+                    // Add status history
+                    await tx.orderStatusHistory.create({
+                        data: {
+                            orderId: params.orderId,
+                            status: OrderStatus.REJECTED,
+                            timestamp: new Date(),
+                        },
+                    });
+
+                    // Soft delete VendorOrder since it was never actually accepted
+                    await tx.vendorOrder.updateMany({
+                        where: { orderId: params.orderId },
+                        data: { deletedAt: new Date() },
+                    });
+                });
+
+                // Notify customer about rejection and refund
+                const notificationBody = refundProcessed
+                    ? 'Your order has been rejected by the vendor and your payment has been refunded.'
+                    : 'Your order has been rejected by the vendor';
+
+                const customerOrderRejectedNotificationData = {
+                    tokens: customerTokens,
+                    title: 'Order Rejected',
+                    body: notificationBody,
+                    notificationData: {
+                        orderId: order.id,
+                        key: 'FETCH_ORDERS',
+                        route: 'Orders',
+                    },
+                };
 
                 if (customerTokens?.length) {
                     const res = await this._notificationService.SendNotificationToMultipleTokens(
@@ -357,8 +425,7 @@ export default class VendorService {
                             data: {
                                 userId: customer.userId,
                                 orderId: order.id,
-                                // message: this.i18n.translate('order.rejected_by_vendor', { lang: this.locale }),
-                                message: 'Your order has been rejected by the vendor',
+                                message: notificationBody,
                                 status: 'UNREAD',
                                 data: {
                                     orderId: order.id,
@@ -368,13 +435,16 @@ export default class VendorService {
                                 type: 'ORDER_REJECTED',
                             },
                         });
-                        console.log('Customer Notification created');
+                        console.log('Customer rejection notification created');
                     } else {
                         console.log('Failed to create notification');
                     }
                 }
 
-                return { message: 'SUCCESS' };
+                return {
+                    message: 'Order rejected successfully',
+                    refunded: refundProcessed,
+                };
 
             case OrderStatus.READY_FOR_PICKUP:
                 const isVendorsOrder = await this._dbService.vendorOrder.findFirst({
