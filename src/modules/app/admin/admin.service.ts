@@ -45,6 +45,7 @@ import {
     DEFAULT_LAUNDRY_TEMPLATE,
     DEFAULT_SERVICES,
 } from '../../../constants/laundry-template';
+import PayTabsService from '../paytabs/paytabs.service';
 
 @Injectable()
 export default class AdminService {
@@ -53,6 +54,7 @@ export default class AdminService {
         private _notificationService: NotificationService,
         private _s3service: S3Service,
         private _mediaService: MediaService,
+        private _payTabsService: PayTabsService,
     ) {}
 
     async GetAllOrders(data: FindOrderRequestDTO): Promise<AllOrderListDto> {
@@ -1339,7 +1341,7 @@ export default class AdminService {
         };
     }
 
-    async cancelOrder(orderId: string, reason: string, refundCustomer?: boolean): Promise<any> {
+    async cancelOrder(orderId: string, reason: string): Promise<any> {
         const order = await this._dbService.order.findUnique({
             where: { id: orderId },
             include: {
@@ -1356,15 +1358,42 @@ export default class AdminService {
             throw new BadRequestException('Order already cancelled');
         }
 
+        // Process refund BEFORE database transaction if order was paid
+        let refundProcessed = false;
+        if (order.paid && order.payment?.transactionRef) {
+            try {
+                await this._payTabsService.processRefund(
+                    order.payment.transactionRef,
+                    order.totalAmount,
+                    orderId,
+                    reason,
+                );
+                refundProcessed = true;
+                console.log(`Refund processed successfully for order ${orderId}`);
+            } catch (error) {
+                console.error(`Failed to process refund for order ${orderId}:`, error);
+                throw new BadRequestException(
+                    `Failed to process refund: ${error.message}. Order cancellation aborted.`,
+                );
+            }
+        }
+
+        // Update database in transaction
         await this._dbService.$transaction(async (tx) => {
+            // Cancel the order
             await tx.order.update({
                 where: { id: orderId },
                 data: {
                     status: OrderStatus.CANCELLED,
                     cancelReason: reason,
+                    ...(refundProcessed && {
+                        paid: false,
+                        paymentStatus: PaymentStatus.REFUNDED,
+                    }),
                 },
             });
 
+            // Add status history
             await tx.orderStatusHistory.create({
                 data: {
                     orderId,
@@ -1373,37 +1402,63 @@ export default class AdminService {
                 },
             });
 
-            if (order.paid && refundCustomer) {
-                await tx.order.update({
-                    where: { id: orderId },
+            // Update payment record if refund was processed
+            if (refundProcessed && order.payment) {
+                await tx.payment.update({
+                    where: { orderId },
                     data: {
-                        paid: false,
-                        paymentStatus: PaymentStatus.REFUNDED,
+                        status: 'REFUNDED',
+                        type: 'Refund',
                     },
                 });
+            }
 
-                if (order.payment) {
-                    await tx.payment.update({
-                        where: { orderId },
-                        data: {
-                            status: 'REFUNDED',
-                            type: 'Refund',
-                        },
-                    });
-                }
+            // Clean up VendorOrder (soft delete)
+            await tx.vendorOrder.updateMany({
+                where: { orderId },
+                data: { deletedAt: new Date() },
+            });
+
+            // Clean up Pickup (unassign rider and mark as cancelled)
+            const pickup = await tx.pickup.findUnique({ where: { orderId } });
+            if (pickup) {
+                await tx.pickup.update({
+                    where: { orderId },
+                    data: {
+                        status: OrderStatus.CANCELLED,
+                        riderId: null,
+                    },
+                });
+            }
+
+            // Clean up Delivery (unassign rider and mark as cancelled)
+            const delivery = await tx.delivery.findUnique({ where: { orderId } });
+            if (delivery) {
+                await tx.delivery.update({
+                    where: { orderId },
+                    data: {
+                        status: OrderStatus.CANCELLED,
+                        riderId: null,
+                    },
+                });
             }
         });
 
+        // Notify customer
         const customerTokens = await this._dbService.deviceToken.findMany({
             where: { userId: order.userId, deletedAt: null },
         });
 
         if (customerTokens.length > 0) {
             const tokens = customerTokens.map((t) => t.token);
+            const notificationBody = refundProcessed
+                ? `Your order has been cancelled and refund has been processed. Reason: ${reason}`
+                : `Your order has been cancelled. Reason: ${reason}`;
+
             await this._notificationService.SendNotificationToMultipleTokens({
                 tokens,
                 title: 'Order Cancelled',
-                body: `Your order has been cancelled. Reason: ${reason}`,
+                body: notificationBody,
                 notificationData: {
                     orderId: order.id,
                     key: 'GET_ORDER_BY_ID',
@@ -1412,7 +1467,10 @@ export default class AdminService {
             });
         }
 
-        return { message: 'Order cancelled successfully' };
+        return {
+            message: 'Order cancelled successfully',
+            refunded: refundProcessed,
+        };
     }
 
     async deleteUser(userId: string, data: DeleteUserRequestDTO, adminUser: User): Promise<DeleteUserResponseDTO> {

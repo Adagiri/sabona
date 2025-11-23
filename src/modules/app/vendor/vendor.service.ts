@@ -28,6 +28,8 @@ import LocationService from '../location/location.service';
 import { BooleanResponseDTO } from 'src/core/response/response.schema';
 import { I18nContext, I18nService } from 'nestjs-i18n';
 import { CATEGORY_SORT_ORDER } from 'src/constants/laundry-template';
+import PayTabsService from '../paytabs/paytabs.service';
+import { PaymentStatus } from '@prisma/client';
 
 @Injectable()
 export default class VendorService {
@@ -37,6 +39,7 @@ export default class VendorService {
         private _notificationService: NotificationService,
         private _locationService: LocationService,
         private i18n: I18nService,
+        private _payTabsService: PayTabsService,
     ) {
         this.locale = I18nContext.current()?.lang || 'en';
     }
@@ -1467,26 +1470,135 @@ export default class VendorService {
                     vendorId: user.id,
                 },
             },
+            include: {
+                payment: true,
+                user: true,
+            },
         });
 
         if (!order) {
             throw new BadRequestException('Order does not exist');
         }
 
-        const updatedOrder = await this._dbService.order.update({
-            where: {
-                id: params.orderId,
-            },
-            data: {
-                status: OrderStatus.CANCELLED,
-            },
-        });
-
-        if (!updatedOrder) {
-            throw new BadRequestException('Failed to cancel order');
+        if (order.status === OrderStatus.CANCELLED) {
+            throw new BadRequestException('Order already cancelled');
         }
 
-        return { message: 'SUCCESS' };
+        const cancelReason = params.reason || 'Vendor cancelled order';
+
+        // Process refund BEFORE database transaction if order was paid
+        let refundProcessed = false;
+        if (order.paid && order.payment?.transactionRef) {
+            try {
+                await this._payTabsService.processRefund(
+                    order.payment.transactionRef,
+                    order.totalAmount,
+                    params.orderId,
+                    cancelReason,
+                );
+                refundProcessed = true;
+                console.log(`Refund processed successfully for vendor-cancelled order ${params.orderId}`);
+            } catch (error) {
+                console.error(`Failed to process refund for order ${params.orderId}:`, error);
+                throw new BadRequestException(
+                    `Failed to process refund: ${error.message}. Order cancellation aborted.`,
+                );
+            }
+        }
+
+        // Update database in transaction
+        await this._dbService.$transaction(async (tx) => {
+            // Cancel the order
+            await tx.order.update({
+                where: { id: params.orderId },
+                data: {
+                    status: OrderStatus.CANCELLED,
+                    cancelReason,
+                    ...(refundProcessed && {
+                        paid: false,
+                        paymentStatus: PaymentStatus.REFUNDED,
+                    }),
+                },
+            });
+
+            // Add status history
+            await tx.orderStatusHistory.create({
+                data: {
+                    orderId: params.orderId,
+                    status: OrderStatus.CANCELLED,
+                    timestamp: new Date(),
+                },
+            });
+
+            // Update payment record if refund was processed
+            if (refundProcessed && order.payment) {
+                await tx.payment.update({
+                    where: { orderId: params.orderId },
+                    data: {
+                        status: 'REFUNDED',
+                        type: 'Refund',
+                    },
+                });
+            }
+
+            // Clean up VendorOrder (soft delete)
+            await tx.vendorOrder.updateMany({
+                where: { orderId: params.orderId },
+                data: { deletedAt: new Date() },
+            });
+
+            // Clean up Pickup (unassign rider and mark as cancelled)
+            const pickup = await tx.pickup.findUnique({ where: { orderId: params.orderId } });
+            if (pickup) {
+                await tx.pickup.update({
+                    where: { orderId: params.orderId },
+                    data: {
+                        status: OrderStatus.CANCELLED,
+                        riderId: null,
+                    },
+                });
+            }
+
+            // Clean up Delivery (unassign rider and mark as cancelled)
+            const delivery = await tx.delivery.findUnique({ where: { orderId: params.orderId } });
+            if (delivery) {
+                await tx.delivery.update({
+                    where: { orderId: params.orderId },
+                    data: {
+                        status: OrderStatus.CANCELLED,
+                        riderId: null,
+                    },
+                });
+            }
+        });
+
+        // Notify customer
+        const customerTokens = await this._dbService.deviceToken.findMany({
+            where: { userId: order.userId, deletedAt: null },
+        });
+
+        if (customerTokens.length > 0) {
+            const tokens = customerTokens.map((t) => t.token);
+            const notificationBody = refundProcessed
+                ? `Your order has been cancelled by the vendor and refund has been processed. Reason: ${cancelReason}`
+                : `Your order has been cancelled by the vendor. Reason: ${cancelReason}`;
+
+            await this._notificationService.SendNotificationToMultipleTokens({
+                tokens,
+                title: 'Order Cancelled',
+                body: notificationBody,
+                notificationData: {
+                    orderId: order.id,
+                    key: 'GET_ORDER_BY_ID',
+                    route: 'TrackOrder',
+                },
+            });
+        }
+
+        return {
+            message: 'Order cancelled successfully',
+            refunded: refundProcessed,
+        } as UpdateStatusResponseDTO;
     }
 
     async getAllOrders(user: User): Promise<any> {
