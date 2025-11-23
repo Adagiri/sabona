@@ -28,6 +28,8 @@ import LocationService from '../location/location.service';
 import { BooleanResponseDTO } from 'src/core/response/response.schema';
 import { I18nContext, I18nService } from 'nestjs-i18n';
 import { CATEGORY_SORT_ORDER } from 'src/constants/laundry-template';
+import PayTabsService from '../paytabs/paytabs.service';
+import { PaymentStatus } from '@prisma/client';
 
 @Injectable()
 export default class VendorService {
@@ -37,6 +39,7 @@ export default class VendorService {
         private _notificationService: NotificationService,
         private _locationService: LocationService,
         private i18n: I18nService,
+        private _payTabsService: PayTabsService,
     ) {
         this.locale = I18nContext.current()?.lang || 'en';
     }
@@ -312,19 +315,7 @@ export default class VendorService {
                 return { message: 'SUCCESS' };
 
             case OrderStatus.REJECTED:
-                const customerOrderRejectedNotificationData = {
-                    tokens: customerTokens,
-                    title: 'Order Rejected!',
-                    // body: this.i18n.translate('order.rejected_by_vendor', { lang: this.locale }),
-                    body: 'Your order has been rejected by the vendor',
-
-                    notificationData: {
-                        orderId: order.id,
-                        key: 'FETCH_ORDERS',
-                        route: 'Orders',
-                    },
-                };
-
+                // Check if already rejected
                 const isOrderRejected = await this._dbService.order.findFirst({
                     where: {
                         id: params.orderId,
@@ -336,14 +327,94 @@ export default class VendorService {
                     throw new BadRequestException('order.already_rejected');
                 }
 
-                await this._dbService.order.update({
-                    where: {
-                        id: params.orderId,
-                    },
-                    data: {
-                        status: OrderStatus.REJECTED,
+                // Get order with payment details for refund
+                const orderToReject = await this._dbService.order.findUnique({
+                    where: { id: params.orderId },
+                    include: {
+                        payment: true,
+                        user: true,
                     },
                 });
+
+                if (!orderToReject) {
+                    throw new BadRequestException('Order not found');
+                }
+
+                // Process refund BEFORE updating order status if order was paid
+                let refundProcessed = false;
+                if (orderToReject.paid && orderToReject.payment?.transactionRef) {
+                    try {
+                        await this._payTabsService.processRefund(
+                            orderToReject.payment.transactionRef,
+                            orderToReject.totalAmount,
+                            params.orderId,
+                            'Vendor rejected order',
+                        );
+                        refundProcessed = true;
+                        console.log(`Refund processed for rejected order ${params.orderId}`);
+                    } catch (error) {
+                        console.error(`Failed to process refund for rejected order ${params.orderId}:`, error);
+                        throw new BadRequestException(
+                            `Failed to process refund: ${error.message}. Order rejection aborted.`,
+                        );
+                    }
+                }
+
+                // Update order status and payment in transaction
+                await this._dbService.$transaction(async (tx) => {
+                    await tx.order.update({
+                        where: { id: params.orderId },
+                        data: {
+                            status: OrderStatus.REJECTED,
+                            ...(refundProcessed && {
+                                paid: false,
+                                paymentStatus: PaymentStatus.REFUNDED,
+                            }),
+                        },
+                    });
+
+                    // Update payment record if refund was processed
+                    if (refundProcessed && orderToReject.payment) {
+                        await tx.payment.update({
+                            where: { orderId: params.orderId },
+                            data: {
+                                status: 'REFUNDED',
+                                type: 'Refund',
+                            },
+                        });
+                    }
+
+                    // Add status history
+                    await tx.orderStatusHistory.create({
+                        data: {
+                            orderId: params.orderId,
+                            status: OrderStatus.REJECTED,
+                            timestamp: new Date(),
+                        },
+                    });
+
+                    // Soft delete VendorOrder since it was never actually accepted
+                    await tx.vendorOrder.updateMany({
+                        where: { orderId: params.orderId },
+                        data: { deletedAt: new Date() },
+                    });
+                });
+
+                // Notify customer about rejection and refund
+                const notificationBody = refundProcessed
+                    ? 'Your order has been rejected by the vendor and your payment has been refunded.'
+                    : 'Your order has been rejected by the vendor';
+
+                const customerOrderRejectedNotificationData = {
+                    tokens: customerTokens,
+                    title: 'Order Rejected',
+                    body: notificationBody,
+                    notificationData: {
+                        orderId: order.id,
+                        key: 'FETCH_ORDERS',
+                        route: 'Orders',
+                    },
+                };
 
                 if (customerTokens?.length) {
                     const res = await this._notificationService.SendNotificationToMultipleTokens(
@@ -354,8 +425,7 @@ export default class VendorService {
                             data: {
                                 userId: customer.userId,
                                 orderId: order.id,
-                                // message: this.i18n.translate('order.rejected_by_vendor', { lang: this.locale }),
-                                message: 'Your order has been rejected by the vendor',
+                                message: notificationBody,
                                 status: 'UNREAD',
                                 data: {
                                     orderId: order.id,
@@ -365,13 +435,16 @@ export default class VendorService {
                                 type: 'ORDER_REJECTED',
                             },
                         });
-                        console.log('Customer Notification created');
+                        console.log('Customer rejection notification created');
                     } else {
                         console.log('Failed to create notification');
                     }
                 }
 
-                return { message: 'SUCCESS' };
+                return {
+                    message: 'Order rejected successfully',
+                    refunded: refundProcessed,
+                };
 
             case OrderStatus.READY_FOR_PICKUP:
                 const isVendorsOrder = await this._dbService.vendorOrder.findFirst({
@@ -1467,26 +1540,135 @@ export default class VendorService {
                     vendorId: user.id,
                 },
             },
+            include: {
+                payment: true,
+                user: true,
+            },
         });
 
         if (!order) {
             throw new BadRequestException('Order does not exist');
         }
 
-        const updatedOrder = await this._dbService.order.update({
-            where: {
-                id: params.orderId,
-            },
-            data: {
-                status: OrderStatus.CANCELLED,
-            },
-        });
-
-        if (!updatedOrder) {
-            throw new BadRequestException('Failed to cancel order');
+        if (order.status === OrderStatus.CANCELLED) {
+            throw new BadRequestException('Order already cancelled');
         }
 
-        return { message: 'SUCCESS' };
+        const cancelReason = params.reason || 'Vendor cancelled order';
+
+        // Process refund BEFORE database transaction if order was paid
+        let refundProcessed = false;
+        if (order.paid && order.payment?.transactionRef) {
+            try {
+                await this._payTabsService.processRefund(
+                    order.payment.transactionRef,
+                    order.totalAmount,
+                    params.orderId,
+                    cancelReason,
+                );
+                refundProcessed = true;
+                console.log(`Refund processed successfully for vendor-cancelled order ${params.orderId}`);
+            } catch (error) {
+                console.error(`Failed to process refund for order ${params.orderId}:`, error);
+                throw new BadRequestException(
+                    `Failed to process refund: ${error.message}. Order cancellation aborted.`,
+                );
+            }
+        }
+
+        // Update database in transaction
+        await this._dbService.$transaction(async (tx) => {
+            // Cancel the order
+            await tx.order.update({
+                where: { id: params.orderId },
+                data: {
+                    status: OrderStatus.CANCELLED,
+                    cancelReason,
+                    ...(refundProcessed && {
+                        paid: false,
+                        paymentStatus: PaymentStatus.REFUNDED,
+                    }),
+                },
+            });
+
+            // Add status history
+            await tx.orderStatusHistory.create({
+                data: {
+                    orderId: params.orderId,
+                    status: OrderStatus.CANCELLED,
+                    timestamp: new Date(),
+                },
+            });
+
+            // Update payment record if refund was processed
+            if (refundProcessed && order.payment) {
+                await tx.payment.update({
+                    where: { orderId: params.orderId },
+                    data: {
+                        status: 'REFUNDED',
+                        type: 'Refund',
+                    },
+                });
+            }
+
+            // Clean up VendorOrder (soft delete)
+            await tx.vendorOrder.updateMany({
+                where: { orderId: params.orderId },
+                data: { deletedAt: new Date() },
+            });
+
+            // Clean up Pickup (unassign rider and mark as cancelled)
+            const pickup = await tx.pickup.findUnique({ where: { orderId: params.orderId } });
+            if (pickup) {
+                await tx.pickup.update({
+                    where: { orderId: params.orderId },
+                    data: {
+                        status: OrderStatus.CANCELLED,
+                        riderId: null,
+                    },
+                });
+            }
+
+            // Clean up Delivery (unassign rider and mark as cancelled)
+            const delivery = await tx.delivery.findUnique({ where: { orderId: params.orderId } });
+            if (delivery) {
+                await tx.delivery.update({
+                    where: { orderId: params.orderId },
+                    data: {
+                        status: OrderStatus.CANCELLED,
+                        riderId: null,
+                    },
+                });
+            }
+        });
+
+        // Notify customer
+        const customerTokens = await this._dbService.deviceToken.findMany({
+            where: { userId: order.userId, deletedAt: null },
+        });
+
+        if (customerTokens.length > 0) {
+            const tokens = customerTokens.map((t) => t.token);
+            const notificationBody = refundProcessed
+                ? `Your order has been cancelled by the vendor and refund has been processed. Reason: ${cancelReason}`
+                : `Your order has been cancelled by the vendor. Reason: ${cancelReason}`;
+
+            await this._notificationService.SendNotificationToMultipleTokens({
+                tokens,
+                title: 'Order Cancelled',
+                body: notificationBody,
+                notificationData: {
+                    orderId: order.id,
+                    key: 'GET_ORDER_BY_ID',
+                    route: 'TrackOrder',
+                },
+            });
+        }
+
+        return {
+            message: 'Order cancelled successfully',
+            refunded: refundProcessed,
+        } as UpdateStatusResponseDTO;
     }
 
     async getAllOrders(user: User): Promise<any> {

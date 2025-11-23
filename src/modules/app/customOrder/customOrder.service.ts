@@ -8,6 +8,7 @@ import { extractTokens } from '../../../helpers/util.helper';
 import { DELIVERY_CHARGES } from '../../../constants';
 import { CreateCustomOrderRequestDTO } from './dto/request/createCustomOrder.request';
 import { EmailService } from 'src/services/email.service';
+import PayTabsService from '../paytabs/paytabs.service';
 
 interface CustomOrderEstimate {
     estimatedCost: number;
@@ -22,6 +23,7 @@ export default class CustomOrderService {
         private _dbService: DatabaseService,
         private _notificationService: NotificationService,
         private emailService: EmailService,
+        private _payTabsService: PayTabsService,
     ) {}
 
     /**
@@ -607,7 +609,7 @@ export default class CustomOrderService {
         return { data: orders };
     }
 
-    async cancelCustomOrder(orderId: string, reason: string, refundCustomer?: boolean): Promise<any> {
+    async cancelCustomOrder(orderId: string, reason: string): Promise<any> {
         const order = await this._dbService.order.findUnique({
             where: { id: orderId },
             include: {
@@ -624,6 +626,27 @@ export default class CustomOrderService {
             throw new BadRequestException('Order already cancelled');
         }
 
+        // Process refund BEFORE database transaction if customer paid
+        let refundProcessed = false;
+        if (order.customerPaid && order.payment?.transactionRef) {
+            try {
+                await this._payTabsService.processRefund(
+                    order.payment.transactionRef,
+                    order.totalAmount,
+                    orderId,
+                    reason,
+                );
+                refundProcessed = true;
+                console.log(`Refund processed successfully for custom order ${orderId}`);
+            } catch (error) {
+                console.error(`Failed to process refund for custom order ${orderId}:`, error);
+                throw new BadRequestException(
+                    `Failed to process refund: ${error.message}. Order cancellation aborted.`,
+                );
+            }
+        }
+
+        // Update database in transaction
         await this._dbService.$transaction(async (tx) => {
             // Update order status
             await tx.order.update({
@@ -631,6 +654,10 @@ export default class CustomOrderService {
                 data: {
                     status: OrderStatus.CANCELLED,
                     cancelReason: reason,
+                    ...(refundProcessed && {
+                        customerPaid: false,
+                        paymentStatus: PaymentStatus.REFUNDED,
+                    }),
                 },
             });
 
@@ -643,25 +670,39 @@ export default class CustomOrderService {
                 },
             });
 
-            // If customer paid and refund requested, update payment status
-            if (order.customerPaid && refundCustomer) {
-                await tx.order.update({
-                    where: { id: orderId },
+            // Update payment record if refund was processed
+            if (refundProcessed && order.payment) {
+                await tx.payment.update({
+                    where: { orderId },
                     data: {
-                        customerPaid: false,
-                        paymentStatus: PaymentStatus.REFUNDED,
+                        status: 'REFUNDED',
+                        type: 'Refund',
                     },
                 });
+            }
 
-                if (order.payment) {
-                    await tx.payment.update({
-                        where: { orderId },
-                        data: {
-                            status: 'REFUNDED',
-                            type: 'Refund',
-                        },
-                    });
-                }
+            // Clean up Pickup (unassign rider and mark as cancelled)
+            const pickup = await tx.pickup.findUnique({ where: { orderId } });
+            if (pickup) {
+                await tx.pickup.update({
+                    where: { orderId },
+                    data: {
+                        status: OrderStatus.CANCELLED,
+                        riderId: null,
+                    },
+                });
+            }
+
+            // Clean up Delivery (unassign rider and mark as cancelled)
+            const delivery = await tx.delivery.findUnique({ where: { orderId } });
+            if (delivery) {
+                await tx.delivery.update({
+                    where: { orderId },
+                    data: {
+                        status: OrderStatus.CANCELLED,
+                        riderId: null,
+                    },
+                });
             }
         });
 
@@ -672,10 +713,14 @@ export default class CustomOrderService {
 
         if (customerTokens.length > 0) {
             const tokens = customerTokens.map((t) => t.token);
+            const notificationBody = refundProcessed
+                ? `Your custom order has been cancelled and refund has been processed. Reason: ${reason}`
+                : `Your custom order has been cancelled. Reason: ${reason}`;
+
             await this._notificationService.SendNotificationToMultipleTokens({
                 tokens,
                 title: 'Order Cancelled',
-                body: `Your order has been cancelled. Reason: ${reason}`,
+                body: notificationBody,
                 notificationData: {
                     orderId: order.id,
                     key: 'GET_ORDER_BY_ID',
@@ -684,6 +729,9 @@ export default class CustomOrderService {
             });
         }
 
-        return { message: 'Order cancelled successfully' };
+        return {
+            message: 'Order cancelled successfully',
+            refunded: refundProcessed,
+        };
     }
 }

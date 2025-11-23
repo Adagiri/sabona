@@ -29,6 +29,12 @@ export interface WebhookProcessingResult {
     orderId?: string;
 }
 
+export interface PayTabsRefundResponse {
+    success: boolean;
+    transactionRef: string;
+    message?: string;
+}
+
 @Injectable()
 export default class PayTabsService {
     constructor(
@@ -36,6 +42,74 @@ export default class PayTabsService {
         private _notificationService: NotificationService,
         private emailService: EmailService,
     ) {}
+
+    /**
+     * Process refund through PayTabs API
+     */
+    async processRefund(
+        transactionRef: string,
+        amount: number,
+        orderId: string,
+        reason: string,
+    ): Promise<PayTabsRefundResponse> {
+        try {
+            if (!transactionRef) {
+                throw new BadRequestException('Transaction reference is required for refund');
+            }
+
+            if (amount <= 0) {
+                throw new BadRequestException('Invalid refund amount');
+            }
+
+            console.log(`Processing refund for order ${orderId}: ${amount} SAR via transaction ${transactionRef}`);
+
+            const response = await fetch(`https://secure.paytabs.sa/payment/request`, {
+                method: 'POST',
+                headers: {
+                    authorization: AppConfig.PAYTABS.SERVER_KEY,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    profile_id: AppConfig.PAYTABS.PROFILE_ID,
+                    tran_type: 'refund',
+                    tran_class: 'ecom',
+                    cart_id: orderId,
+                    cart_description: `Refund for order cancellation: ${reason}`,
+                    cart_currency: 'SAR',
+                    cart_amount: amount,
+                    cart_refund_id: transactionRef, // Original transaction reference
+                    tran_ref: transactionRef, // Original transaction to refund
+                }),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('PayTabs refund API error:', errorText);
+                throw new BadRequestException(
+                    `PayTabs refund failed with status ${response.status}: ${errorText}`,
+                );
+            }
+
+            const payTabsResponse = await response.json();
+            console.log('PayTabs refund response:', payTabsResponse);
+
+            // Check if refund was successful
+            if (payTabsResponse.tran_ref) {
+                return {
+                    success: true,
+                    transactionRef: payTabsResponse.tran_ref,
+                    message: payTabsResponse.message || 'Refund processed successfully',
+                };
+            } else {
+                throw new BadRequestException(
+                    payTabsResponse.message || 'PayTabs refund failed - no transaction reference returned',
+                );
+            }
+        } catch (error) {
+            console.error('Error processing PayTabs refund:', error);
+            throw error;
+        }
+    }
 
     /**
      * Main webhook handler - routes to appropriate order type handler
