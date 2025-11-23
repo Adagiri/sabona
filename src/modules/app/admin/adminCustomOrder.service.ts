@@ -508,6 +508,11 @@ export default class AdminCustomOrderService {
             throw new BadRequestException('Custom order not found');
         }
 
+             // Check if payment has already been received
+        if (order.status === OrderStatus.CANCELLED) {
+            throw new BadRequestException('This order has already been cancelled');
+        }
+
         // Check if payment has already been received
         if (order.customerPaid) {
             throw new BadRequestException('Payment has already been received for this order');
