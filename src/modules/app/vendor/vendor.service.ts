@@ -1,4 +1,4 @@
-import { OrderStatus, RiderOrderType, User } from '@prisma/client';
+import { DeliveryStatus, OrderStatus, RiderOrderType, User, PickupStatus } from '@prisma/client';
 import DatabaseService from 'src/database/database.service';
 import UpdateStatusRequestDTO from './dto/request/updateStatus.request';
 import GetOrderRequestsResponseDTO from './dto/response/getOrderRequests.response';
@@ -443,7 +443,6 @@ export default class VendorService {
 
                 return {
                     message: 'Order rejected successfully',
-                    refunded: refundProcessed,
                 };
 
             case OrderStatus.READY_FOR_PICKUP:
@@ -706,10 +705,7 @@ export default class VendorService {
                             },
                         },
                     },
-                    orderBy: [
-                        { sortOrder: { sort: 'asc', nulls: 'last' } },
-                        { name: 'asc' },
-                    ],
+                    orderBy: [{ sortOrder: { sort: 'asc', nulls: 'last' } }, { name: 'asc' }],
                 },
             },
         });
@@ -844,7 +840,7 @@ export default class VendorService {
 
         if (activeOrders > 0) {
             throw new BadRequestException(
-                `Cannot delete laundry - it has ${activeOrders} active order(s). Complete or cancel them first.`
+                `Cannot delete laundry - it has ${activeOrders} active order(s). Complete or cancel them first.`,
             );
         }
 
@@ -861,7 +857,7 @@ export default class VendorService {
 
         if (pendingWithdrawals > 0) {
             throw new BadRequestException(
-                `Cannot delete laundry - it has ${pendingWithdrawals} pending withdrawal(s). Complete them first.`
+                `Cannot delete laundry - it has ${pendingWithdrawals} pending withdrawal(s). Complete them first.`,
             );
         }
 
@@ -874,7 +870,7 @@ export default class VendorService {
             select: { id: true },
         });
 
-        const serviceIds = services.map(s => s.id);
+        const serviceIds = services.map((s) => s.id);
 
         // Soft delete all items in these services
         if (serviceIds.length > 0) {
@@ -1057,7 +1053,7 @@ export default class VendorService {
 
         if (activeOrderServices > 0) {
             throw new BadRequestException(
-                `Cannot delete service - it is used in ${activeOrderServices} active order(s). Complete or cancel them first.`
+                `Cannot delete service - it is used in ${activeOrderServices} active order(s). Complete or cancel them first.`,
             );
         }
 
@@ -1360,7 +1356,7 @@ export default class VendorService {
 
         if (activeOrderItems > 0) {
             throw new BadRequestException(
-                `Cannot delete item - it is in ${activeOrderItems} active order(s). Complete or cancel them first.`
+                `Cannot delete item - it is in ${activeOrderItems} active order(s). Complete or cancel them first.`,
             );
         }
 
@@ -1438,7 +1434,7 @@ export default class VendorService {
         });
 
         // Add expressPrice for backward compatibility
-        const itemsWithExpressPrice = items.map(item => ({
+        const itemsWithExpressPrice = items.map((item) => ({
             ...item,
             expressPrice: item.expressVendorPrice,
         }));
@@ -1524,7 +1520,7 @@ export default class VendorService {
         });
 
         // Add expressPrice for backward compatibility
-        const itemsWithExpressPrice = items.map(item => ({
+        const itemsWithExpressPrice = items.map((item) => ({
             ...item,
             expressPrice: item.expressVendorPrice,
         }));
@@ -1623,7 +1619,7 @@ export default class VendorService {
                 await tx.pickup.update({
                     where: { orderId: params.orderId },
                     data: {
-                        status: OrderStatus.CANCELLED,
+                        status: PickupStatus.CANCELLED,
                         riderId: null,
                     },
                 });
@@ -1635,7 +1631,7 @@ export default class VendorService {
                 await tx.delivery.update({
                     where: { orderId: params.orderId },
                     data: {
-                        status: OrderStatus.CANCELLED,
+                        status: DeliveryStatus.CANCELLED,
                         riderId: null,
                     },
                 });
@@ -1896,9 +1892,7 @@ export default class VendorService {
             // Validate category name against allowed names
             const allowedCategoryNames = Object.keys(CATEGORY_SORT_ORDER);
             if (!allowedCategoryNames.includes(data.nameLocale.en)) {
-                throw new BadRequestException(
-                    `Category name must be one of: ${allowedCategoryNames.join(', ')}`
-                );
+                throw new BadRequestException(`Category name must be one of: ${allowedCategoryNames.join(', ')}`);
             }
 
             updateData.nameLocale = data.nameLocale;
@@ -1948,9 +1942,7 @@ export default class VendorService {
         });
 
         if (itemsUsingCategory > 0) {
-            throw new BadRequestException(
-                `Cannot delete category - ${itemsUsingCategory} item(s) are still using it.`
-            );
+            throw new BadRequestException(`Cannot delete category - ${itemsUsingCategory} item(s) are still using it.`);
         }
 
         // Check for active subcategories
@@ -1963,7 +1955,7 @@ export default class VendorService {
 
         if (activeSubcategories > 0) {
             throw new BadRequestException(
-                `Cannot delete category - it has ${activeSubcategories} active subcategory/subcategories. Delete subcategories first.`
+                `Cannot delete category - it has ${activeSubcategories} active subcategory/subcategories. Delete subcategories first.`,
             );
         }
 
@@ -2147,7 +2139,7 @@ export default class VendorService {
         });
 
         // Add expressPrice for backward compatibility
-        const itemsWithExpressPrice = items.map(item => ({
+        const itemsWithExpressPrice = items.map((item) => ({
             ...item,
             expressPrice: item.expressVendorPrice,
         }));
@@ -2156,7 +2148,10 @@ export default class VendorService {
     }
 
     // Reorder Laundry Services
-    async reorderLaundryServices(laundryId: string, serviceIds: string[]): Promise<{ success: boolean; message: string }> {
+    async reorderLaundryServices(
+        laundryId: string,
+        serviceIds: string[],
+    ): Promise<{ success: boolean; message: string }> {
         // Verify laundry exists
         const laundry = await this._dbService.laundry.findFirst({
             where: { id: laundryId, deletedAt: null },

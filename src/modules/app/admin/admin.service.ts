@@ -3,7 +3,7 @@ import DatabaseService from '../../../database/database.service';
 import { AllOrderListDto } from './dto/response/allorderlist.response.dto';
 import FindUsersRequestDTO from '../user/dto/request/find.request';
 import FindUsersResponseDTO from '../user/dto/response/find.response';
-import { OrderStatus, PaymentStatus, Prisma, ServiceChargeType, User, UserStatus, UserType } from '@prisma/client';
+import { DeliveryStatus, OrderStatus, PaymentStatus, Prisma, ServiceChargeType, User, UserStatus, UserType } from '@prisma/client';
 import {
     extractTokens,
     GetDateFilterOptions,
@@ -1437,7 +1437,7 @@ export default class AdminService {
                 await tx.delivery.update({
                     where: { orderId },
                     data: {
-                        status: OrderStatus.CANCELLED,
+                        status: DeliveryStatus.CANCELLED,
                         riderId: null,
                     },
                 });

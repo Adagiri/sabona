@@ -408,6 +408,7 @@ enum PickupStatus {
   ACCEPTED
   PICKED_UP // Rider has picked up the order from the user
   DELIVERED_TO_VENDOR // Rider has delivered the order to the vendor
+  CANCELLED // Pickup request cancelled
 }
 
 // Enum to track the status of the delivery process
@@ -416,6 +417,7 @@ enum DeliveryStatus {
   ACCEPTED
   PICKED_UP_FROM_VENDOR // Rider has picked up the order from the vendor
   DELIVERED_TO_USER // Rider has delivered the order to the user
+  CANCELLED // Delivery request cancelled
 }
 
 enum DetergentType {
@@ -511,7 +513,7 @@ model LaundryService {
   descriptionLocale   Json?                 @db.JsonB
   iconId              Int?
   icon                Icon?                 @relation("ServiceIcon", fields: [iconId], references: [id])
-  sortOrder           Int?                  // For custom sorting of services
+  sortOrder           Int? // For custom sorting of services
   laundryServiceItems LaundryServiceItem[] // Relation to LaundryServiceItem model
   createdAt           DateTime              @default(now()) @db.Timestamptz()
   updatedAt           DateTime              @default(now()) @updatedAt @db.Timestamptz()
@@ -596,12 +598,12 @@ model OrderLaundryServiceItem {
   quantity              Int
 
   // CRITICAL: Price snapshots at time of order (prevents historical data corruption)
-  vendorPriceSnapshot           Float // Vendor's earning per item at order time (normal)
-  platformPriceSnapshot         Float // Platform price at order time (normal)
-  expressVendorPriceSnapshot    Float? // Vendor's earning per item at order time (express)
-  expressPlatformPriceSnapshot  Float? // Platform price at order time (express)
-  itemName                      String? // Item name snapshot
-  serviceName                   String? // Service name snapshot
+  vendorPriceSnapshot          Float // Vendor's earning per item at order time (normal)
+  platformPriceSnapshot        Float // Platform price at order time (normal)
+  expressVendorPriceSnapshot   Float? // Vendor's earning per item at order time (express)
+  expressPlatformPriceSnapshot Float? // Platform price at order time (express)
+  itemName                     String? // Item name snapshot
+  serviceName                  String? // Service name snapshot
 
   createdAt DateTime @default(now()) @db.Timestamptz()
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
@@ -635,12 +637,12 @@ model Order {
   adminServiceCharge  Float? // Admin-set service charge for custom orders
 
   // Custom order - PayTabs customer payment
-  payTabsInvoiceId           String? // PayTabs invoice ID
-  payTabsInvoiceUrl          String? // Invoice link admin sends to customer
-  payTabsInvoiceDateCreated  DateTime? @db.Timestamptz() // When payment link was generated
-  customerPaid               Boolean?  @default(false) // Customer payment status via PayTabs
-  customerPaymentDate        DateTime? // When customer paid the invoice
-  payTabsTransactionRef      String? // PayTabs transaction reference
+  payTabsInvoiceId          String? // PayTabs invoice ID
+  payTabsInvoiceUrl         String? // Invoice link admin sends to customer
+  payTabsInvoiceDateCreated DateTime? @db.Timestamptz() // When payment link was generated
+  customerPaid              Boolean?  @default(false) // Customer payment status via PayTabs
+  customerPaymentDate       DateTime? // When customer paid the invoice
+  payTabsTransactionRef     String? // PayTabs transaction reference
 
   // Fee breakdown fields
   subtotalAmount     Float? // Total of all service items only

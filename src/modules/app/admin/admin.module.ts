@@ -13,6 +13,8 @@ import VendorModule from '../vendor/vendor.module';
 import CustomOrderModule from '../customOrder/customOrder.module';
 import AdminCustomOrderModule from './adminCustomOrder.module';
 import SMSModule from 'src/modules/sms/sms.module';
+import PayTabsService from '../paytabs/paytabs.service';
+import { EmailService } from 'src/services/email.service';
 
 
 @Module({
@@ -28,7 +30,7 @@ import SMSModule from 'src/modules/sms/sms.module';
         SMSModule
     ],
     exports: [AdminService, DashboardService, FinanceService],
-    providers: [AdminService, DashboardService, FinanceService, S3Service],
+    providers: [AdminService, DashboardService, FinanceService, S3Service, PayTabsService, EmailService],
     controllers: [AdminController, AdminDashboardController],
 })
 export default class AdminModule {}
