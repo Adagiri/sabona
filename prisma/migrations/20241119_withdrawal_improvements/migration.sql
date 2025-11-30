@@ -1,1 +1,0 @@
--- This migration was applied directly in production and is intentionally empty.

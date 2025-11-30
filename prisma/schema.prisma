@@ -178,6 +178,9 @@ model AdminSettings {
   maxDeliveryDistance     Float     @default(50.0) // Maximum delivery distance in km
   lastWithdrawalTimestamp DateTime? @db.Timestamptz() // Track last withdrawal globally
 
+  transferChargeType ServiceChargeType @default(PERCENTAGE)
+  transferChargeRate Float             @default(1.0)
+
   createdAt DateTime  @default(now()) @db.Timestamptz()
   updatedAt DateTime  @updatedAt @db.Timestamptz()
   deletedAt DateTime? @db.Timestamptz() // Optional deleted at timestamp
@@ -666,6 +669,10 @@ model Order {
   paymentType    PaymentType? // Payment type for the order
   paid           Boolean?
 
+  vendorEarningDisbursed Boolean   @default(false)
+  disbursedAt            DateTime?
+  withdrawalId           String?
+
   tip Tip[] // Tip details for the order
 
   riderOrders   RiderOrder[] // Existing relation with riders for order management
@@ -682,6 +689,9 @@ model Order {
   createdAt     DateTime             @default(now()) @db.Timestamptz()
   updatedAt     DateTime             @default(now()) @updatedAt @db.Timestamptz()
   deletedAt     DateTime?            @db.Timestamptz()
+
+  @@index([vendorEarningDisbursed])
+  @@index([withdrawalId])
 }
 
 // RiderOrder model to manage assignments between riders and orders
