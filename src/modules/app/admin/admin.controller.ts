@@ -79,6 +79,8 @@ import { CancelOrderRequestDTO } from './dto/request/cancelOrder.request';
 import { DeleteUserResponseDTO } from './dto/response/deleteUser.response';
 import { DeleteUserRequestDTO } from './dto/request/deleteUser.request';
 import { IgnoreTranslation } from 'src/core/decorators/ignore_translation.decorator';
+import { EditUserRequestDTO, ChangePhoneRequestDTO, ChangeEmailRequestDTO } from './dto/request/editUser.request';
+import { EditUserResponseDTO, ChangePhoneResponseDTO, ChangeEmailResponseDTO } from './dto/response/editUser.response';
 
 @ApiController({
     path: '/admin',
@@ -954,6 +956,48 @@ export default class AdminController {
     })
     async cancelOrder(@Param('orderId') orderId: string, @Body() data: CancelOrderRequestDTO): Promise<any> {
         return await this._adminService.cancelOrder(orderId, data.reason);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/users/:userId/edit',
+        description: 'Edit user profile (name, email, phone, status, level)',
+        response: EditUserResponseDTO,
+    })
+    async editUser(
+        @Param('userId') userId: string,
+        @Body() data: EditUserRequestDTO,
+        @CurrentUser() adminUser: User,
+    ): Promise<EditUserResponseDTO> {
+        return this._adminService.editUser(userId, data, adminUser);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Post({
+        path: '/users/:userId/change-phone',
+        description: 'Change user phone number (requires reason)',
+        response: ChangePhoneResponseDTO,
+    })
+    async changeUserPhone(
+        @Param('userId') userId: string,
+        @Body() data: ChangePhoneRequestDTO,
+        @CurrentUser() adminUser: User,
+    ): Promise<ChangePhoneResponseDTO> {
+        return this._adminService.changeUserPhone(userId, data, adminUser);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Post({
+        path: '/users/:userId/change-email',
+        description: 'Change user email address (optional reason)',
+        response: ChangeEmailResponseDTO,
+    })
+    async changeUserEmail(
+        @Param('userId') userId: string,
+        @Body() data: ChangeEmailRequestDTO,
+        @CurrentUser() adminUser: User,
+    ): Promise<ChangeEmailResponseDTO> {
+        return this._adminService.changeUserEmail(userId, data, adminUser);
     }
 
     @Authorized(UserType.ADMIN)

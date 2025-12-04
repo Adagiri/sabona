@@ -46,6 +46,15 @@ import {
     DEFAULT_SERVICES,
 } from '../../../constants/laundry-template';
 import PayTabsService from '../paytabs/paytabs.service';
+import { EditUserRequestDTO, ChangePhoneRequestDTO, ChangeEmailRequestDTO } from './dto/request/editUser.request';
+import { EditUserResponseDTO, ChangePhoneResponseDTO, ChangeEmailResponseDTO } from './dto/response/editUser.response';
+import {
+    isValidSaudiPhone,
+    normalizeSaudiPhone,
+    isValidEmail,
+    normalizeEmail,
+    isValidName,
+} from '../../../helpers/validation.helper';
 
 @Injectable()
 export default class AdminService {
@@ -1636,6 +1645,351 @@ export default class AdminService {
                 emailFreed: !!user.email,
                 deletedPhone: user.phone || undefined, // Return for confirmation
             },
+        };
+    }
+
+    /**
+     * Edit user profile
+     * Allows admin to update user's name, email, phone, status, and level
+     * Cannot edit admins
+     */
+    async editUser(userId: string, data: EditUserRequestDTO, adminUser: User): Promise<EditUserResponseDTO> {
+        // Find the user to edit
+        const user = await this._dbService.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        // Prevent editing admin users
+        if (user.type === UserType.ADMIN) {
+            throw new BadRequestException('Cannot edit admin users');
+        }
+
+        // Prevent admin from editing themselves (if they're not admin type, which is already blocked)
+        if (user.id === adminUser.id) {
+            throw new BadRequestException('Cannot edit your own account through this endpoint');
+        }
+
+        const changesApplied: string[] = [];
+        const updateData: any = {};
+
+        // Validate and update name
+        if (data.name !== undefined && data.name !== user.name) {
+            if (data.name && !isValidName(data.name)) {
+                throw new BadRequestException(
+                    'Invalid name format. Name must be 2-100 characters and contain only letters, spaces, hyphens, and apostrophes',
+                );
+            }
+            updateData.name = data.name?.trim() || null;
+            changesApplied.push('name');
+        }
+
+        // Validate and update email
+        if (data.email !== undefined && data.email !== user.email) {
+            const normalizedEmail = data.email ? normalizeEmail(data.email) : null;
+
+            if (normalizedEmail && !isValidEmail(normalizedEmail)) {
+                throw new BadRequestException('Invalid email format');
+            }
+
+            // Check if email is already in use by another active user
+            if (normalizedEmail) {
+                const existingUser = await this._dbService.user.findFirst({
+                    where: {
+                        email: normalizedEmail,
+                        deletedAt: null,
+                        id: { not: userId },
+                    },
+                });
+
+                if (existingUser) {
+                    throw new BadRequestException('Email is already in use by another user');
+                }
+            }
+
+            // Log email change
+            await this._dbService.emailChangeLog.create({
+                data: {
+                    userId: userId,
+                    oldEmail: user.email,
+                    newEmail: normalizedEmail || '',
+                    changedBy: adminUser.id,
+                    reason: 'Admin edited user profile',
+                },
+            });
+
+            updateData.email = normalizedEmail;
+            changesApplied.push('email');
+
+            // Send notification to user about email change
+            if (normalizedEmail) {
+                await this._notificationService.sendPushNotificationByUserId(
+                    userId,
+                    'Email Address Updated',
+                    `Your email address has been updated to ${normalizedEmail} by an administrator.`,
+                    {},
+                    'PROFILE_UPDATE',
+                );
+            }
+        }
+
+        // Validate and update phone
+        if (data.phone !== undefined && data.phone !== user.phone) {
+            const normalizedPhone = data.phone ? normalizeSaudiPhone(data.phone) : null;
+
+            if (normalizedPhone && !isValidSaudiPhone(normalizedPhone)) {
+                throw new BadRequestException('Invalid Saudi phone number format');
+            }
+
+            // Check if phone is already in use by another active user
+            if (normalizedPhone) {
+                const existingUser = await this._dbService.user.findFirst({
+                    where: {
+                        phone: normalizedPhone,
+                        deletedAt: null,
+                        id: { not: userId },
+                    },
+                });
+
+                if (existingUser) {
+                    throw new BadRequestException('Phone number is already in use by another user');
+                }
+            }
+
+            // Log phone change
+            await this._dbService.phoneChangeLog.create({
+                data: {
+                    userId: userId,
+                    oldPhone: user.phone,
+                    newPhone: normalizedPhone || '',
+                    changedBy: adminUser.id,
+                    reason: 'Admin edited user profile',
+                },
+            });
+
+            updateData.phone = normalizedPhone;
+            changesApplied.push('phone');
+
+            // Send notification to user about phone change
+            if (normalizedPhone) {
+                await this._notificationService.sendPushNotificationByUserId(
+                    userId,
+                    'Phone Number Updated',
+                    `Your phone number has been updated to ${normalizedPhone} by an administrator.`,
+                    {},
+                    'PROFILE_UPDATE',
+                );
+            }
+        }
+
+        // Update status
+        if (data.status !== undefined && data.status !== user.status) {
+            updateData.status = data.status;
+            changesApplied.push('status');
+        }
+
+        // Update level (only for customers)
+        if (data.level !== undefined && data.level !== user.level) {
+            if (user.type !== UserType.USER) {
+                throw new BadRequestException('Level can only be set for customer users');
+            }
+            updateData.level = data.level;
+            changesApplied.push('level');
+        }
+
+        // If no changes, return early
+        if (Object.keys(updateData).length === 0) {
+            return {
+                data: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    phone: user.phone,
+                    status: user.status,
+                    level: user.level,
+                    type: user.type,
+                    updatedAt: user.updatedAt,
+                },
+                message: 'No changes detected',
+                changesApplied: [],
+            };
+        }
+
+        // Update user
+        const updatedUser = await this._dbService.user.update({
+            where: { id: userId },
+            data: updateData,
+        });
+
+        return {
+            data: {
+                id: updatedUser.id,
+                name: updatedUser.name,
+                email: updatedUser.email,
+                phone: updatedUser.phone,
+                status: updatedUser.status,
+                level: updatedUser.level,
+                type: updatedUser.type,
+                updatedAt: updatedUser.updatedAt,
+            },
+            message: `User profile updated successfully`,
+            changesApplied,
+        };
+    }
+
+    /**
+     * Change user's phone number with reason
+     * Requires reason for audit trail
+     */
+    async changeUserPhone(
+        userId: string,
+        data: ChangePhoneRequestDTO,
+        adminUser: User,
+    ): Promise<ChangePhoneResponseDTO> {
+        const user = await this._dbService.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        if (user.type === UserType.ADMIN) {
+            throw new BadRequestException('Cannot edit admin users');
+        }
+
+        const normalizedPhone = normalizeSaudiPhone(data.newPhone);
+
+        if (!isValidSaudiPhone(normalizedPhone)) {
+            throw new BadRequestException('Invalid Saudi phone number format');
+        }
+
+        // Check if phone is already in use
+        const existingUser = await this._dbService.user.findFirst({
+            where: {
+                phone: normalizedPhone,
+                deletedAt: null,
+                id: { not: userId },
+            },
+        });
+
+        if (existingUser) {
+            throw new BadRequestException('Phone number is already in use by another user');
+        }
+
+        // Log phone change with reason
+        const changeLog = await this._dbService.phoneChangeLog.create({
+            data: {
+                userId: userId,
+                oldPhone: user.phone,
+                newPhone: normalizedPhone,
+                changedBy: adminUser.id,
+                reason: data.reason,
+            },
+        });
+
+        // Update user phone
+        await this._dbService.user.update({
+            where: { id: userId },
+            data: { phone: normalizedPhone },
+        });
+
+        // Send push notification to user
+        await this._notificationService.sendPushNotificationByUserId(
+            userId,
+            'Phone Number Updated',
+            `Your phone number has been updated to ${normalizedPhone}. Reason: ${data.reason}`,
+            {},
+            'PROFILE_UPDATE',
+        );
+
+        return {
+            data: {
+                userId: userId,
+                oldPhone: user.phone,
+                newPhone: normalizedPhone,
+                changedAt: changeLog.createdAt,
+            },
+            message: 'Phone number updated successfully',
+        };
+    }
+
+    /**
+     * Change user's email with optional reason
+     */
+    async changeUserEmail(
+        userId: string,
+        data: ChangeEmailRequestDTO,
+        adminUser: User,
+    ): Promise<ChangeEmailResponseDTO> {
+        const user = await this._dbService.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        if (user.type === UserType.ADMIN) {
+            throw new BadRequestException('Cannot edit admin users');
+        }
+
+        const normalizedEmail = normalizeEmail(data.newEmail);
+
+        if (!isValidEmail(normalizedEmail)) {
+            throw new BadRequestException('Invalid email format');
+        }
+
+        // Check if email is already in use
+        const existingUser = await this._dbService.user.findFirst({
+            where: {
+                email: normalizedEmail,
+                deletedAt: null,
+                id: { not: userId },
+            },
+        });
+
+        if (existingUser) {
+            throw new BadRequestException('Email is already in use by another user');
+        }
+
+        // Log email change
+        const changeLog = await this._dbService.emailChangeLog.create({
+            data: {
+                userId: userId,
+                oldEmail: user.email,
+                newEmail: normalizedEmail,
+                changedBy: adminUser.id,
+                reason: data.reason || 'Admin updated email',
+            },
+        });
+
+        // Update user email
+        await this._dbService.user.update({
+            where: { id: userId },
+            data: { email: normalizedEmail },
+        });
+
+        // Send push notification to user
+        await this._notificationService.sendPushNotificationByUserId(
+            userId,
+            'Email Address Updated',
+            `Your email address has been updated to ${normalizedEmail}.`,
+            {},
+            'PROFILE_UPDATE',
+        );
+
+        return {
+            data: {
+                userId: userId,
+                oldEmail: user.email,
+                newEmail: normalizedEmail,
+                changedAt: changeLog.createdAt,
+            },
+            message: 'Email updated successfully',
         };
     }
 }

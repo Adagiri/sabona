@@ -239,6 +239,11 @@ model User {
   laundryWithdrawals    WithdrawalLaundry[] @relation("LaundryWithdrawals")
   mainVendorWithdrawals WithdrawalLaundry[] @relation("MainVendorWithdrawals")
   location              UserLocation?
+
+  phoneChangeLogs PhoneChangeLog[] @relation("UserPhoneChanges")
+  emailChangeLogs EmailChangeLog[] @relation("UserEmailChanges")
+  adminPhoneChanges PhoneChangeLog[] @relation("AdminPhoneChanges")
+  adminEmailChanges EmailChangeLog[] @relation("AdminEmailChanges")
 }
 
 model UserLocation {
@@ -927,4 +932,46 @@ model WithdrawalLaundry {
   @@index([withdrawalId])
   @@index([laundryId])
   @@index([vendorId])
+}
+
+// Phone change log model to track all phone number changes
+model PhoneChangeLog {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation("UserPhoneChanges", fields: [userId], references: [id], onDelete: Cascade)
+
+  oldPhone    String?  // Previous phone number (null if first time setting)
+  newPhone    String   // New phone number
+
+  changedBy   String   // Admin ID who made the change
+  admin       User     @relation("AdminPhoneChanges", fields: [changedBy], references: [id])
+
+  reason      String   // Reason for the change
+
+  createdAt   DateTime @default(now()) @db.Timestamptz()
+
+  @@index([userId])
+  @@index([changedBy])
+  @@index([createdAt])
+}
+
+// Email change log model to track all email changes
+model EmailChangeLog {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation("UserEmailChanges", fields: [userId], references: [id], onDelete: Cascade)
+
+  oldEmail    String?  // Previous email (null if first time setting)
+  newEmail    String   // New email
+
+  changedBy   String   // Admin ID who made the change
+  admin       User     @relation("AdminEmailChanges", fields: [changedBy], references: [id])
+
+  reason      String?  // Optional reason for the change
+
+  createdAt   DateTime @default(now()) @db.Timestamptz()
+
+  @@index([userId])
+  @@index([changedBy])
+  @@index([createdAt])
 }
