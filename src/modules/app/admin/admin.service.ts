@@ -1726,13 +1726,34 @@ export default class AdminService {
 
             // Send notification to user about email change
             if (normalizedEmail) {
-                await this._notificationService.sendPushNotificationByUserId(
-                    userId,
-                    'Email Address Updated',
-                    `Your email address has been updated to ${normalizedEmail} by an administrator.`,
-                    {},
-                    'PROFILE_UPDATE',
-                );
+                const deviceTokens = await this._dbService.deviceToken.findMany({
+                    where: {
+                        userId: userId,
+                        deletedAt: null,
+                    },
+                    select: {
+                        token: true,
+                    },
+                });
+
+                const userTokens = extractTokens(deviceTokens);
+
+                if (userTokens?.length) {
+                    try {
+                        await this._notificationService.SendNotificationToMultipleTokens({
+                            tokens: userTokens,
+                            title: 'Email Address Updated',
+                            body: `Your email address has been updated to ${normalizedEmail} by an administrator.`,
+                            notificationData: {
+                                orderId: '',
+                                key: 'PROFILE_UPDATE',
+                                route: '',
+                            },
+                        });
+                    } catch (error) {
+                        console.log('Error sending email change notification:', error);
+                    }
+                }
             }
         }
 
@@ -1775,13 +1796,34 @@ export default class AdminService {
 
             // Send notification to user about phone change
             if (normalizedPhone) {
-                await this._notificationService.sendPushNotificationByUserId(
-                    userId,
-                    'Phone Number Updated',
-                    `Your phone number has been updated to ${normalizedPhone} by an administrator.`,
-                    {},
-                    'PROFILE_UPDATE',
-                );
+                const deviceTokens = await this._dbService.deviceToken.findMany({
+                    where: {
+                        userId: userId,
+                        deletedAt: null,
+                    },
+                    select: {
+                        token: true,
+                    },
+                });
+
+                const userTokens = extractTokens(deviceTokens);
+
+                if (userTokens?.length) {
+                    try {
+                        await this._notificationService.SendNotificationToMultipleTokens({
+                            tokens: userTokens,
+                            title: 'Phone Number Updated',
+                            body: `Your phone number has been updated to ${normalizedPhone} by an administrator.`,
+                            notificationData: {
+                                orderId: '',
+                                key: 'PROFILE_UPDATE',
+                                route: '',
+                            },
+                        });
+                    } catch (error) {
+                        console.log('Error sending phone change notification:', error);
+                    }
+                }
             }
         }
 
@@ -1898,13 +1940,34 @@ export default class AdminService {
         });
 
         // Send push notification to user
-        await this._notificationService.sendPushNotificationByUserId(
-            userId,
-            'Phone Number Updated',
-            `Your phone number has been updated to ${normalizedPhone}. Reason: ${data.reason}`,
-            {},
-            'PROFILE_UPDATE',
-        );
+        const deviceTokens = await this._dbService.deviceToken.findMany({
+            where: {
+                userId: userId,
+                deletedAt: null,
+            },
+            select: {
+                token: true,
+            },
+        });
+
+        const userTokens = extractTokens(deviceTokens);
+
+        if (userTokens?.length) {
+            try {
+                await this._notificationService.SendNotificationToMultipleTokens({
+                    tokens: userTokens,
+                    title: 'Phone Number Updated',
+                    body: `Your phone number has been updated to ${normalizedPhone}. Reason: ${data.reason}`,
+                    notificationData: {
+                        orderId: '',
+                        key: 'PROFILE_UPDATE',
+                        route: '',
+                    },
+                });
+            } catch (error) {
+                console.log('Error sending phone change notification:', error);
+            }
+        }
 
         return {
             data: {
@@ -1974,13 +2037,34 @@ export default class AdminService {
         });
 
         // Send push notification to user
-        await this._notificationService.sendPushNotificationByUserId(
-            userId,
-            'Email Address Updated',
-            `Your email address has been updated to ${normalizedEmail}.`,
-            {},
-            'PROFILE_UPDATE',
-        );
+        const deviceTokens = await this._dbService.deviceToken.findMany({
+            where: {
+                userId: userId,
+                deletedAt: null,
+            },
+            select: {
+                token: true,
+            },
+        });
+
+        const userTokens = extractTokens(deviceTokens);
+
+        if (userTokens?.length) {
+            try {
+                await this._notificationService.SendNotificationToMultipleTokens({
+                    tokens: userTokens,
+                    title: 'Email Address Updated',
+                    body: `Your email address has been updated to ${normalizedEmail}.`,
+                    notificationData: {
+                        orderId: '',
+                        key: 'PROFILE_UPDATE',
+                        route: '',
+                    },
+                });
+            } catch (error) {
+                console.log('Error sending email change notification:', error);
+            }
+        }
 
         return {
             data: {
