@@ -156,7 +156,7 @@ export default class CronService {
         // console.log('++++++++++ Cron Job: Yearly Reset of User Levels Finished ++++++++++');
     }
 
-    @Cron(CronExpression.EVERY_30_MINUTES, { name: 'cancel-card-unpaid-orders' })
+    @Cron(CronExpression.EVERY_30_MINUTES, { name: 'cancel-card-and-applepay-unpaid-orders' })
     async HandleCancelUnpaidCardOrders() {
         // console.log('++++++++++ Cron Job: Cancel Card Unpaid Orders Started ++++++++++');
         try {
@@ -164,7 +164,7 @@ export default class CronService {
                 where: {
                     AND: {
                         paymentStatus: PaymentStatus.PENDING,
-                        paymentType: PaymentType.CARD,
+                        paymentType: { in: [PaymentType.CARD, PaymentType.APPLEPAY] },
                         orderType: OrderType.REGISTERED_LAUNDRY,
                         status: { not: OrderStatus.CANCELLED },
                     },
