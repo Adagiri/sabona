@@ -106,7 +106,7 @@ class AssignedOrder {
     customLaundryLong?: number;
 
     @ApiProperty({ type: AssignedOrderUser })
-    user: AssignedOrderUser;
+    user?: AssignedOrderUser;
 
     @ApiProperty({ type: AssignedOrderLaundry, required: false })
     laundry?: AssignedOrderLaundry;

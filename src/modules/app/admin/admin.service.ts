@@ -41,10 +41,7 @@ import { BooleanResponseDTO } from 'src/core/response/response.schema';
 import { GetAdminSettingsResponseDTO } from './dto/response/adminSettings.response';
 import { DeleteUserRequestDTO } from './dto/request/deleteUser.request';
 import { DeleteUserResponseDTO } from './dto/response/deleteUser.response';
-import {
-    DEFAULT_LAUNDRY_TEMPLATE,
-    DEFAULT_SERVICES,
-} from '../../../constants/laundry-template';
+import { DEFAULT_LAUNDRY_TEMPLATE, DEFAULT_SERVICES } from '../../../constants/laundry-template';
 import { EditUserRequestDTO, ChangePhoneRequestDTO, ChangeEmailRequestDTO } from './dto/request/editUser.request';
 import { EditUserResponseDTO, ChangePhoneResponseDTO, ChangeEmailResponseDTO } from './dto/response/editUser.response';
 import {
@@ -1425,6 +1422,7 @@ export default class AdminService {
     }
 
     async acceptOrder(orderId: string, adminUser: User): Promise<any> {
+        console.log(typeof adminUser)
         // Verify order exists and is PENDING
         const order = await this._dbService.order.findUnique({
             where: { id: orderId },
@@ -1482,7 +1480,6 @@ export default class AdminService {
                     status: UserStatus.ACTIVE,
                     deletedAt: null,
                 },
-                isAvailable: true,
             },
             include: {
                 user: true,
@@ -1657,10 +1654,7 @@ export default class AdminService {
         const dLon = this.deg2rad(lon2 - lon1);
         const a =
             Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(this.deg2rad(lat1)) *
-                Math.cos(this.deg2rad(lat2)) *
-                Math.sin(dLon / 2) *
-                Math.sin(dLon / 2);
+            Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
     }

@@ -945,7 +945,7 @@ export default class AdminController {
         @Param('orderId') orderId: string,
         @Body() data: CancelCustomOrderRequestDTO,
     ): Promise<any> {
-        return await this._customOrderService.cancelCustomOrder(orderId, data.reason, data.refundCustomer);
+        return await this._customOrderService.cancelCustomOrder(orderId, data.reason);
     }
 
     @Authorized(UserType.ADMIN)

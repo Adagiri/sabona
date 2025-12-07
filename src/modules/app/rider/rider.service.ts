@@ -50,12 +50,15 @@ export default class RiderService {
                         orderNumber: true,
                         status: true,
                         totalAmount: true,
+                        orderType: true,
                         pickup: {
                             select: {
                                 pickupLat: true,
                                 pickupLong: true,
                                 pickupAddress: true,
                                 status: true,
+                                pickupDate: true,
+                                pickupTime: true
                             },
                         },
                         delivery: {
@@ -103,7 +106,7 @@ export default class RiderService {
             }
         }
 
-        return { data: transformedOrders };
+        return {data: transformedOrders}
     }
 
     /**
@@ -167,7 +170,8 @@ export default class RiderService {
                                         serviceName: true,
                                         vendorPriceSnapshot: true,
                                         platformPriceSnapshot: true,
-                                        expressPriceSnapshot: true,
+                                        expressVendorPriceSnapshot: true,
+                                        expressPlatformPriceSnapshot: true,
                                         // Current item reference
                                         laundryServiceItem: {
                                             select: {
