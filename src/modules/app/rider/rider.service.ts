@@ -25,8 +25,8 @@ export default class RiderService {
     }
 
     /**
-     * Get orders assigned to this specific rider
-     * NO MORE general order list - only assigned orders
+     * Get orders assigned to this specific rider (LIGHTWEIGHT - for list view)
+     * Returns basic info only for performance
      */
     async getRides(user: User): Promise<GetRideRequestsResponseDTO> {
         // Get orders specifically assigned to this rider
@@ -40,57 +40,30 @@ export default class RiderService {
                     },
                 },
             },
-            include: {
+            select: {
+                id: true,
+                type: true,
+                assignedAt: true,
                 order: {
-                    include: {
-                        user: {
-                            select: {
-                                firstName: true,
-                                lastName: true,
-                                phone: true,
-                            },
-                        },
-                        laundry: {
-                            select: {
-                                name: true,
-                                address: true,
-                                lat: true,
-                                long: true,
-                            },
-                        },
-                        services: {
-                            select: {
-                                items: {
-                                    select: {
-                                        quantity: true,
-                                        laundryServiceItem: {
-                                            select: {
-                                                name: true,
-                                                platformPrice: true,
-                                                expressPlatformPrice: true
-                                            },
-                                        },
-                                    },
-                                },
-                            },
-                        },
+                    select: {
+                        id: true,
+                        orderNumber: true,
+                        status: true,
+                        totalAmount: true,
                         pickup: {
                             select: {
-                                pickupAddress: true,
                                 pickupLat: true,
                                 pickupLong: true,
+                                pickupAddress: true,
                                 status: true,
-                                pickupDate: true,
-                                pickupTime: true,
                             },
                         },
                         delivery: {
                             select: {
-                                deliveryAddress: true,
                                 deliveryLat: true,
                                 deliveryLong: true,
+                                deliveryAddress: true,
                                 status: true,
-                                deliveryDate: true,
                             },
                         },
                     },
@@ -131,6 +104,138 @@ export default class RiderService {
         }
 
         return { data: transformedOrders };
+    }
+
+    /**
+     * Get single ride with full order details (for detail view)
+     * Includes customer, pickup, delivery, items with snapshots, and laundry info
+     */
+    async getRideById(rideId: string, user: User): Promise<{ data: any }> {
+        // Verify rider is assigned to this ride
+        const riderAssignment = await this._dbService.riderOrder.findFirst({
+            where: {
+                id: rideId,
+                riderId: user.id,
+                deletedAt: null,
+            },
+            include: {
+                order: {
+                    include: {
+                        // Customer details
+                        user: {
+                            select: {
+                                id: true,
+                                firstName: true,
+                                lastName: true,
+                                phone: true,
+                                email: true,
+                            },
+                        },
+                        // Laundry details
+                        laundry: {
+                            select: {
+                                id: true,
+                                name: true,
+                                address: true,
+                                lat: true,
+                                long: true,
+                                vendor: {
+                                    select: {
+                                        phone: true,
+                                        firstName: true,
+                                        lastName: true,
+                                    },
+                                },
+                            },
+                        },
+                        // Service items with snapshots
+                        services: {
+                            select: {
+                                id: true,
+                                laundryService: {
+                                    select: {
+                                        name: true,
+                                        description: true,
+                                    },
+                                },
+                                items: {
+                                    select: {
+                                        id: true,
+                                        quantity: true,
+                                        // Snapshot fields
+                                        itemName: true,
+                                        serviceName: true,
+                                        vendorPriceSnapshot: true,
+                                        platformPriceSnapshot: true,
+                                        expressPriceSnapshot: true,
+                                        // Current item reference
+                                        laundryServiceItem: {
+                                            select: {
+                                                id: true,
+                                                name: true,
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        // Pickup details
+                        pickup: {
+                            select: {
+                                id: true,
+                                pickupAddress: true,
+                                pickupLat: true,
+                                pickupLong: true,
+                                pickupDate: true,
+                                pickupTime: true,
+                                status: true,
+                            },
+                        },
+                        // Delivery details
+                        delivery: {
+                            select: {
+                                id: true,
+                                deliveryAddress: true,
+                                deliveryLat: true,
+                                deliveryLong: true,
+                                deliveryDate: true,
+                                deliveryTime: true,
+                                status: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        if (!riderAssignment) {
+            throw new BadRequestException('Ride not found or you are not assigned to this ride');
+        }
+
+        // Calculate distance to pickup if driver location available
+        let distanceToPickup = null;
+        const driverLocation = await this._dbService.userLocation.findUnique({
+            where: { userId: user.id },
+        });
+
+        if (driverLocation && riderAssignment.order.pickup) {
+            distanceToPickup = this._locationService['calculateDistance'](
+                driverLocation.lat,
+                driverLocation.long,
+                riderAssignment.order.pickup.pickupLat,
+                riderAssignment.order.pickup.pickupLong,
+            );
+        }
+
+        return {
+            data: {
+                assignmentId: riderAssignment.id,
+                assignmentType: riderAssignment.type,
+                assignedAt: riderAssignment.assignedAt,
+                distanceToPickup,
+                order: riderAssignment.order,
+            },
+        };
     }
 
     /**

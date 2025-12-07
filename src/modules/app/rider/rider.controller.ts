@@ -20,11 +20,21 @@ export default class RiderController {
     @Authorized()
     @Get({
         path: '/rides',
-        description: 'Get requests and rides',
+        description: 'Get requests and rides (lightweight)',
         response: GetRideRequestsResponseDTO,
     })
     async getRideRequests(@CurrentUser() user: User): Promise<GetRideRequestsResponseDTO> {
         return await this._riderService.getRides(user);
+    }
+
+    @Authorized()
+    @Get({
+        path: '/rides/:rideId',
+        description: 'Get single ride with full order details',
+        response: {},
+    })
+    async getRideById(@Param('rideId') rideId: string, @CurrentUser() user: User): Promise<any> {
+        return await this._riderService.getRideById(rideId, user);
     }
 
     @Authorized()

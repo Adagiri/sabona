@@ -3,7 +3,7 @@ import DatabaseService from '../../../database/database.service';
 import { AllOrderListDto } from './dto/response/allorderlist.response.dto';
 import FindUsersRequestDTO from '../user/dto/request/find.request';
 import FindUsersResponseDTO from '../user/dto/response/find.response';
-import { DeliveryStatus, OrderStatus, PaymentStatus, Prisma, ServiceChargeType, User, UserStatus, UserType } from '@prisma/client';
+import { OrderStatus, PaymentStatus, Prisma, ServiceChargeType, User, UserStatus, UserType } from '@prisma/client';
 import {
     extractTokens,
     GetDateFilterOptions,
@@ -45,7 +45,6 @@ import {
     DEFAULT_LAUNDRY_TEMPLATE,
     DEFAULT_SERVICES,
 } from '../../../constants/laundry-template';
-import PayTabsService from '../paytabs/paytabs.service';
 import { EditUserRequestDTO, ChangePhoneRequestDTO, ChangeEmailRequestDTO } from './dto/request/editUser.request';
 import { EditUserResponseDTO, ChangePhoneResponseDTO, ChangeEmailResponseDTO } from './dto/response/editUser.response';
 import {
@@ -63,7 +62,6 @@ export default class AdminService {
         private _notificationService: NotificationService,
         private _s3service: S3Service,
         private _mediaService: MediaService,
-        private _payTabsService: PayTabsService,
     ) {}
 
     async GetAllOrders(data: FindOrderRequestDTO): Promise<AllOrderListDto> {
@@ -1350,7 +1348,7 @@ export default class AdminService {
         };
     }
 
-    async cancelOrder(orderId: string, reason: string): Promise<any> {
+    async cancelOrder(orderId: string, reason: string, refundCustomer?: boolean): Promise<any> {
         const order = await this._dbService.order.findUnique({
             where: { id: orderId },
             include: {
@@ -1367,42 +1365,15 @@ export default class AdminService {
             throw new BadRequestException('Order already cancelled');
         }
 
-        // Process refund BEFORE database transaction if order was paid
-        let refundProcessed = false;
-        if (order.paid && order.payment?.transactionRef) {
-            try {
-                await this._payTabsService.processRefund(
-                    order.payment.transactionRef,
-                    order.totalAmount,
-                    orderId,
-                    reason,
-                );
-                refundProcessed = true;
-                console.log(`Refund processed successfully for order ${orderId}`);
-            } catch (error) {
-                console.error(`Failed to process refund for order ${orderId}:`, error);
-                throw new BadRequestException(
-                    `Failed to process refund: ${error.message}. Order cancellation aborted.`,
-                );
-            }
-        }
-
-        // Update database in transaction
         await this._dbService.$transaction(async (tx) => {
-            // Cancel the order
             await tx.order.update({
                 where: { id: orderId },
                 data: {
                     status: OrderStatus.CANCELLED,
                     cancelReason: reason,
-                    ...(refundProcessed && {
-                        paid: false,
-                        paymentStatus: PaymentStatus.REFUNDED,
-                    }),
                 },
             });
 
-            // Add status history
             await tx.orderStatusHistory.create({
                 data: {
                     orderId,
@@ -1411,63 +1382,37 @@ export default class AdminService {
                 },
             });
 
-            // Update payment record if refund was processed
-            if (refundProcessed && order.payment) {
-                await tx.payment.update({
-                    where: { orderId },
+            if (order.paid && refundCustomer) {
+                await tx.order.update({
+                    where: { id: orderId },
                     data: {
-                        status: 'REFUNDED',
-                        type: 'Refund',
+                        paid: false,
+                        paymentStatus: PaymentStatus.REFUNDED,
                     },
                 });
-            }
 
-            // Clean up VendorOrder (soft delete)
-            await tx.vendorOrder.updateMany({
-                where: { orderId },
-                data: { deletedAt: new Date() },
-            });
-
-            // Clean up Pickup (unassign rider and mark as cancelled)
-            const pickup = await tx.pickup.findUnique({ where: { orderId } });
-            if (pickup) {
-                await tx.pickup.update({
-                    where: { orderId },
-                    data: {
-                        status: OrderStatus.CANCELLED,
-                        riderId: null,
-                    },
-                });
-            }
-
-            // Clean up Delivery (unassign rider and mark as cancelled)
-            const delivery = await tx.delivery.findUnique({ where: { orderId } });
-            if (delivery) {
-                await tx.delivery.update({
-                    where: { orderId },
-                    data: {
-                        status: DeliveryStatus.CANCELLED,
-                        riderId: null,
-                    },
-                });
+                if (order.payment) {
+                    await tx.payment.update({
+                        where: { orderId },
+                        data: {
+                            status: 'REFUNDED',
+                            type: 'Refund',
+                        },
+                    });
+                }
             }
         });
 
-        // Notify customer
         const customerTokens = await this._dbService.deviceToken.findMany({
             where: { userId: order.userId, deletedAt: null },
         });
 
         if (customerTokens.length > 0) {
             const tokens = customerTokens.map((t) => t.token);
-            const notificationBody = refundProcessed
-                ? `Your order has been cancelled and refund has been processed. Reason: ${reason}`
-                : `Your order has been cancelled. Reason: ${reason}`;
-
             await this._notificationService.SendNotificationToMultipleTokens({
                 tokens,
                 title: 'Order Cancelled',
-                body: notificationBody,
+                body: `Your order has been cancelled. Reason: ${reason}`,
                 notificationData: {
                     orderId: order.id,
                     key: 'GET_ORDER_BY_ID',
@@ -1476,10 +1421,252 @@ export default class AdminService {
             });
         }
 
+        return { message: 'Order cancelled successfully' };
+    }
+
+    async acceptOrder(orderId: string, adminUser: User): Promise<any> {
+        // Verify order exists and is PENDING
+        const order = await this._dbService.order.findUnique({
+            where: { id: orderId },
+            include: {
+                laundry: {
+                    select: {
+                        id: true,
+                        name: true,
+                        lat: true,
+                        long: true,
+                        vendorId: true,
+                        vendor: {
+                            select: {
+                                id: true,
+                                firstName: true,
+                                lastName: true,
+                                phone: true,
+                            },
+                        },
+                    },
+                },
+                pickup: {
+                    select: {
+                        pickupLat: true,
+                        pickupLong: true,
+                    },
+                },
+                user: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                    },
+                },
+            },
+        });
+
+        if (!order) {
+            throw new BadRequestException('Order does not exist');
+        }
+
+        if (order.status !== OrderStatus.PENDING) {
+            throw new BadRequestException(`Order is already ${order.status}. Can only accept PENDING orders`);
+        }
+
+        if (!order.laundry) {
+            throw new BadRequestException('Order must have a laundry assigned');
+        }
+
+        // Find closest available driver (using same logic as vendor service)
+        const availableDrivers = await this._dbService.userLocation.findMany({
+            where: {
+                user: {
+                    type: UserType.RIDER,
+                    status: UserStatus.ACTIVE,
+                    deletedAt: null,
+                },
+                isAvailable: true,
+            },
+            include: {
+                user: true,
+            },
+        });
+
+        if (availableDrivers.length === 0) {
+            throw new BadRequestException('No available drivers found');
+        }
+
+        // Calculate distances and find closest
+        let closestDriver = availableDrivers[0];
+        let minDistance = this.calculateDistance(
+            order.pickup.pickupLat,
+            order.pickup.pickupLong,
+            closestDriver.lat,
+            closestDriver.long,
+        );
+
+        for (const driver of availableDrivers.slice(1)) {
+            const distance = this.calculateDistance(
+                order.pickup.pickupLat,
+                order.pickup.pickupLong,
+                driver.lat,
+                driver.long,
+            );
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestDriver = driver;
+            }
+        }
+
+        // Create rider assignment
+        await this._dbService.riderOrder.create({
+            data: {
+                orderId: orderId,
+                riderId: closestDriver.userId,
+                type: 'RIDER_PICKUP',
+            },
+        });
+
+        // Update pickup with assigned rider
+        await this._dbService.pickup.update({
+            where: { orderId: orderId },
+            data: { riderId: closestDriver.userId },
+        });
+
+        // Update order status to ACCEPTED
+        await this._dbService.order.update({
+            where: { id: orderId },
+            data: { status: OrderStatus.ACCEPTED },
+        });
+
+        // Create status history
+        await this._dbService.orderStatusHistory.create({
+            data: {
+                orderId,
+                status: OrderStatus.ACCEPTED,
+                timestamp: new Date(),
+            },
+        });
+
+        // Get device tokens for notifications
+        const customerDeviceTokens = await this._dbService.deviceToken.findMany({
+            where: { userId: order.userId, deletedAt: null },
+            select: { token: true },
+        });
+
+        const vendorDeviceTokens = await this._dbService.deviceToken.findMany({
+            where: { userId: order.laundry.vendorId, deletedAt: null },
+            select: { token: true },
+        });
+
+        const customerTokens = extractTokens(customerDeviceTokens);
+        const vendorTokens = extractTokens(vendorDeviceTokens);
+
+        // Notify customer
+        if (customerTokens.length > 0) {
+            await this._notificationService.SendNotificationToMultipleTokens({
+                tokens: customerTokens,
+                title: 'Order Accepted!',
+                body: `Your order at ${order.laundry.name} has been accepted and a driver has been assigned`,
+                notificationData: {
+                    orderId: order.id,
+                    key: 'GET_ORDER_BY_ID',
+                    route: 'TrackOrder',
+                },
+            });
+
+            await this._dbService.notification.create({
+                data: {
+                    userId: order.userId,
+                    orderId: order.id,
+                    message: `Your order at ${order.laundry.name} has been accepted and a driver has been assigned`,
+                    status: 'UNREAD',
+                    data: {
+                        orderId: order.id,
+                        key: 'GET_ORDER_BY_ID',
+                        route: 'TrackOrder',
+                    },
+                    type: 'ORDER_ACCEPTED',
+                },
+            });
+        }
+
+        // Notify vendor that admin accepted on their behalf
+        if (vendorTokens.length > 0) {
+            await this._notificationService.SendNotificationToMultipleTokens({
+                tokens: vendorTokens,
+                title: 'Order Auto-Accepted',
+                body: `Order #${order.orderNumber || order.id.slice(-8)} was accepted by admin. Driver assigned.`,
+                notificationData: {
+                    orderId: order.id,
+                    key: 'GET_ORDER_BY_ID',
+                    route: 'Track',
+                },
+            });
+
+            await this._dbService.notification.create({
+                data: {
+                    userId: order.laundry.vendorId,
+                    orderId: order.id,
+                    message: `Order #${order.orderNumber || order.id.slice(-8)} was accepted by admin. Driver assigned.`,
+                    status: 'UNREAD',
+                    data: {
+                        orderId: order.id,
+                        key: 'GET_ORDER_BY_ID',
+                        route: 'Track',
+                    },
+                    type: 'ORDER_ACCEPTED',
+                },
+            });
+        }
+
+        // Notify assigned driver
+        const driverTokens = await this._dbService.deviceToken.findMany({
+            where: { userId: closestDriver.userId, deletedAt: null },
+            select: { token: true },
+        });
+
+        if (driverTokens.length > 0) {
+            const tokens = extractTokens(driverTokens);
+            await this._notificationService.SendNotificationToMultipleTokens({
+                tokens,
+                title: 'New Pickup Assignment',
+                body: `You have been assigned to pickup from ${order.user.firstName} ${order.user.lastName}`,
+                notificationData: {
+                    orderId: order.id,
+                    key: 'GET_ORDER_BY_ID',
+                    route: 'RideDetails',
+                },
+            });
+        }
+
         return {
-            message: 'Order cancelled successfully',
-            refunded: refundProcessed,
+            message: 'Order accepted successfully',
+            data: {
+                orderId: order.id,
+                status: OrderStatus.ACCEPTED,
+                assignedDriver: {
+                    id: closestDriver.userId,
+                    name: `${closestDriver.user.firstName} ${closestDriver.user.lastName}`,
+                },
+            },
         };
+    }
+
+    // Helper method to calculate distance between two points (Haversine formula)
+    private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+        const R = 6371; // Earth's radius in km
+        const dLat = this.deg2rad(lat2 - lat1);
+        const dLon = this.deg2rad(lon2 - lon1);
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(this.deg2rad(lat1)) *
+                Math.cos(this.deg2rad(lat2)) *
+                Math.sin(dLon / 2) *
+                Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    private deg2rad(deg: number): number {
+        return deg * (Math.PI / 180);
     }
 
     async deleteUser(userId: string, data: DeleteUserRequestDTO, adminUser: User): Promise<DeleteUserResponseDTO> {
