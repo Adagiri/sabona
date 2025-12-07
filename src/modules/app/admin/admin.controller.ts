@@ -938,24 +938,34 @@ export default class AdminController {
     @Authorized(UserType.ADMIN)
     @Patch({
         path: '/custom-order/:orderId/cancel',
-        description: 'Cancel custom order (auto-refunds if paid)',
+        description: 'Cancel custom order',
         response: {},
     })
     async cancelCustomOrder(
         @Param('orderId') orderId: string,
         @Body() data: CancelCustomOrderRequestDTO,
     ): Promise<any> {
-        return await this._customOrderService.cancelCustomOrder(orderId, data.reason);
+        return await this._customOrderService.cancelCustomOrder(orderId, data.reason, data.refundCustomer);
     }
 
     @Authorized(UserType.ADMIN)
     @Patch({
         path: '/order/:orderId/cancel',
-        description: 'Cancel regular order (auto-refunds if paid)',
+        description: 'Cancel regular order',
         response: {},
     })
     async cancelOrder(@Param('orderId') orderId: string, @Body() data: CancelOrderRequestDTO): Promise<any> {
-        return await this._adminService.cancelOrder(orderId, data.reason);
+        return await this._adminService.cancelOrder(orderId, data.reason, data.refundCustomer);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/order/:orderId/accept',
+        description: 'Accept order on behalf of vendor',
+        response: {},
+    })
+    async acceptOrder(@Param('orderId') orderId: string, @CurrentUser() admin: User): Promise<any> {
+        return await this._adminService.acceptOrder(orderId, admin);
     }
 
     @Authorized(UserType.ADMIN)
