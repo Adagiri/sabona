@@ -37,7 +37,9 @@ import { WithdrawalModule } from './modules/app/withdrawal/withdrawal.module';
                 path: path.join(__dirname, '/i18n/'),
                 watch: true,
             },
-            resolvers: [new HeaderResolver(['locale'])],
+            resolvers: [
+                new HeaderResolver(['locale', 'accept-language']),
+            ],
         }),
         EventEmitterModule.forRoot(),
         RedisModule,
