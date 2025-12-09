@@ -827,7 +827,7 @@ export default class UserService {
         return {
             id: user.id,
             preferredLanguage: user.preferredLanguage,
-            message: 'user.language_updated_successfully',
+            message: 'Language preference updated successfully',
         };
     }
 }

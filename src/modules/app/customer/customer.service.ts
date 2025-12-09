@@ -614,7 +614,7 @@ export default class CustomerService {
             ]);
 
             if (feedbacksCreated.some((feedback) => feedback === true)) {
-                return { message: 'feedback.added_successfully' };
+                return { message: 'Feedback added successfully' };
             } else {
                 throw new BadRequestException('feedback.error_adding');
             }
