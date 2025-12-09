@@ -33,6 +33,7 @@ import LocationService from '../location/location.service';
 import { CalculateFeesRequestDTO } from './dto/request/calculateFees.request';
 import { CalculateFeesResponseDTO } from './dto/response/calculateFees.response';
 import { BooleanResponseDTO } from '../../../core/response/response.schema';
+import NotificationService from '../notification/notification.service';
 // import { BooleanResponseDTO } from 'src/core/response/response.schema';
 
 export interface FeeCalculationInput {
@@ -53,6 +54,7 @@ export default class CustomerService {
     constructor(
         private _dbService: DatabaseService,
         private _locationService: LocationService,
+        private _notificationService: NotificationService,
     ) {}
 
     async calculateOrderFees(data: CalculateFeesRequestDTO, userId?: string): Promise<CalculateFeesResponseDTO> {
@@ -396,11 +398,56 @@ export default class CustomerService {
                 },
             });
 
+            // Notify admins about new order
+            await this.notifyAdminsNewOrder(order.id, user);
+
             return {
                 data: order,
             };
         } catch (error) {
             console.log(error, 'Error while creating order');
+        }
+    }
+
+    /**
+     * Notify all admins about a new regular order
+     */
+    private async notifyAdminsNewOrder(orderId: string, customer: User): Promise<void> {
+        try {
+            // Get all admin users
+            const adminUsers = await this._dbService.user.findMany({
+                where: { type: 'ADMIN' },
+                select: { id: true },
+            });
+
+            if (!adminUsers || adminUsers.length === 0) {
+                return; // No admins to notify
+            }
+
+            const adminIds = adminUsers.map((admin) => admin.id);
+
+            // Send multilingual push notifications to admins
+            await this._notificationService.SendMultilingualNotificationToMultipleUsers(
+                adminIds,
+                'NEW_REGULAR_ORDER',
+                {
+                    orderId: orderId,
+                    key: 'FETCH_ORDERS',
+                    route: 'Orders',
+                },
+            );
+
+            // Create in-app notifications for admins
+            await this._notificationService.CreateInAppNotificationsForMultipleUsers(
+                adminIds,
+                'ORDER_PLACED',
+                `New order from ${customer.firstName || ''} ${customer.lastName || ''}`,
+                orderId,
+                { orderId, key: 'FETCH_ORDERS', route: 'Orders' },
+            );
+        } catch (error) {
+            console.error('Error notifying admins about new order:', error);
+            // Don't throw - notification failures shouldn't break order creation
         }
     }
 

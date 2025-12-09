@@ -14,6 +14,7 @@
     "errors.unauthorized": "Unauthorized resource",
     "errors.invalid_values": "Invalid values for ${values}",
     "errors.unindentified": "Unidentified error occurred",
+    "errors.unidentified": "Unidentified error occurred",
 
     "auth.invalid_credentials": "Invalid credentials",
     "auth.invalid_verification_code": "Invalid verification code",
