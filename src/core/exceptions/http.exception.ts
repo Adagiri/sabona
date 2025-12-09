@@ -72,12 +72,27 @@ export class HttpExceptionFilter implements ExceptionFilter {
             }
 
             // Default error handling
+            let translationKey = 'errors.unidentified';
+            let translationArgs = {};
+            let responseData = undefined;
+
+            // Handle case where exceptionResponse is a string
+            if (typeof exceptionResponse === 'string') {
+                // If it's a string, try to use it as a translation key
+                translationKey = exceptionResponse;
+            } else if (typeof exceptionResponse === 'object') {
+                // If it's an object, use the key property or the message property
+                translationKey = exceptionResponse.key || exceptionResponse.message || 'errors.unidentified';
+                translationArgs = exceptionResponse.data || {};
+                responseData = exceptionResponse.data;
+            }
+
             const ResponseToSend = {
-                message: this.i18n.translate(exceptionResponse.key || 'errors.unindentified', {
+                message: this.i18n.translate(translationKey, {
                     lang: locale,
-                    args: exceptionResponse.data,
+                    args: translationArgs,
                 }),
-                data: exceptionResponse?.data || undefined,
+                data: responseData,
             };
             (response as any).__ss_body = ResponseToSend;
             return response.status(status).json(ResponseToSend);

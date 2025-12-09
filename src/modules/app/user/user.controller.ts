@@ -16,6 +16,8 @@ import EditAddressResponseDTO from './dto/response/editAddress.response';
 import addCustomerAddressRequestDTO from './dto/request/addAddress.request';
 import { UpdateLocationResponseDTO } from './dto/response/update_location.response.dto';
 import { UpdateLocationRequestDTO } from './dto/request/update_location.request.dto';
+import UpdatePreferredLanguageRequestDTO from './dto/request/update_preferred_language.request';
+import UpdatePreferredLanguageResponseDTO from './dto/response/update_preferred_language.response';
 
 @ApiController({ version: '1', tag: 'user' })
 export default class UserController {
@@ -105,6 +107,19 @@ export default class UserController {
         @CurrentUser() user: User,
     ): Promise<UpdateLocationResponseDTO> {
         return this._userService.UpdateLocation(user.id, data.lat, data.long);
+    }
+
+    @Authorized()
+    @Patch({
+        path: '/user/preferred-language',
+        description: 'Update user preferred language for notifications',
+        response: UpdatePreferredLanguageResponseDTO,
+    })
+    async UpdatePreferredLanguage(
+        @Body() data: UpdatePreferredLanguageRequestDTO,
+        @CurrentUser() user: User,
+    ): Promise<UpdatePreferredLanguageResponseDTO> {
+        return this._userService.UpdatePreferredLanguage(user.id, data.preferredLanguage);
     }
 
     @Get({

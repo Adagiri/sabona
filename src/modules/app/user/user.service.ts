@@ -813,4 +813,21 @@ export default class UserService {
             message: 'Location updated successfully',
         };
     }
+
+    async UpdatePreferredLanguage(userId: string, preferredLanguage: string): Promise<any> {
+        const user = await this._dbService.user.update({
+            where: { id: userId },
+            data: { preferredLanguage },
+            select: {
+                id: true,
+                preferredLanguage: true,
+            },
+        });
+
+        return {
+            id: user.id,
+            preferredLanguage: user.preferredLanguage,
+            message: 'user.language_updated_successfully',
+        };
+    }
 }
