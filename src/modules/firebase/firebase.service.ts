@@ -41,13 +41,16 @@ export default class FirebaseService {
                 tokens,
                 data:
                     (notificationData && {
-                        orderId: notificationData.orderId,
+                        orderId: notificationData.orderId || '',
                         key: notificationData.key,
                         route: notificationData.route,
                     }) ||
                     {},
             };
+
+            console.log(message, 'message');
             const res = await admin.messaging().sendEachForMulticast(message);
+            console.log(JSON.stringify(res), 'response after notif sent');
             return res as SendMultipleNotificationResponseDTO;
         } catch (error) {
             throw new BadRequestException(`Failed to send notifications to multiple tokens: ${error.message}`);

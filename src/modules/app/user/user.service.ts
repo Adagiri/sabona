@@ -818,10 +818,6 @@ export default class UserService {
         const user = await this._dbService.user.update({
             where: { id: userId },
             data: { preferredLanguage },
-            select: {
-                id: true,
-                preferredLanguage: true,
-            },
         });
 
         return {
