@@ -68,7 +68,7 @@ export default class UserService {
         }
 
         if (AppConfig.APP.ENV === APP_ENV.TEST || ['+966563651254', '+966563651244'].indexOf(data.phone) !== -1) {
-            return { message: 'common.auth.login_code_sent' };
+            return { message: 'Login code sent' };
         } else {
             const response = await this._smsService.sendVerificationCode(data.phone);
 

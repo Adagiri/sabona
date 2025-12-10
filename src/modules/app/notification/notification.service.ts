@@ -236,7 +236,6 @@ export default class NotificationService {
                     whereConditions.createdAt.lte = new Date(data.registrationEndDate);
                 }
             }
-            console.log(whereConditions);
             // Get all users matching the filters
             let users = await this._dbService.user.findMany({
                 where: whereConditions,
@@ -253,11 +252,8 @@ export default class NotificationService {
                 },
             });
 
-            console.log(users.length, 'user length');
-
             // Filter by order count if specified
             if (data.minOrderCount !== undefined || data.maxOrderCount !== undefined) {
-                console.log(1);
                 users = users.filter((user) => {
                     const orderCount = user._count.Order;
                     if (data.minOrderCount !== undefined && orderCount < data.minOrderCount) {
@@ -272,7 +268,6 @@ export default class NotificationService {
 
             // Filter out users without device tokens
             const usersWithTokens = users.filter((user) => user.DeviceToken && user.DeviceToken.length > 0);
-            console.log(usersWithTokens.length, 'user with token count');
             if (usersWithTokens.length === 0) {
                 return {
                     message: 'No users found matching the specified filters',
@@ -294,7 +289,6 @@ export default class NotificationService {
                 tokensByLanguage[lang].push(...userTokens);
             });
 
-            console.log(usersWithTokens, 'user with tokens');
             let notificationsSent = 0;
 
             // Send notifications for each language group
