@@ -60,21 +60,21 @@ export default class UserService {
             where: { phone: data.phone },
         });
         if (!user) {
-            throw new BadRequestException('auth.phone_not_registered');
+            throw new BadRequestException('common.auth.phone_not_registered');
         }
 
         if (user.type === UserType.VENDOR) {
-            throw new BadRequestException('auth.phone_registered_as_vendor');
+            throw new BadRequestException('common.auth.phone_registered_as_vendor');
         }
 
         if (AppConfig.APP.ENV === APP_ENV.TEST || ['+966563651254', '+966563651244'].indexOf(data.phone) !== -1) {
-            return { message: 'auth.login_code_sent' };
+            return { message: 'common.auth.login_code_sent' };
         } else {
             const response = await this._smsService.sendVerificationCode(data.phone);
 
             console.log(response);
             if (!response) {
-                throw new BadRequestException('auth.error_sending_code');
+                throw new BadRequestException('common.auth.error_sending_code');
             }
             return {
                 message: 'Login code sent successfully',
@@ -140,7 +140,7 @@ export default class UserService {
         }
 
         if (!user) {
-            throw new BadRequestException('auth.error_creating_user');
+            throw new BadRequestException('common.auth.error_creating_user');
         }
 
         return {
@@ -249,7 +249,7 @@ export default class UserService {
             select: { id: true, email: true },
         });
         if (!user) {
-            throw new BadRequestException('auth.invalid_credentials');
+            throw new BadRequestException('common.auth.invalid_credentials');
         }
 
         const token = await this._authService.CreateSession(user.id);
@@ -275,7 +275,7 @@ export default class UserService {
         });
 
         if (existingUser) {
-            throw new BadRequestException('auth.email_already_exist'); // Already exists
+            throw new BadRequestException('common.auth.email_already_exist'); // Already exists
         }
 
         const user = await this._dbService.user.create({
@@ -327,7 +327,7 @@ export default class UserService {
         }
 
         if (!user) {
-            throw new BadRequestException('auth.error_creating_user');
+            throw new BadRequestException('common.auth.error_creating_user');
         }
 
         const token = await this._authService.CreateSession(user.id);
@@ -398,7 +398,7 @@ export default class UserService {
         }
 
         if (!user) {
-            throw new BadRequestException('auth.error_creating_user');
+            throw new BadRequestException('common.auth.error_creating_user');
         }
 
         const token = await this._authService.CreateSession(user.id);
@@ -560,7 +560,7 @@ export default class UserService {
                 return { token };
             }
         } else {
-            throw new BadRequestException('auth.invalid_token'); // Already exists
+            throw new BadRequestException('common.auth.invalid_token'); // Already exists
         }
     }
 
@@ -581,12 +581,12 @@ export default class UserService {
         });
 
         if (!user) {
-            throw new BadRequestException('auth.invalid_phone_or_password');
+            throw new BadRequestException('common.auth.invalid_phone_or_password');
         }
 
         // Check if user has a password set
         if (!user.password) {
-            throw new BadRequestException('auth.no_password_use_otp');
+            throw new BadRequestException('common.auth.no_password_use_otp');
         }
 
         // Verify password
@@ -600,7 +600,7 @@ export default class UserService {
             user.status !== UserStatus.ACTIVE &&
             ['+201221925690', '+201221825444', '+201221925330'].indexOf(data.phone) === -1
         ) {
-            throw new BadRequestException('auth.account_not_active');
+            throw new BadRequestException('common.auth.account_not_active');
         }
 
         // Generate token
@@ -616,7 +616,7 @@ export default class UserService {
         });
 
         if (!userDetails) {
-            throw new BadRequestException('user.notfound'); // Already exists
+            throw new BadRequestException('user.not_found'); // Already exists
         }
 
         // Filter out undefined/null values before updating
