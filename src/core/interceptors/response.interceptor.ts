@@ -1,8 +1,8 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { LocaleTranslation } from 'i18n';
 import { I18nService } from 'nestjs-i18n';
+import { LocaleTranslation } from 'src/i18n';
 @Injectable()
 export class ResponseInterceptor<T> implements NestInterceptor<T, any> {
     constructor(private readonly i18n: I18nService) {}

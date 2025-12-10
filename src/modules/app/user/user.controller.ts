@@ -119,6 +119,7 @@ export default class UserController {
         @Body() data: UpdatePreferredLanguageRequestDTO,
         @CurrentUser() user: User,
     ): Promise<UpdatePreferredLanguageResponseDTO> {
+        
         return this._userService.UpdatePreferredLanguage(user.id, data.preferredLanguage);
     }
 

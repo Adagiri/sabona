@@ -13,7 +13,7 @@ function _prepareBadRequestValidationErrors(errors: any) {
             Object.values(err.constraints)[0];
         Errors[err.property] = constraint
             ? constraint
-            : this.i18n.translate('errors.field_invalid', {
+            : this.i18n.translate('common.errors.field_invalid', {
                   args: { field: err.property },
                   lang: errors.lang,
               });
@@ -33,7 +33,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         const request = ctx.getRequest<Request>();
         const locale = request.headers[LOCALE_HEADER_KEY] as string;
 
-        // ✅ Prevent double responses
+        // Prevent double responses
         if (response.headersSent) {
             console.warn('[HttpExceptionFilter] Headers already sent — skipping response write.');
             return;
@@ -43,7 +43,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
             // Handle non-HttpException errors
             if (!(exception instanceof HttpException)) {
                 const ResponseToSend = {
-                    message: this.i18n.translate('errors.fatal', { lang: locale }),
+                    message: this.i18n.translate('common.errors.fatal', { lang: locale }),
                 };
                 (response as any).__ss_body = ResponseToSend;
                 return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json(ResponseToSend);
@@ -59,7 +59,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
                 Array.isArray(exceptionResponse.message)
             ) {
                 const ResponseToSend = {
-                    message: this.i18n.translate('errors.invalid_values', {
+                    message: this.i18n.translate('common.errors.invalid_values', {
                         args: {
                             values: exceptionResponse.message.map((x) => x.property).join(', '),
                         },
@@ -72,7 +72,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
             }
 
             // Default error handling
-            let translationKey = 'errors.unidentified';
+            let translationKey = 'common.errors.unidentified';
             let translationArgs = {};
             let responseData = undefined;
 
@@ -82,7 +82,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
                 translationKey = exceptionResponse;
             } else if (typeof exceptionResponse === 'object') {
                 // If it's an object, use the key property or the message property
-                translationKey = exceptionResponse.key || exceptionResponse.message || 'errors.unidentified';
+                translationKey = exceptionResponse.key || exceptionResponse.message || 'common.errors.unidentified';
                 translationArgs = exceptionResponse.data || {};
                 responseData = exceptionResponse.data;
             }

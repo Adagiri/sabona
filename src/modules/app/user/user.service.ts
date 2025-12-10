@@ -41,6 +41,7 @@ import { VendorLoginSendCodeResponseDTO } from './dto/response/vendorLoginSendCo
 import { VendorLoginVerifyCodeResponseDTO } from './dto/response/vendorLoginVerifyCode.response';
 import { HashPassword, ComparePassword } from '../../../helpers/util.helper';
 import { UpdateLocationResponseDTO } from './dto/response/update_location.response.dto';
+import { I18nService } from 'nestjs-i18n';
 
 @Injectable()
 export default class UserService {
@@ -51,6 +52,7 @@ export default class UserService {
         private _oauthService: OAuthService,
         private _smsService: SMSService,
         private _firebaseService: FirebaseService,
+        private readonly i18n: I18nService,
     ) {}
 
     async SendLoginCode(data: SendVerificationCodeRequestDTO): Promise<SendVerificationCodeResponseDTO> {
@@ -815,15 +817,20 @@ export default class UserService {
     }
 
     async UpdatePreferredLanguage(userId: string, preferredLanguage: string): Promise<any> {
-        const user = await this._dbService.user.update({
-            where: { id: userId },
-            data: { preferredLanguage },
-        });
+        try {
+            const user = await this._dbService.user.update({
+                where: { id: userId },
+                data: { preferredLanguage },
+            });
 
-        return {
-            id: user.id,
-            preferredLanguage: user.preferredLanguage,
-            message: 'user.language_updated_successfully',
-        };
+            const response = {
+                id: user.id,
+                preferredLanguage: user.preferredLanguage,
+                message: 'Language updated successfully',
+            };
+            return response;
+        } catch (error) {
+            console.log(error, ' : Error updaging language preference');
+        }
     }
 }

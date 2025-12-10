@@ -55,7 +55,7 @@ export default class NotificationService {
         });
 
         if (!notification) {
-            throw new BadRequestException('errors.fatal'); // Already exists
+            throw new BadRequestException('common.errors.fatal'); // Already exists
         }
 
         return { message: 'notification.marked_read' };

@@ -21,7 +21,7 @@ import AdminModule from './modules/app/admin/admin.module';
 import { NotificationModule } from './modules/app/notification/notification.module';
 import { FirebaseModule } from './modules/firebase/firebase.module';
 import PaymentsModule from './modules/app/payments/payments.module';
-import { I18nModule, HeaderResolver } from 'nestjs-i18n';
+import { HeaderResolver, I18nModule } from 'nestjs-i18n';
 import * as path from 'path';
 import CustomOrderModule from './modules/app/customOrder/customOrder.module';
 import PayTabsModule from './modules/app/paytabs/paytabs.module';
@@ -34,10 +34,11 @@ import { WithdrawalModule } from './modules/app/withdrawal/withdrawal.module';
         I18nModule.forRoot({
             fallbackLanguage: 'en',
             loaderOptions: {
-                path: path.join(__dirname, '/i18n/'),
+                path: path.join(__dirname, '../i18n/'),
                 watch: true,
             },
             resolvers: [new HeaderResolver(['locale'])],
+            logging: true, // Add this to debug
         }),
         EventEmitterModule.forRoot(),
         RedisModule,
@@ -60,7 +61,7 @@ import { WithdrawalModule } from './modules/app/withdrawal/withdrawal.module';
         PayTabsModule,
         AdminCustomOrderModule,
         IconModule,
-        WithdrawalModule
+        WithdrawalModule,
     ],
     controllers: [AppController],
     providers: [

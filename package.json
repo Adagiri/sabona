@@ -52,7 +52,6 @@
         "exceljs": "^4.4.0",
         "firebase-admin": "^13.0.2",
         "generate-pincode": "^6.0.0",
-        "i18n": "^0.15.1",
         "lodash": "^4.17.21",
         "moment-timezone": "^0.5.45",
         "nestjs-i18n": "^10.5.1",

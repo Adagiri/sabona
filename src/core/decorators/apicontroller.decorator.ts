@@ -1,6 +1,6 @@
-import { applyDecorators, Controller, UseFilters } from '@nestjs/common';
+import { applyDecorators, Controller } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { HttpExceptionFilter } from '../exceptions/http.exception';
+// import { HttpExceptionFilter } from '../exceptions/http.exception';
 
 type ApiControllerArgs = {
     path?: string;
@@ -12,6 +12,6 @@ export function ApiController(args: ApiControllerArgs) {
     return applyDecorators(
         ApiTags(args.tag || 'default'),
         Controller(args),
-        UseFilters(HttpExceptionFilter),
+        // UseFilters(HttpExceptionFilter),
     );
 }
