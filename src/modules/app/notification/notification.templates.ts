@@ -81,6 +81,36 @@ export const NOTIFICATION_TEMPLATES = {
             body: 'تم توصيل طلبك بنجاح',
         },
     },
+    ORDER_COMPLETED: {
+        en: {
+            title: 'Order Completed',
+            body: 'Your order has been completed successfully',
+        },
+        ar: {
+            title: 'تم إكمال الطلب',
+            body: 'تم إكمال طلبك بنجاح',
+        },
+    },
+    ORDER_PROCESSING: {
+        en: {
+            title: 'Order Processing',
+            body: 'Your order is being processed',
+        },
+        ar: {
+            title: 'جاري معالجة الطلب',
+            body: 'جاري معالجة طلبك',
+        },
+    },
+    ORDER_PAID: {
+        en: {
+            title: 'Payment Successful',
+            body: 'Your payment has been processed successfully',
+        },
+        ar: {
+            title: 'تم الدفع بنجاح',
+            body: 'تمت معالجة دفعتك بنجاح',
+        },
+    },
     PAYMENT_CONFIRMED: {
         en: {
             title: 'Payment Confirmed',
@@ -89,6 +119,26 @@ export const NOTIFICATION_TEMPLATES = {
         ar: {
             title: 'تم تأكيد الدفع',
             body: 'تم تأكيد دفعتك',
+        },
+    },
+    PAYMENT_FAILED: {
+        en: {
+            title: 'Payment Failed',
+            body: 'Your payment was unsuccessful. Please try again',
+        },
+        ar: {
+            title: 'فشل الدفع',
+            body: 'فشلت عملية الدفع. يرجى المحاولة مرة أخرى',
+        },
+    },
+    PAYMENT_REFUNDED: {
+        en: {
+            title: 'Payment Refunded',
+            body: 'Your payment has been refunded successfully',
+        },
+        ar: {
+            title: 'تم استرداد المبلغ',
+            body: 'تم استرداد مبلغك بنجاح',
         },
     },
 
@@ -133,6 +183,16 @@ export const NOTIFICATION_TEMPLATES = {
         ar: {
             title: 'طلب جديد',
             body: 'تم تقديم طلب جديد',
+        },
+    },
+    CUSTOM_ORDER_COMPLETE: {
+        en: {
+            title: 'Custom Order Complete',
+            body: 'Customer payment received for custom order',
+        },
+        ar: {
+            title: 'اكتمل الطلب المخصص',
+            body: 'تم استلام دفع العميل للطلب المخصص',
         },
     },
 
