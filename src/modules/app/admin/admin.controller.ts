@@ -968,6 +968,84 @@ export default class AdminController {
         return await this._adminService.acceptOrder(orderId, admin);
     }
 
+    // ============================================================================
+    // ADMIN ORDER MANAGEMENT - Quick Actions for Driver and Vendor Operations
+    // ============================================================================
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/order/:orderId/driver-accept-pickup',
+        description: 'Accept pickup ride on behalf of driver',
+        response: {},
+    })
+    async acceptPickupRide(@Param('orderId') orderId: string, @CurrentUser() admin: User): Promise<any> {
+        return await this._adminService.acceptPickupRide(orderId, admin);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/order/:orderId/driver-picked-up',
+        description: 'Mark order as picked up from customer on behalf of driver',
+        response: {},
+    })
+    async markPickedUp(@Param('orderId') orderId: string, @CurrentUser() admin: User): Promise<any> {
+        return await this._adminService.markPickedUp(orderId, admin);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/order/:orderId/driver-dropped-at-vendor',
+        description: 'Mark items dropped off at vendor on behalf of driver (triggers IN_PROGRESS)',
+        response: {},
+    })
+    async markDroppedAtVendor(@Param('orderId') orderId: string, @CurrentUser() admin: User): Promise<any> {
+        return await this._adminService.markDroppedAtVendor(orderId, admin);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/order/:orderId/mark-ready',
+        description: 'Mark order ready for delivery on behalf of vendor (triggers READY_FOR_PICKUP)',
+        response: {},
+    })
+    async markReadyForDelivery(@Param('orderId') orderId: string, @CurrentUser() admin: User): Promise<any> {
+        return await this._adminService.markReadyForDelivery(orderId, admin);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/order/:orderId/driver-accept-delivery',
+        description: 'Accept delivery ride on behalf of driver',
+        response: {},
+    })
+    async acceptDeliveryRide(@Param('orderId') orderId: string, @CurrentUser() admin: User): Promise<any> {
+        return await this._adminService.acceptDeliveryRide(orderId, admin);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/order/:orderId/driver-delivered',
+        description: 'Mark order as delivered to customer on behalf of driver (triggers COMPLETED)',
+        response: {},
+    })
+    async markDeliveredToCustomer(@Param('orderId') orderId: string, @CurrentUser() admin: User): Promise<any> {
+        return await this._adminService.markDeliveredToCustomer(orderId, admin);
+    }
+
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/order/:orderId/notes',
+        description: 'Add admin notes to order',
+        response: {},
+    })
+    async addOrderNotes(
+        @Param('orderId') orderId: string,
+        @Body() data: { notes: string },
+        @CurrentUser() admin: User,
+    ): Promise<any> {
+        return await this._adminService.addOrderNotes(orderId, data.notes, admin);
+    }
+
     @Authorized(UserType.ADMIN)
     @Patch({
         path: '/users/:userId/edit',

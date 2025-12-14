@@ -693,6 +693,7 @@ model Order {
   detergentType DetergentType? // Type of detergent used
   colorType     ColorType? // Type of color (light/dark/mixed)
   notes         String? // Additional notes for the order
+  adminNotes    String?              @db.Text // Admin notes for internal tracking
   createdAt     DateTime             @default(now()) @db.Timestamptz()
   updatedAt     DateTime             @default(now()) @updatedAt @db.Timestamptz()
   deletedAt     DateTime?            @db.Timestamptz()
