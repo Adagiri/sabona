@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
 import DatabaseService from '../../../database/database.service';
 import NotificationService from '../notification/notification.service';
-import { extractTokens } from 'src/helpers/util.helper';
 import { OrderStatus, OrderType, User } from '@prisma/client';
 import { UpdateOrderStatusResponseDTO, AddOrderNotesResponseDTO } from './dto/response/updateOrderStatus.response';
 
@@ -25,7 +24,7 @@ export default class AdminOrderManagementService {
      * Equivalent to: PATCH /rider/:orderId/ACCEPT
      */
     async acceptPickupRide(orderId: string, adminUser: User): Promise<UpdateOrderStatusResponseDTO> {
-        console.log(typeof adminUser)
+        console.log(typeof adminUser);
         const order = await this._dbService.order.findUnique({
             where: { id: orderId },
             include: {
@@ -55,15 +54,11 @@ export default class AdminOrderManagementService {
 
         // Notify customer
         if (order.user.id) {
-            await this._notificationService.SendMultilingualNotificationToUser(
-                order.user.id,
-                'ORDER_ACCEPTED',
-                {
-                    orderId: order.id,
-                    key: 'GET_ORDER_BY_ID',
-                    route: 'TrackOrder',
-                },
-            );
+            await this._notificationService.SendMultilingualNotificationToUser(order.user.id, 'ORDER_ACCEPTED', {
+                orderId: order.id,
+                key: 'GET_ORDER_BY_ID',
+                route: 'TrackOrder',
+            });
         }
 
         // Notify vendor
@@ -120,15 +115,11 @@ export default class AdminOrderManagementService {
 
         // Notify customer
         if (order.user.id) {
-            await this._notificationService.SendMultilingualNotificationToUser(
-                order.user.id,
-                'ORDER_PICKED_UP',
-                {
-                    orderId: order.id,
-                    key: 'GET_ORDER_BY_ID',
-                    route: 'TrackOrder',
-                },
-            );
+            await this._notificationService.SendMultilingualNotificationToUser(order.user.id, 'ORDER_PICKED_UP', {
+                orderId: order.id,
+                key: 'GET_ORDER_BY_ID',
+                route: 'TrackOrder',
+            });
         }
 
         return {
@@ -192,7 +183,7 @@ export default class AdminOrderManagementService {
         if (order.laundry?.vendorId) {
             await this._notificationService.SendMultilingualNotificationToUser(
                 order.laundry.vendorId,
-                'ORDER_PROCESSING',
+                'ORDER_IN_PROGRESS',
                 {
                     orderId: order.id,
                     key: 'GET_ORDER_BY_ID',
@@ -282,40 +273,46 @@ export default class AdminOrderManagementService {
      */
     async acceptDeliveryRide(orderId: string, adminUser: User): Promise<UpdateOrderStatusResponseDTO> {
         console.log(typeof adminUser);
+        console.log('I raaaaaaaan');
+        try {
+            const order = await this._dbService.order.findUnique({
+                where: { id: orderId },
+                include: {
+                    delivery: { select: { riderId: true, status: true } },
+                },
+            });
 
-        const order = await this._dbService.order.findUnique({
-            where: { id: orderId },
-            include: {
-                delivery: { select: { riderId: true, status: true } },
-            },
-        });
+            if (!order) {
+                throw new BadRequestException('Order not found');
+            }
 
-        if (!order) {
-            throw new BadRequestException('Order not found');
+            if (order.status !== OrderStatus.READY_FOR_PICKUP) {
+                throw new BadRequestException('Order must be in READY_FOR_PICKUP status');
+            }
+
+            console.log(order.delivery, 'order delivery');
+
+            if (!order.delivery?.riderId) {
+                throw new BadRequestException('No delivery driver assigned to this order');
+            }
+
+            // Update delivery status to accepted
+            await this._dbService.delivery.update({
+                where: { orderId: orderId },
+                data: { status: 'ACCEPTED' },
+            });
+
+            return {
+                message: 'Delivery ride accepted successfully on behalf of driver',
+                data: {
+                    orderId: order.id,
+                    status: order.status,
+                    updatedAt: new Date(),
+                },
+            };
+        } catch (error) {
+            console.log(error, ' :::Error during acception of delivery ride');
         }
-
-        if (order.status !== OrderStatus.READY_FOR_PICKUP) {
-            throw new BadRequestException('Order must be in READY_FOR_PICKUP status');
-        }
-
-        if (!order.delivery?.riderId) {
-            throw new BadRequestException('No delivery driver assigned to this order');
-        }
-
-        // Update delivery status to accepted
-        await this._dbService.delivery.update({
-            where: { orderId: orderId },
-            data: { status: 'ACCEPTED' },
-        });
-
-        return {
-            message: 'Delivery ride accepted successfully on behalf of driver',
-            data: {
-                orderId: order.id,
-                status: order.status,
-                updatedAt: new Date(),
-            },
-        };
     }
 
     /**
@@ -363,15 +360,11 @@ export default class AdminOrderManagementService {
 
         // Notify customer
         if (order.user.id) {
-            await this._notificationService.SendMultilingualNotificationToUser(
-                order.user.id,
-                'ORDER_COMPLETED',
-                {
-                    orderId: order.id,
-                    key: 'GET_ORDER_BY_ID',
-                    route: 'Orders',
-                },
-            );
+            await this._notificationService.SendMultilingualNotificationToUser(order.user.id, 'ORDER_COMPLETED', {
+                orderId: order.id,
+                key: 'GET_ORDER_BY_ID',
+                route: 'Orders',
+            });
         }
 
         return {
@@ -417,259 +410,4 @@ export default class AdminOrderManagementService {
             },
         };
     }
-
-    /**
-     * Accept order on behalf of vendor (assigns driver and updates status)
-     * Equivalent to: PATCH /vendor/:orderId/ACCEPTED
-     */
-    async acceptOrder(orderId: string, adminUser: User): Promise<UpdateOrderStatusResponseDTO> {
-        // Verify order exists and is PENDING
-        const order = await this._dbService.order.findUnique({
-            where: { id: orderId },
-            include: {
-                laundry: {
-                    select: {
-                        id: true,
-                        name: true,
-                        lat: true,
-                        long: true,
-                        vendorId: true,
-                    },
-                },
-                pickup: {
-                    select: {
-                        pickupLat: true,
-                        pickupLong: true,
-                    },
-                },
-                user: {
-                    select: {
-                        id: true,
-                        firstName: true,
-                        lastName: true,
-                    },
-                },
-            },
-        });
-
-        if (!order) {
-            throw new BadRequestException('Order does not exist');
-        }
-
-        if (order.status !== OrderStatus.PENDING) {
-            throw new BadRequestException(`Order is already ${order.status}. Can only accept PENDING orders`);
-        }
-
-        if (!order.laundry) {
-            throw new BadRequestException('Order must have a laundry assigned');
-        }
-
-        // Find closest available driver
-        const availableDrivers = await this._dbService.userLocation.findMany({
-            where: {
-                user: {
-                    type: 'RIDER',
-                    status: 'ACTIVE',
-                    deletedAt: null,
-                },
-            },
-            include: {
-                user: true,
-            },
-        });
-
-        if (availableDrivers.length === 0) {
-            throw new BadRequestException('No available drivers found');
-        }
-
-        // Calculate distances and find closest
-        let closestDriver = availableDrivers[0];
-        let minDistance = this.calculateDistance(
-            order.pickup.pickupLat,
-            order.pickup.pickupLong,
-            closestDriver.lat,
-            closestDriver.long,
-        );
-
-        for (const driver of availableDrivers.slice(1)) {
-            const distance = this.calculateDistance(
-                order.pickup.pickupLat,
-                order.pickup.pickupLong,
-                driver.lat,
-                driver.long,
-            );
-            if (distance < minDistance) {
-                minDistance = distance;
-                closestDriver = driver;
-            }
-        }
-
-        // Create rider assignment
-        await this._dbService.riderOrder.create({
-            data: {
-                orderId: orderId,
-                riderId: closestDriver.userId,
-                type: RiderOrderType.RIDER_PICKUP,
-            },
-        });
-
-        // Update pickup with assigned rider
-        await this._dbService.pickup.update({
-            where: { orderId: orderId },
-            data: { riderId: closestDriver.userId },
-        });
-
-        // Update order status to ACCEPTED
-        await this._dbService.order.update({
-            where: { id: orderId },
-            data: { status: OrderStatus.ACCEPTED },
-        });
-
-        // Create status history
-        await this._dbService.orderStatusHistory.create({
-            data: {
-                orderId,
-                status: OrderStatus.ACCEPTED,
-                timestamp: new Date(),
-            },
-        });
-
-        // Notify customer
-        if (order.user.id) {
-            await this._notificationService.SendMultilingualNotificationToUser(
-                order.user.id,
-                'ORDER_ACCEPTED',
-                {
-                    orderId: order.id,
-                    key: 'GET_ORDER_BY_ID',
-                    route: 'TrackOrder',
-                },
-            );
-        }
-
-        // Notify assigned driver
-        if (closestDriver.userId) {
-            await this._notificationService.SendMultilingualNotificationToUser(
-                closestDriver.userId,
-                'NEW_PICKUP_REQUEST',
-                {
-                    orderId: order.id,
-                    key: 'GET_ORDER_BY_ID',
-                    route: 'RideDetails',
-                },
-            );
-        }
-
-        return {
-            message: 'Order accepted successfully on behalf of vendor',
-            data: {
-                orderId: order.id,
-                status: OrderStatus.ACCEPTED,
-                assignedDriver: {
-                    id: closestDriver.userId,
-                    name: `${closestDriver.user.firstName} ${closestDriver.user.lastName}`,
-                },
-                updatedAt: new Date(),
-            },
-        };
-    }
-
-    /**
-     * Cancel order on behalf of admin
-     */
-    async cancelOrder(orderId: string, reason: string, refundCustomer?: boolean): Promise<UpdateOrderStatusResponseDTO> {
-        const order = await this._dbService.order.findUnique({
-            where: { id: orderId },
-            include: {
-                user: true,
-                payment: true,
-            },
-        });
-
-        if (!order) {
-            throw new BadRequestException('Order not found');
-        }
-
-        if (order.status === OrderStatus.CANCELLED) {
-            throw new BadRequestException('Order already cancelled');
-        }
-
-        await this._dbService.$transaction(async (tx) => {
-            await tx.order.update({
-                where: { id: orderId },
-                data: {
-                    status: OrderStatus.CANCELLED,
-                    cancelReason: reason,
-                },
-            });
-
-            await tx.orderStatusHistory.create({
-                data: {
-                    orderId,
-                    status: OrderStatus.CANCELLED,
-                    timestamp: new Date(),
-                },
-            });
-
-            if (order.paid && refundCustomer) {
-                await tx.order.update({
-                    where: { id: orderId },
-                    data: {
-                        paid: false,
-                        paymentStatus: 'REFUNDED',
-                    },
-                });
-
-                if (order.payment) {
-                    await tx.payment.update({
-                        where: { orderId },
-                        data: {
-                            status: 'REFUNDED',
-                            type: 'Refund',
-                        },
-                    });
-                }
-            }
-        });
-
-        // Notify customer
-        if (order.user.id) {
-            await this._notificationService.SendMultilingualNotificationToUser(
-                order.user.id,
-                'ORDER_REJECTED',
-                {
-                    orderId: order.id,
-                    key: 'GET_ORDER_BY_ID',
-                    route: 'TrackOrder',
-                },
-            );
-        }
-
-        return {
-            message: 'Order cancelled successfully',
-            data: {
-                orderId: order.id,
-                status: OrderStatus.CANCELLED,
-                refunded: order.paid && refundCustomer,
-                updatedAt: new Date(),
-            },
-        };
-    }
-
-    // Helper method to calculate distance between two points (Haversine formula)
-    private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-        const R = 6371; // Earth's radius in km
-        const dLat = this.deg2rad(lat2 - lat1);
-        const dLon = this.deg2rad(lon2 - lon1);
-        const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    }
-
-    private deg2rad(deg: number): number {
-        return deg * (Math.PI / 180);
-    }
-
 }
