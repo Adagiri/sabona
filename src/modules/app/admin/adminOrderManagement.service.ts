@@ -391,8 +391,8 @@ export default class AdminOrderManagementService {
 
         // Update order with admin notes
         const currentNotes = order.adminNotes || '';
-        const timestamp = new Date().toISOString();
-        const newNote = `[${timestamp}] (Admin: ${adminUser.firstName} ${adminUser.lastName}): ${notes}`;
+        const adminName = adminUser.name || 'NIL';
+        const newNote = `(Admin: ${adminName}): ${notes}`;
         const updatedNotes = currentNotes ? `${currentNotes}\n\n${newNote}` : newNote;
 
         await this._dbService.order.update({
@@ -405,7 +405,7 @@ export default class AdminOrderManagementService {
             data: {
                 orderId: order.id,
                 notes: newNote,
-                addedBy: `${adminUser.firstName} ${adminUser.lastName}`,
+                addedBy: adminName,
                 addedAt: new Date(),
             },
         };
