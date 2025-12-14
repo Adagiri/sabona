@@ -105,6 +105,40 @@ export default class AdminOrderManagementController {
         return await this._adminOrderService.markReadyForDelivery(orderId, adminUser);
     }
 
+    /**
+     * Accept order on behalf of vendor (assigns driver and updates status to ACCEPTED)
+     * Equivalent to vendor calling: PATCH /vendor/:orderId/ACCEPTED
+     */
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/order/:orderId/accept',
+        description: 'Accept order on behalf of vendor',
+        response: UpdateOrderStatusResponseDTO,
+    })
+    async acceptOrder(
+        @Param('orderId') orderId: string,
+        @CurrentUser() adminUser: User,
+    ): Promise<UpdateOrderStatusResponseDTO> {
+        return await this._adminOrderService.acceptOrder(orderId, adminUser);
+    }
+
+    /**
+     * Cancel order on behalf of admin
+     */
+    @Authorized(UserType.ADMIN)
+    @Patch({
+        path: '/order/:orderId/cancel',
+        description: 'Cancel order',
+        response: UpdateOrderStatusResponseDTO,
+    })
+    async cancelOrder(
+        @Param('orderId') orderId: string,
+        @Body() data: { reason: string; refundCustomer?: boolean },
+        @CurrentUser() adminUser: User,
+    ): Promise<UpdateOrderStatusResponseDTO> {
+        return await this._adminOrderService.cancelOrder(orderId, data.reason, data.refundCustomer);
+    }
+
     // ============================================================================
     // DRIVER DELIVERY ACTIONS (on behalf of delivery driver)
     // ============================================================================
