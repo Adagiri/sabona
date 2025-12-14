@@ -239,77 +239,32 @@ export default class VendorService {
                 const driverNotificationTokens = extractTokens(driverTokens);
 
                 // Notify customer about acceptance
-                if (customerTokens?.length) {
-                    const customerAcceptedNotificationData = {
-                        tokens: customerTokens,
-                        title: 'Order Accepted!',
-                        body: 'Your order has been accepted and a driver has been assigned.',
-                        notificationData: {
+                if (customer.userId) {
+                    await this._notificationService.SendMultilingualNotificationToUser(
+                        customer.userId,
+                        'ORDER_ACCEPTED',
+                        {
                             orderId: order.id,
                             key: 'GET_ORDER_BY_ID',
                             route: 'TrackOrder',
                         },
-                    };
-
-                    const res = await this._notificationService.SendNotificationToMultipleTokens(
-                        customerAcceptedNotificationData,
                     );
-
-                    if (res) {
-                        await this._dbService.notification.create({
-                            data: {
-                                orderId: order.id,
-                                userId: customer.userId,
-                                type: 'ORDER_ACCEPTED',
-                                message: 'Your order has been accepted and a driver has been assigned.',
-                                status: 'UNREAD',
-                                data: {
-                                    orderId: order.id,
-                                    key: 'GET_ORDER_BY_ID',
-                                    route: 'TrackOrder',
-                                },
-                            },
-                        });
-                    }
                 }
 
                 // Notify ONLY the assigned driver
-                if (driverNotificationTokens?.length) {
-                    const driverNotificationData = {
-                        tokens: driverNotificationTokens,
-                        title: 'New Pickup Assignment!',
-                        body: `Order #${order.orderNumber} has been accepted - ${closestDriver.distance}km away from ${order.laundry.name}`,
-                        notificationData: {
+                if (closestDriver.riderId) {
+                    await this._notificationService.SendMultilingualNotificationToUser(
+                        closestDriver.riderId,
+                        'NEW_PICKUP_REQUEST',
+                        {
                             orderId: order.id,
                             key: 'FETCH_ASSIGNED_ORDERS',
                             route: 'AssignedRides',
                         },
-                    };
-
-                    const res =
-                        await this._notificationService.SendNotificationToMultipleTokens(driverNotificationData);
-
-                    if (res) {
-                        await this._dbService.notification.create({
-                            data: {
-                                userId: closestDriver.riderId,
-                                orderId: order.id,
-                                message: `New pickup assignment - ${closestDriver.distance}km away from ${order.laundry.name}`,
-                                status: 'UNREAD',
-                                data: {
-                                    orderId: order.id,
-                                    key: 'FETCH_ASSIGNED_ORDERS',
-                                    route: 'AssignedRides',
-                                },
-                                type: 'ORDER_ACCEPTED',
-                            },
-                        });
-                        console.log('Driver assigned and notified');
-                    } else {
-                        console.log('Failed to notify driver');
-                    }
+                    );
+                    console.log('Driver assigned and notified');
                 } else {
-                    console.log('No driver tokens found');
+                    console.log('No driver assigned');
                 }
 
                 return { message: 'SUCCESS' };
@@ -401,44 +356,17 @@ export default class VendorService {
                 });
 
                 // Notify customer about rejection and refund
-                const notificationBody = refundProcessed
-                    ? 'Your order has been rejected by the vendor and your payment has been refunded.'
-                    : 'Your order has been rejected by the vendor';
-
-                const customerOrderRejectedNotificationData = {
-                    tokens: customerTokens,
-                    title: 'Order Rejected',
-                    body: notificationBody,
-                    notificationData: {
-                        orderId: order.id,
-                        key: 'FETCH_ORDERS',
-                        route: 'Orders',
-                    },
-                };
-
-                if (customerTokens?.length) {
-                    const res = await this._notificationService.SendNotificationToMultipleTokens(
-                        customerOrderRejectedNotificationData,
+                if (customer.userId) {
+                    await this._notificationService.SendMultilingualNotificationToUser(
+                        customer.userId,
+                        'ORDER_REJECTED',
+                        {
+                            orderId: order.id,
+                            key: 'FETCH_ORDERS',
+                            route: 'Orders',
+                        },
                     );
-                    if (res) {
-                        await this._dbService.notification.create({
-                            data: {
-                                userId: customer.userId,
-                                orderId: order.id,
-                                message: notificationBody,
-                                status: 'UNREAD',
-                                data: {
-                                    orderId: order.id,
-                                    key: 'FETCH_ORDERS',
-                                    route: 'Orders',
-                                },
-                                type: 'ORDER_REJECTED',
-                            },
-                        });
-                        console.log('Customer rejection notification created');
-                    } else {
-                        console.log('Failed to create notification');
-                    }
+                    console.log('Customer rejection notification sent');
                 }
 
                 return {
@@ -494,89 +422,31 @@ export default class VendorService {
                 const assignedRider = { riderId: closestDeliveryDriver.riderId };
 
                 // Notify customer
-                if (customerTokens?.length) {
-                    const customerReadyForPickupNotificationData = {
-                        tokens: customerTokens,
-                        title: 'Order Processed!',
-                        body: 'Your order is processed and will be delivered soon.',
-                        notificationData: {
+                if (customer.userId) {
+                    await this._notificationService.SendMultilingualNotificationToUser(
+                        customer.userId,
+                        'ORDER_READY_FOR_PICKUP',
+                        {
                             orderId: order.id,
                             key: 'GET_ORDER_BY_ID',
                             route: 'TrackOrder',
                         },
-                    };
-
-                    const res = await this._notificationService.SendNotificationToMultipleTokens(
-                        customerReadyForPickupNotificationData,
                     );
-                    if (res) {
-                        await this._dbService.notification.create({
-                            data: {
-                                userId: customer.userId,
-                                orderId: order.id,
-                                message: 'Your order is processed and will be delivered soon.',
-                                status: 'UNREAD',
-                                data: {
-                                    orderId: order.id,
-                                    key: 'GET_ORDER_BY_ID',
-                                    route: 'TrackOrder',
-                                },
-                                type: 'ORDER_PROCESSING',
-                            },
-                        });
-                        console.log('Customer Notification created');
-                    } else {
-                        console.log('Failed to create notification');
-                    }
+                    console.log('Customer notification sent');
                 }
 
                 // Notify ONLY the assigned driver
-                if (assignedRider) {
-                    const assignedDriverTokens = await this._dbService.deviceToken.findMany({
-                        where: {
-                            userId: assignedRider.riderId,
-                            deletedAt: null,
+                if (assignedRider?.riderId) {
+                    await this._notificationService.SendMultilingualNotificationToUser(
+                        assignedRider.riderId,
+                        'NEW_DELIVERY_REQUEST',
+                        {
+                            orderId: order.id,
+                            key: 'FETCH_ASSIGNED_ORDERS',
+                            route: 'AssignedRides',
                         },
-                        select: { token: true },
-                    });
-
-                    const assignedDriverNotificationTokens = extractTokens(assignedDriverTokens);
-
-                    if (assignedDriverNotificationTokens?.length) {
-                        const riderReadyForPickupNotificationData = {
-                            tokens: assignedDriverNotificationTokens,
-                            title: 'Order Ready for Pickup!',
-                            body: `Order #${order.orderNumber} is ready for pickup from ${order.laundry.name}`,
-                            notificationData: {
-                                orderId: order.id,
-                                key: 'FETCH_ASSIGNED_ORDERS',
-                                route: 'AssignedRides',
-                            },
-                        };
-
-                        const res = await this._notificationService.SendNotificationToMultipleTokens(
-                            riderReadyForPickupNotificationData,
-                        );
-                        if (res) {
-                            await this._dbService.notification.create({
-                                data: {
-                                    userId: assignedRider.riderId,
-                                    orderId: order.id,
-                                    message: `Order #${order.orderNumber} is ready for pickup`,
-                                    status: 'UNREAD',
-                                    data: {
-                                        orderId: order.id,
-                                        key: 'FETCH_ASSIGNED_ORDERS',
-                                        route: 'AssignedRides',
-                                    },
-                                    type: 'ORDER_PROCESSING',
-                                },
-                            });
-                            console.log('Assigned driver notified');
-                        }
-                    } else {
-                        console.log('No assigned driver tokens found');
-                    }
+                    );
+                    console.log('Assigned driver notified');
                 } else {
                     console.log('No assigned driver found for this order');
                 }

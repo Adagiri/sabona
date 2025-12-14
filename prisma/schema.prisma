@@ -203,7 +203,7 @@ model User {
   deletedAt        DateTime?  @db.Timestamptz() // Optional deleted at timestamp
   profilePicture   Media?     @relation(fields: [profilePictureId], references: [id])
 
-  preferredLanguage String? @default("en") // User's preferred language for notifications (en, ar)
+  preferredLanguage String? @default("ar") // User's preferred language for notifications (en, ar)
 
   level LEVEL? @default(BASIC) // User level
 
