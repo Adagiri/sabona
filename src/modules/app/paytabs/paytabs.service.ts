@@ -1,7 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import DatabaseService from '../../../database/database.service';
 import NotificationService from '../notification/notification.service';
-import { extractTokens } from 'src/helpers/util.helper';
 import * as crypto from 'crypto';
 import { Order, OrderStatus, OrderType, PaymentStatus, PaymentTransactionType } from '@prisma/client';
 import AppConfig from 'src/configs/app.config';
@@ -526,39 +525,15 @@ export default class PayTabsService {
      */
     private async sendCustomerSuccessNotification(order: any, title: string, body: string): Promise<void> {
         try {
-            const customerTokens = await this._dbService.deviceToken.findMany({
-                where: { userId: order.userId, deletedAt: null },
-            });
-
-            if (customerTokens.length > 0) {
-                const tokens = extractTokens(customerTokens);
-
-                await this._notificationService.SendNotificationToMultipleTokens({
-                    tokens: tokens,
-                    title: title,
-                    body: body,
-                    notificationData: {
-                        orderId: order.id,
-                        key: 'GET_ORDER_BY_ID',
-                        route: 'TrackOrder',
-                    },
-                });
-
-                // Create notification record
-                await this._dbService.notification.create({
-                    data: {
-                        userId: order.userId,
-                        orderId: order.id,
-                        message: title,
-                        status: 'UNREAD',
-                        type: 'ORDER_PAID',
-                        data: {
-                            orderId: order.id,
-                            transactionRef: order.payTabsTransactionRef,
-                        },
-                    },
-                });
-            }
+            await this._notificationService.SendMultilingualNotificationToUser(
+                order.userId,
+                'ORDER_PAID',
+                {
+                    orderId: order.id,
+                    key: 'GET_ORDER_BY_ID',
+                    route: 'TrackOrder',
+                },
+            );
         } catch (error) {
             console.error('Error sending customer success notification:', error);
             throw error;
@@ -573,30 +548,21 @@ export default class PayTabsService {
             const laundries = await this._dbService.laundry.findMany({
                 where: { id: order.laundryId },
                 include: {
-                    vendor: {
-                        include: {
-                            DeviceToken: {
-                                where: { deletedAt: null },
-                            },
-                        },
-                    },
+                    vendor: true,
                 },
             });
 
             for (const laundry of laundries) {
-                if (laundry.vendor.DeviceToken.length > 0) {
-                    const vendorTokens = extractTokens(laundry.vendor.DeviceToken);
-
-                    await this._notificationService.SendNotificationToMultipleTokens({
-                        tokens: vendorTokens,
-                        title: 'New Paid Order',
-                        body: `Order #${order.orderNumber} payment confirmed. Please accept or reject.`,
-                        notificationData: {
+                if (laundry.vendor?.id) {
+                    await this._notificationService.SendMultilingualNotificationToUser(
+                        laundry.vendor.id,
+                        'NEW_PAID_ORDER',
+                        {
                             orderId: order.id,
                             key: 'FETCH_VENDOR_REQUESTS',
                             route: 'Home',
                         },
-                    });
+                    );
                 }
             }
         } catch (error) {
@@ -613,28 +579,18 @@ export default class PayTabsService {
             // Get admin users
             const adminUsers = await this._dbService.user.findMany({
                 where: { type: 'ADMIN' },
-                include: {
-                    DeviceToken: {
-                        where: { deletedAt: null },
-                    },
-                },
             });
 
             for (const admin of adminUsers) {
-                if (admin.DeviceToken.length > 0) {
-                    const adminTokens = extractTokens(admin.DeviceToken);
-
-                    await this._notificationService.SendNotificationToMultipleTokens({
-                        tokens: adminTokens,
-                        title: 'Custom Order Complete',
-                        body: `Customer payment received for custom order #${order.orderNumber}. Order is now complete.`,
-                        notificationData: {
-                            orderId: order.id,
-                            key: 'CUSTOM_ORDER_COMPLETE',
-                            route: 'AdminOrders',
-                        },
-                    });
-                }
+                await this._notificationService.SendMultilingualNotificationToUser(
+                    admin.id,
+                    'CUSTOM_ORDER_COMPLETE',
+                    {
+                        orderId: order.id,
+                        key: 'CUSTOM_ORDER_COMPLETE',
+                        route: 'AdminOrders',
+                    },
+                );
             }
         } catch (error) {
             console.error('Error sending admin custom order complete notification:', error);
@@ -647,24 +603,15 @@ export default class PayTabsService {
      */
     private async sendPaymentFailureNotifications(order: any, additionalMessage: string): Promise<void> {
         try {
-            const customerTokens = await this._dbService.deviceToken.findMany({
-                where: { userId: order.userId, deletedAt: null },
-            });
-
-            if (customerTokens.length > 0) {
-                const tokens = extractTokens(customerTokens);
-
-                await this._notificationService.SendNotificationToMultipleTokens({
-                    tokens: tokens,
-                    title: 'Payment Failed',
-                    body: `Payment for order #${order.orderNumber} was unsuccessful. ${additionalMessage}`,
-                    notificationData: {
-                        orderId: order.id,
-                        key: 'GET_ORDER_BY_ID',
-                        route: 'TrackOrder',
-                    },
-                });
-            }
+            await this._notificationService.SendMultilingualNotificationToUser(
+                order.userId,
+                'PAYMENT_FAILED',
+                {
+                    orderId: order.id,
+                    key: 'GET_ORDER_BY_ID',
+                    route: 'TrackOrder',
+                },
+            );
         } catch (error) {
             console.error('Error sending payment failure notifications:', error);
             throw error;
@@ -826,24 +773,15 @@ export default class PayTabsService {
 
     private async sendPaymentRefundNotifications(order: any, message: string): Promise<void> {
         try {
-            const customerTokens = await this._dbService.deviceToken.findMany({
-                where: { userId: order.userId, deletedAt: null },
-            });
-
-            if (customerTokens.length > 0) {
-                const tokens = extractTokens(customerTokens);
-
-                await this._notificationService.SendNotificationToMultipleTokens({
-                    tokens: tokens,
-                    title: 'Payment Refunded',
-                    body: `Order #${order.orderNumber}: ${message}`,
-                    notificationData: {
-                        orderId: order.id,
-                        key: 'GET_ORDER_BY_ID',
-                        route: 'TrackOrder',
-                    },
-                });
-            }
+            await this._notificationService.SendMultilingualNotificationToUser(
+                order.userId,
+                'PAYMENT_REFUNDED',
+                {
+                    orderId: order.id,
+                    key: 'GET_ORDER_BY_ID',
+                    route: 'TrackOrder',
+                },
+            );
         } catch (error) {
             console.error('Error sending refund notifications:', error);
             throw error;
@@ -855,37 +793,17 @@ export default class PayTabsService {
      */
     private async notifyCustomerPaymentSuccess(order: any): Promise<void> {
         try {
-            if (!order.user?.DeviceToken?.length) return;
+            if (!order.userId) return;
 
-            const tokens = extractTokens(order.user.DeviceToken);
-
-            await this._notificationService.SendNotificationToMultipleTokens({
-                tokens: tokens,
-                title: 'Payment Confirmed!',
-                body: `Your payment for order #${order.orderNumber} has been received. Your order is now being processed.`,
-                notificationData: {
+            await this._notificationService.SendMultilingualNotificationToUser(
+                order.userId,
+                'ORDER_PAID',
+                {
                     orderId: order.id,
                     key: 'GET_ORDER_BY_ID',
                     route: 'TrackOrder',
                 },
-            });
-
-            // Create notification record
-            await this._dbService.notification.create({
-                data: {
-                    userId: order.userId,
-                    orderId: order.id,
-                    message: 'Payment Confirmed! Your order is now being processed.',
-                    status: 'UNREAD',
-                    type: 'ORDER_PAID',
-                    data: {
-                        orderId: order.id,
-                        transactionRef: order.payTabsTransactionRef,
-                        key: 'GET_ORDER_BY_ID',
-                        route: 'TrackOrder',
-                    },
-                },
-            });
+            );
         } catch (error) {
             console.error('Error notifying customer:', error);
         }
@@ -896,36 +814,17 @@ export default class PayTabsService {
      */
     private async notifyVendorNewPaidOrder(order: any): Promise<void> {
         try {
-            if (!order.laundry?.vendor?.DeviceToken?.length) return;
+            if (!order.laundry?.vendorId) return;
 
-            const tokens = extractTokens(order.laundry.vendor.DeviceToken);
-
-            await this._notificationService.SendNotificationToMultipleTokens({
-                tokens: tokens,
-                title: 'New Paid Order!',
-                body: `Order #${order.orderNumber} payment confirmed. Please accept or reject.`,
-                notificationData: {
+            await this._notificationService.SendMultilingualNotificationToUser(
+                order.laundry.vendorId,
+                'NEW_PAID_ORDER',
+                {
                     orderId: order.id,
                     key: 'FETCH_VENDOR_REQUESTS',
                     route: 'Home',
                 },
-            });
-
-            // Create notification record
-            await this._dbService.notification.create({
-                data: {
-                    userId: order.laundry.vendorId,
-                    orderId: order.id,
-                    message: `New paid order #${order.orderNumber}. Please accept or reject.`,
-                    status: 'UNREAD',
-                    type: 'ORDER_PAID',
-                    data: {
-                        orderId: order.id,
-                        key: 'FETCH_VENDOR_REQUESTS',
-                        route: 'Home',
-                    },
-                },
-            });
+            );
         } catch (error) {
             console.error('Error notifying vendor:', error);
         }
