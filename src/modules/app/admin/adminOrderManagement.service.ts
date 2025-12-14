@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
 import DatabaseService from '../../../database/database.service';
 import NotificationService from '../notification/notification.service';
-import { extractTokens } from 'src/helpers/util.helper';
 import { OrderStatus, OrderType, User } from '@prisma/client';
 import { UpdateOrderStatusResponseDTO, AddOrderNotesResponseDTO } from './dto/response/updateOrderStatus.response';
 
@@ -192,7 +191,7 @@ export default class AdminOrderManagementService {
         if (order.laundry?.vendorId) {
             await this._notificationService.SendMultilingualNotificationToUser(
                 order.laundry.vendorId,
-                'ORDER_PROCESSING',
+                'ORDER_IN_PROGRESS',
                 {
                     orderId: order.id,
                     key: 'GET_ORDER_BY_ID',

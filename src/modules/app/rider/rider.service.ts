@@ -306,6 +306,7 @@ export default class RiderService {
 
         const customerTokens = extractTokens(customerDeviceTokens);
         const vendorTokens = extractTokens(vendorDeviceTokens);
+console.log(typeof customerTokens, typeof vendorTokens)
 
         // Handle different status updates
         switch (params.status) {
