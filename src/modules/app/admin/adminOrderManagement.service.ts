@@ -24,7 +24,7 @@ export default class AdminOrderManagementService {
      * Equivalent to: PATCH /rider/:orderId/ACCEPT
      */
     async acceptPickupRide(orderId: string, adminUser: User): Promise<UpdateOrderStatusResponseDTO> {
-        console.log(typeof adminUser)
+        console.log(typeof adminUser);
         const order = await this._dbService.order.findUnique({
             where: { id: orderId },
             include: {
@@ -54,15 +54,11 @@ export default class AdminOrderManagementService {
 
         // Notify customer
         if (order.user.id) {
-            await this._notificationService.SendMultilingualNotificationToUser(
-                order.user.id,
-                'ORDER_ACCEPTED',
-                {
-                    orderId: order.id,
-                    key: 'GET_ORDER_BY_ID',
-                    route: 'TrackOrder',
-                },
-            );
+            await this._notificationService.SendMultilingualNotificationToUser(order.user.id, 'ORDER_ACCEPTED', {
+                orderId: order.id,
+                key: 'GET_ORDER_BY_ID',
+                route: 'TrackOrder',
+            });
         }
 
         // Notify vendor
@@ -119,15 +115,11 @@ export default class AdminOrderManagementService {
 
         // Notify customer
         if (order.user.id) {
-            await this._notificationService.SendMultilingualNotificationToUser(
-                order.user.id,
-                'ORDER_PICKED_UP',
-                {
-                    orderId: order.id,
-                    key: 'GET_ORDER_BY_ID',
-                    route: 'TrackOrder',
-                },
-            );
+            await this._notificationService.SendMultilingualNotificationToUser(order.user.id, 'ORDER_PICKED_UP', {
+                orderId: order.id,
+                key: 'GET_ORDER_BY_ID',
+                route: 'TrackOrder',
+            });
         }
 
         return {
@@ -281,40 +273,46 @@ export default class AdminOrderManagementService {
      */
     async acceptDeliveryRide(orderId: string, adminUser: User): Promise<UpdateOrderStatusResponseDTO> {
         console.log(typeof adminUser);
+        console.log('I raaaaaaaan');
+        try {
+            const order = await this._dbService.order.findUnique({
+                where: { id: orderId },
+                include: {
+                    delivery: { select: { riderId: true, status: true } },
+                },
+            });
 
-        const order = await this._dbService.order.findUnique({
-            where: { id: orderId },
-            include: {
-                delivery: { select: { riderId: true, status: true } },
-            },
-        });
+            if (!order) {
+                throw new BadRequestException('Order not found');
+            }
 
-        if (!order) {
-            throw new BadRequestException('Order not found');
+            if (order.status !== OrderStatus.READY_FOR_PICKUP) {
+                throw new BadRequestException('Order must be in READY_FOR_PICKUP status');
+            }
+
+            console.log(order.delivery, 'order delivery');
+
+            if (!order.delivery?.riderId) {
+                throw new BadRequestException('No delivery driver assigned to this order');
+            }
+
+            // Update delivery status to accepted
+            await this._dbService.delivery.update({
+                where: { orderId: orderId },
+                data: { status: 'ACCEPTED' },
+            });
+
+            return {
+                message: 'Delivery ride accepted successfully on behalf of driver',
+                data: {
+                    orderId: order.id,
+                    status: order.status,
+                    updatedAt: new Date(),
+                },
+            };
+        } catch (error) {
+            console.log(error, ' :::Error during acception of delivery ride');
         }
-
-        if (order.status !== OrderStatus.READY_FOR_PICKUP) {
-            throw new BadRequestException('Order must be in READY_FOR_PICKUP status');
-        }
-
-        if (!order.delivery?.riderId) {
-            throw new BadRequestException('No delivery driver assigned to this order');
-        }
-
-        // Update delivery status to accepted
-        await this._dbService.delivery.update({
-            where: { orderId: orderId },
-            data: { status: 'ACCEPTED' },
-        });
-
-        return {
-            message: 'Delivery ride accepted successfully on behalf of driver',
-            data: {
-                orderId: order.id,
-                status: order.status,
-                updatedAt: new Date(),
-            },
-        };
     }
 
     /**
@@ -362,15 +360,11 @@ export default class AdminOrderManagementService {
 
         // Notify customer
         if (order.user.id) {
-            await this._notificationService.SendMultilingualNotificationToUser(
-                order.user.id,
-                'ORDER_COMPLETED',
-                {
-                    orderId: order.id,
-                    key: 'GET_ORDER_BY_ID',
-                    route: 'Orders',
-                },
-            );
+            await this._notificationService.SendMultilingualNotificationToUser(order.user.id, 'ORDER_COMPLETED', {
+                orderId: order.id,
+                key: 'GET_ORDER_BY_ID',
+                route: 'Orders',
+            });
         }
 
         return {
@@ -416,5 +410,4 @@ export default class AdminOrderManagementService {
             },
         };
     }
-
 }
