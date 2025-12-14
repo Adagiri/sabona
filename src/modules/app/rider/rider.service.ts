@@ -322,65 +322,28 @@ export default class RiderService {
                     });
 
                     // Send notifications
-                    const customerNotificationData = {
-                        tokens: customerTokens,
-                        title: 'Driver Confirmed!',
-                        body: 'Your assigned driver has confirmed and is on the way',
-                        notificationData: {
-                            orderId: params.orderId,
-                            key: 'GET_ORDER_BY_ID',
-                            route: 'TrackOrder',
-                        },
-                    };
-
-                    if (customerTokens?.length) {
-                        await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
-
-                        await this._dbService.notification.create({
-                            data: {
-                                userId: customerId.userId,
+                    if (customerId?.userId) {
+                        await this._notificationService.SendMultilingualNotificationToUser(
+                            customerId.userId,
+                            'ORDER_ACCEPTED',
+                            {
                                 orderId: params.orderId,
-                                message: 'Your assigned driver has confirmed and is on the way',
-                                status: 'UNREAD',
-                                data: {
-                                    orderId: params.orderId,
-                                    key: 'GET_ORDER_BY_ID',
-                                    route: 'TrackOrder',
-                                },
-                                type: 'ORDER_ACCEPTED',
+                                key: 'GET_ORDER_BY_ID',
+                                route: 'TrackOrder',
                             },
-                        });
+                        );
                     }
 
-                    if (order.orderType === OrderType.REGISTERED_LAUNDRY && vendorTokens?.length) {
-                        const vendorNotificationData = {
-                            tokens: vendorTokens,
-                            title: 'Driver Confirmed!',
-                            // body: this.i18n.translate('order.driver_on_way_pickup', { lang: this.locale }),
-                            body: 'Driver is on the way to pick up from customer',
-                            notificationData: {
+                    if (order.orderType === OrderType.REGISTERED_LAUNDRY && vendorId[0]?.vendorId) {
+                        await this._notificationService.SendMultilingualNotificationToUser(
+                            vendorId[0].vendorId,
+                            'ORDER_ACCEPTED',
+                            {
                                 orderId: params.orderId,
                                 key: 'GET_ORDER_BY_ID',
                                 route: 'Track',
                             },
-                        };
-
-                        await this._notificationService.SendNotificationToMultipleTokens(vendorNotificationData);
-
-                        await this._dbService.notification.create({
-                            data: {
-                                userId: vendorId[0].vendorId,
-                                orderId: params.orderId,
-                                message: 'Driver is on the way to pick up from customer',
-                                status: 'UNREAD',
-                                data: {
-                                    orderId: params.orderId,
-                                    key: 'GET_ORDER_BY_ID',
-                                    route: 'Track',
-                                },
-                                type: 'ORDER_ACCEPTED',
-                            },
-                        });
+                        );
                     }
                 }
                 break;
@@ -401,35 +364,16 @@ export default class RiderService {
                     }
 
                     // Send notifications about pickup
-                    const customerNotificationData = {
-                        tokens: customerTokens,
-                        // title: this.i18n.translate('order.picked_up_title', { lang: this.locale }),
-                        title: 'Order Picked Up!',
-                        body: 'Your order has been picked up by the driver',
-                        notificationData: {
-                            orderId: params.orderId,
-                            key: 'GET_ORDER_BY_ID',
-                            route: 'TrackOrder',
-                        },
-                    };
-
-                    if (customerTokens?.length) {
-                        await this._notificationService.SendNotificationToMultipleTokens(customerNotificationData);
-
-                        await this._dbService.notification.create({
-                            data: {
-                                userId: customerId.userId,
+                    if (customerId?.userId) {
+                        await this._notificationService.SendMultilingualNotificationToUser(
+                            customerId.userId,
+                            'ORDER_PICKED_UP',
+                            {
                                 orderId: params.orderId,
-                                message: 'Your order has been picked up by the driver',
-                                status: 'UNREAD',
-                                data: {
-                                    orderId: params.orderId,
-                                    key: 'GET_ORDER_BY_ID',
-                                    route: 'TrackOrder',
-                                },
-                                type: 'ORDER_PICKED_UP',
+                                key: 'GET_ORDER_BY_ID',
+                                route: 'TrackOrder',
                             },
-                        });
+                        );
                     }
                 }
                 break;
