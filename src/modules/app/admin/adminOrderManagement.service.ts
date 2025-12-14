@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
 import DatabaseService from '../../../database/database.service';
 import NotificationService from '../notification/notification.service';
-import { extractTokens } from 'src/helpers/util.helper';
 import { OrderStatus, OrderType, RiderOrderType, User } from '@prisma/client';
 import { UpdateOrderStatusResponseDTO, AddOrderNotesResponseDTO } from './dto/response/updateOrderStatus.response';
 
@@ -52,68 +51,30 @@ export default class AdminOrderManagementService {
             data: { status: 'ACCEPTED' },
         });
 
-        // Get tokens for notifications
-        const customerTokens = await this._getDeviceTokens(order.user.id);
-        const vendorTokens = order.laundry?.vendorId
-            ? await this._getDeviceTokens(order.laundry.vendorId)
-            : [];
-
         // Notify customer
-        if (customerTokens.length) {
-            await this._notificationService.SendNotificationToMultipleTokens({
-                tokens: customerTokens,
-                title: 'Driver Confirmed!',
-                body: 'Your assigned driver has confirmed and is on the way',
-                notificationData: {
+        if (order.user.id) {
+            await this._notificationService.SendMultilingualNotificationToUser(
+                order.user.id,
+                'ORDER_ACCEPTED',
+                {
                     orderId: order.id,
                     key: 'GET_ORDER_BY_ID',
                     route: 'TrackOrder',
                 },
-            });
-
-            await this._dbService.notification.create({
-                data: {
-                    userId: order.user.id,
-                    orderId: order.id,
-                    message: 'Your assigned driver has confirmed and is on the way (accepted by admin)',
-                    status: 'UNREAD',
-                    type: 'ORDER_ACCEPTED',
-                    data: {
-                        orderId: order.id,
-                        key: 'GET_ORDER_BY_ID',
-                        route: 'TrackOrder',
-                    },
-                },
-            });
+            );
         }
 
         // Notify vendor
-        if (vendorTokens.length && order.orderType === OrderType.REGISTERED_LAUNDRY) {
-            await this._notificationService.SendNotificationToMultipleTokens({
-                tokens: vendorTokens,
-                title: 'Driver Confirmed!',
-                body: 'Driver is on the way to pick up from customer',
-                notificationData: {
+        if (order.laundry?.vendorId && order.orderType === OrderType.REGISTERED_LAUNDRY) {
+            await this._notificationService.SendMultilingualNotificationToUser(
+                order.laundry.vendorId,
+                'ORDER_ACCEPTED',
+                {
                     orderId: order.id,
                     key: 'GET_ORDER_BY_ID',
                     route: 'Track',
                 },
-            });
-
-            await this._dbService.notification.create({
-                data: {
-                    userId: order.laundry.vendorId,
-                    orderId: order.id,
-                    message: 'Driver is on the way to pick up from customer (accepted by admin)',
-                    status: 'UNREAD',
-                    type: 'ORDER_ACCEPTED',
-                    data: {
-                        orderId: order.id,
-                        key: 'GET_ORDER_BY_ID',
-                        route: 'Track',
-                    },
-                },
-            });
+            );
         }
 
         return {
@@ -154,33 +115,16 @@ export default class AdminOrderManagementService {
         });
 
         // Notify customer
-        const customerTokens = await this._getDeviceTokens(order.user.id);
-        if (customerTokens.length) {
-            await this._notificationService.SendNotificationToMultipleTokens({
-                tokens: customerTokens,
-                title: 'Order Picked Up!',
-                body: 'Your order has been picked up by the driver',
-                notificationData: {
+        if (order.user.id) {
+            await this._notificationService.SendMultilingualNotificationToUser(
+                order.user.id,
+                'ORDER_PICKED_UP',
+                {
                     orderId: order.id,
                     key: 'GET_ORDER_BY_ID',
                     route: 'TrackOrder',
                 },
-            });
-
-            await this._dbService.notification.create({
-                data: {
-                    userId: order.user.id,
-                    orderId: order.id,
-                    message: 'Your order has been picked up by the driver',
-                    status: 'UNREAD',
-                    type: 'ORDER_PICKED_UP',
-                    data: {
-                        orderId: order.id,
-                        key: 'GET_ORDER_BY_ID',
-                        route: 'TrackOrder',
-                    },
-                },
-            });
+            );
         }
 
         return {
@@ -240,34 +184,15 @@ export default class AdminOrderManagementService {
 
         // Notify vendor
         if (order.laundry?.vendorId) {
-            const vendorTokens = await this._getDeviceTokens(order.laundry.vendorId);
-            if (vendorTokens.length) {
-                await this._notificationService.SendNotificationToMultipleTokens({
-                    tokens: vendorTokens,
-                    title: 'Items Delivered!',
-                    body: `Order items have been delivered to ${order.laundry.name}. Please start processing.`,
-                    notificationData: {
-                        orderId: order.id,
-                        key: 'GET_ORDER_BY_ID',
-                        route: 'Track',
-                    },
-                });
-
-                await this._dbService.notification.create({
-                    data: {
-                        userId: order.laundry.vendorId,
-                        orderId: order.id,
-                        message: `Order items delivered to your laundry. Please start processing.`,
-                        status: 'UNREAD',
-                        type: 'ORDER_PROCESSING',
-                        data: {
-                            orderId: order.id,
-                            key: 'GET_ORDER_BY_ID',
-                            route: 'Track',
-                        },
-                    },
-                });
-            }
+            await this._notificationService.SendMultilingualNotificationToUser(
+                order.laundry.vendorId,
+                'ORDER_PROCESSING',
+                {
+                    orderId: order.id,
+                    key: 'GET_ORDER_BY_ID',
+                    route: 'Track',
+                },
+            );
         }
 
         return {
@@ -322,33 +247,16 @@ export default class AdminOrderManagementService {
         // The admin can manually assign a delivery driver
 
         // Notify customer
-        const customerTokens = await this._getDeviceTokens(order.user.id);
-        if (customerTokens.length) {
-            await this._notificationService.SendNotificationToMultipleTokens({
-                tokens: customerTokens,
-                title: 'Order Processed!',
-                body: 'Your order is processed and will be delivered soon.',
-                notificationData: {
+        if (order.user.id) {
+            await this._notificationService.SendMultilingualNotificationToUser(
+                order.user.id,
+                'ORDER_READY_FOR_PICKUP',
+                {
                     orderId: order.id,
                     key: 'GET_ORDER_BY_ID',
                     route: 'TrackOrder',
                 },
-            });
-
-            await this._dbService.notification.create({
-                data: {
-                    userId: order.user.id,
-                    orderId: order.id,
-                    message: 'Your order is processed and will be delivered soon.',
-                    status: 'UNREAD',
-                    type: 'ORDER_PROCESSING',
-                    data: {
-                        orderId: order.id,
-                        key: 'GET_ORDER_BY_ID',
-                        route: 'TrackOrder',
-                    },
-                },
-            });
+            );
         }
 
         return {
@@ -442,33 +350,16 @@ export default class AdminOrderManagementService {
         });
 
         // Notify customer
-        const customerTokens = await this._getDeviceTokens(order.user.id);
-        if (customerTokens.length) {
-            await this._notificationService.SendNotificationToMultipleTokens({
-                tokens: customerTokens,
-                title: 'Order Delivered!',
-                body: 'Your order has been delivered successfully. Thank you!',
-                notificationData: {
+        if (order.user.id) {
+            await this._notificationService.SendMultilingualNotificationToUser(
+                order.user.id,
+                'ORDER_COMPLETED',
+                {
                     orderId: order.id,
                     key: 'GET_ORDER_BY_ID',
                     route: 'Orders',
                 },
-            });
-
-            await this._dbService.notification.create({
-                data: {
-                    userId: order.user.id,
-                    orderId: order.id,
-                    message: 'Your order has been delivered successfully.',
-                    status: 'UNREAD',
-                    type: 'ORDER_COMPLETED',
-                    data: {
-                        orderId: order.id,
-                        key: 'GET_ORDER_BY_ID',
-                        route: 'Orders',
-                    },
-                },
-            });
+            );
         }
 
         return {
@@ -515,14 +406,4 @@ export default class AdminOrderManagementService {
         };
     }
 
-    /**
-     * Helper method to get device tokens
-     */
-    private async _getDeviceTokens(userId: string): Promise<string[]> {
-        const tokens = await this._dbService.deviceToken.findMany({
-            where: { userId, deletedAt: null },
-            select: { token: true },
-        });
-        return extractTokens(tokens);
-    }
 }
