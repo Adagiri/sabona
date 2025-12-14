@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { BadRequestException } from 'src/core/exceptions/response.exception';
 import DatabaseService from '../../../database/database.service';
 import NotificationService from '../notification/notification.service';
-import { OrderStatus, OrderType, RiderOrderType, User } from '@prisma/client';
+import { extractTokens } from 'src/helpers/util.helper';
+import { OrderStatus, OrderType, User } from '@prisma/client';
 import { UpdateOrderStatusResponseDTO, AddOrderNotesResponseDTO } from './dto/response/updateOrderStatus.response';
 
 /**
@@ -24,6 +25,7 @@ export default class AdminOrderManagementService {
      * Equivalent to: PATCH /rider/:orderId/ACCEPT
      */
     async acceptPickupRide(orderId: string, adminUser: User): Promise<UpdateOrderStatusResponseDTO> {
+        console.log(typeof adminUser)
         const order = await this._dbService.order.findUnique({
             where: { id: orderId },
             include: {
@@ -92,6 +94,8 @@ export default class AdminOrderManagementService {
      * Equivalent to: PATCH /rider/:orderId/PICKED_UP
      */
     async markPickedUp(orderId: string, adminUser: User): Promise<UpdateOrderStatusResponseDTO> {
+        console.log(typeof adminUser);
+
         const order = await this._dbService.order.findUnique({
             where: { id: orderId },
             include: {
@@ -142,6 +146,8 @@ export default class AdminOrderManagementService {
      * Equivalent to: PATCH /rider/:orderId/DROPPED_OFF (for pickup)
      */
     async markDroppedAtVendor(orderId: string, adminUser: User): Promise<UpdateOrderStatusResponseDTO> {
+        console.log(typeof adminUser);
+
         const order = await this._dbService.order.findUnique({
             where: { id: orderId },
             include: {
@@ -210,6 +216,8 @@ export default class AdminOrderManagementService {
      * Equivalent to: PATCH /vendor/:orderId/READY_FOR_PICKUP
      */
     async markReadyForDelivery(orderId: string, adminUser: User): Promise<UpdateOrderStatusResponseDTO> {
+        console.log(typeof adminUser);
+
         const order = await this._dbService.order.findUnique({
             where: { id: orderId },
             include: {
@@ -273,6 +281,8 @@ export default class AdminOrderManagementService {
      * Accept delivery ride on behalf of driver
      */
     async acceptDeliveryRide(orderId: string, adminUser: User): Promise<UpdateOrderStatusResponseDTO> {
+        console.log(typeof adminUser);
+
         const order = await this._dbService.order.findUnique({
             where: { id: orderId },
             include: {
@@ -313,6 +323,8 @@ export default class AdminOrderManagementService {
      * Equivalent to: PATCH /rider/:orderId/DROPPED_OFF (for delivery)
      */
     async markDeliveredToCustomer(orderId: string, adminUser: User): Promise<UpdateOrderStatusResponseDTO> {
+        console.log(typeof adminUser);
+
         const order = await this._dbService.order.findUnique({
             where: { id: orderId },
             include: {
