@@ -209,6 +209,7 @@ export default class CustomOrderService {
      */
     private async notifyAdminsNewCustomOrder(orderId: string, customer: User): Promise<void> {
         // Get all admins
+        console.log(typeof customer)
         const adminUsers = await this._dbService.user.findMany({
             where: { type: UserType.ADMIN },
             select: { id: true },

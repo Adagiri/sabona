@@ -102,7 +102,7 @@ export default class AdminCustomOrderService {
         await this.notifyDriverAssignment(riderId, order, 'PICKUP');
 
         // Notify customer about driver assignment
-        await this.notifyCustomerDriverAssigned(order.userId, order, driver);
+        await this.notifyCustomerDriverAssigned(order.userId, order);
 
         // Create admin activity log
         await this._dbService.notification.create({
@@ -204,7 +204,7 @@ export default class AdminCustomOrderService {
         });
 
         // Notify customer with payment link
-        await this.notifyCustomerPaymentRequired(order.user, order, payTabsInvoice.invoiceUrl);
+        await this.notifyCustomerPaymentRequired(order.user, order);
 
         // Create admin activity log
         await this._dbService.notification.create({
@@ -549,7 +549,7 @@ export default class AdminCustomOrderService {
         });
 
         // Notify customer with new payment link
-        await this.notifyCustomerPaymentRequired(order.user, order, payTabsInvoice.invoiceUrl);
+        await this.notifyCustomerPaymentRequired(order.user, order);
 
         // Create admin activity log
         await this._dbService.notification.create({
@@ -664,7 +664,7 @@ export default class AdminCustomOrderService {
     /**
      * Notify customer about driver assignment
      */
-    private async notifyCustomerDriverAssigned(userId: string, order: any, driver: any): Promise<void> {
+    private async notifyCustomerDriverAssigned(userId: string, order: any): Promise<void> {
         await this._notificationService.SendMultilingualNotificationToUser(
             userId,
             'CUSTOM_DRIVER_ASSIGNED_CUSTOMER',
@@ -679,7 +679,7 @@ export default class AdminCustomOrderService {
     /**
      * Notify customer payment is required
      */
-    private async notifyCustomerPaymentRequired(user: any, order: any, invoiceUrl: string): Promise<void> {
+    private async notifyCustomerPaymentRequired(user: any, order: any): Promise<void> {
         const userId = order.userId || user.id;
 
         await this._notificationService.SendMultilingualNotificationToUser(
@@ -687,7 +687,6 @@ export default class AdminCustomOrderService {
             'CUSTOM_PAYMENT_REQUIRED',
             {
                 orderId: order.id,
-                invoiceUrl: invoiceUrl,
                 key: 'PAY_CUSTOM_ORDER',
                 route: 'Payment',
             },
