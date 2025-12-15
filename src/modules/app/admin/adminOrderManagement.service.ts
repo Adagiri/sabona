@@ -240,10 +240,73 @@ export default class AdminOrderManagementService {
             },
         });
 
-        // Find closest delivery driver and assign
-        // Note: You'll need to import LocationService for this
-        // For now, we'll create the assignment without auto-finding driver
-        // The admin can manually assign a delivery driver
+        // Find closest available delivery driver
+        const availableDrivers = await this._dbService.userLocation.findMany({
+            where: {
+                user: {
+                    type: 'RIDER',
+                    status: 'ACTIVE',
+                    deletedAt: null,
+                },
+            },
+            include: {
+                user: true,
+            },
+        });
+
+        if (availableDrivers.length === 0) {
+            throw new BadRequestException('No available drivers found for delivery');
+        }
+
+        // Calculate distances and find closest to laundry location
+        let closestDriver = availableDrivers[0];
+        let minDistance = this.calculateDistance(
+            order.laundry.lat,
+            order.laundry.long,
+            closestDriver.lat,
+            closestDriver.long,
+        );
+
+        for (const driver of availableDrivers.slice(1)) {
+            const distance = this.calculateDistance(
+                order.laundry.lat,
+                order.laundry.long,
+                driver.lat,
+                driver.long,
+            );
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestDriver = driver;
+            }
+        }
+
+        // Create delivery rider assignment
+        await this._dbService.riderOrder.create({
+            data: {
+                orderId: orderId,
+                riderId: closestDriver.userId,
+                type: RiderOrderType.RIDER_DELIVERY,
+            },
+        });
+
+        // Update delivery with assigned rider
+        await this._dbService.delivery.update({
+            where: { orderId: orderId },
+            data: { riderId: closestDriver.userId },
+        });
+
+        // Notify assigned delivery driver
+        if (closestDriver.userId) {
+            await this._notificationService.SendMultilingualNotificationToUser(
+                closestDriver.userId,
+                'NEW_DELIVERY_REQUEST',
+                {
+                    orderId: order.id,
+                    key: 'GET_ORDER_BY_ID',
+                    route: 'RideDetails',
+                },
+            );
+        }
 
         // Notify customer
         if (order.user.id) {
@@ -263,6 +326,10 @@ export default class AdminOrderManagementService {
             data: {
                 orderId: order.id,
                 status: OrderStatus.READY_FOR_PICKUP,
+                assignedDeliveryDriver: {
+                    id: closestDriver.userId,
+                    name: `${closestDriver.user.firstName} ${closestDriver.user.lastName}`,
+                },
                 updatedAt: new Date(),
             },
         };
