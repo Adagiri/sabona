@@ -134,7 +134,6 @@ export default class AdminOrderManagementController {
     async cancelOrder(
         @Param('orderId') orderId: string,
         @Body() data: { reason: string; refundCustomer?: boolean },
-        @CurrentUser() adminUser: User,
     ): Promise<UpdateOrderStatusResponseDTO> {
         return await this._adminOrderService.cancelOrder(orderId, data.reason, data.refundCustomer);
     }

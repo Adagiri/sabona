@@ -84,9 +84,7 @@ export default class PayTabsService {
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error('PayTabs refund API error:', errorText);
-                throw new BadRequestException(
-                    `PayTabs refund failed with status ${response.status}: ${errorText}`,
-                );
+                throw new BadRequestException(`PayTabs refund failed with status ${response.status}: ${errorText}`);
             }
 
             const payTabsResponse = await response.json();
@@ -486,7 +484,7 @@ export default class PayTabsService {
                 .catch((err) => {
                     console.error('Failed to send admin email alert for regular order payment:', err);
                 });
-                
+
             // 1. Notify Customer
             await this.notifyCustomerPaymentSuccess(order);
 
@@ -524,16 +522,13 @@ export default class PayTabsService {
      * Send customer success notification
      */
     private async sendCustomerSuccessNotification(order: any, title: string, body: string): Promise<void> {
+        console.log(typeof title, typeof body);
         try {
-            await this._notificationService.SendMultilingualNotificationToUser(
-                order.userId,
-                'ORDER_PAID',
-                {
-                    orderId: order.id,
-                    key: 'GET_ORDER_BY_ID',
-                    route: 'TrackOrder',
-                },
-            );
+            await this._notificationService.SendMultilingualNotificationToUser(order.userId, 'ORDER_PAID', {
+                orderId: order.id,
+                key: 'GET_ORDER_BY_ID',
+                route: 'TrackOrder',
+            });
         } catch (error) {
             console.error('Error sending customer success notification:', error);
             throw error;
@@ -582,15 +577,11 @@ export default class PayTabsService {
             });
 
             for (const admin of adminUsers) {
-                await this._notificationService.SendMultilingualNotificationToUser(
-                    admin.id,
-                    'CUSTOM_ORDER_COMPLETE',
-                    {
-                        orderId: order.id,
-                        key: 'CUSTOM_ORDER_COMPLETE',
-                        route: 'AdminOrders',
-                    },
-                );
+                await this._notificationService.SendMultilingualNotificationToUser(admin.id, 'CUSTOM_ORDER_COMPLETE', {
+                    orderId: order.id,
+                    key: 'CUSTOM_ORDER_COMPLETE',
+                    route: 'AdminOrders',
+                });
             }
         } catch (error) {
             console.error('Error sending admin custom order complete notification:', error);
@@ -602,16 +593,13 @@ export default class PayTabsService {
      * Send payment failure notifications
      */
     private async sendPaymentFailureNotifications(order: any, additionalMessage: string): Promise<void> {
+        console.log(typeof additionalMessage);
         try {
-            await this._notificationService.SendMultilingualNotificationToUser(
-                order.userId,
-                'PAYMENT_FAILED',
-                {
-                    orderId: order.id,
-                    key: 'GET_ORDER_BY_ID',
-                    route: 'TrackOrder',
-                },
-            );
+            await this._notificationService.SendMultilingualNotificationToUser(order.userId, 'PAYMENT_FAILED', {
+                orderId: order.id,
+                key: 'GET_ORDER_BY_ID',
+                route: 'TrackOrder',
+            });
         } catch (error) {
             console.error('Error sending payment failure notifications:', error);
             throw error;
@@ -772,16 +760,13 @@ export default class PayTabsService {
     }
 
     private async sendPaymentRefundNotifications(order: any, message: string): Promise<void> {
+        console.log(typeof message);
         try {
-            await this._notificationService.SendMultilingualNotificationToUser(
-                order.userId,
-                'PAYMENT_REFUNDED',
-                {
-                    orderId: order.id,
-                    key: 'GET_ORDER_BY_ID',
-                    route: 'TrackOrder',
-                },
-            );
+            await this._notificationService.SendMultilingualNotificationToUser(order.userId, 'PAYMENT_REFUNDED', {
+                orderId: order.id,
+                key: 'GET_ORDER_BY_ID',
+                route: 'TrackOrder',
+            });
         } catch (error) {
             console.error('Error sending refund notifications:', error);
             throw error;
@@ -795,15 +780,11 @@ export default class PayTabsService {
         try {
             if (!order.userId) return;
 
-            await this._notificationService.SendMultilingualNotificationToUser(
-                order.userId,
-                'ORDER_PAID',
-                {
-                    orderId: order.id,
-                    key: 'GET_ORDER_BY_ID',
-                    route: 'TrackOrder',
-                },
-            );
+            await this._notificationService.SendMultilingualNotificationToUser(order.userId, 'ORDER_PAID', {
+                orderId: order.id,
+                key: 'GET_ORDER_BY_ID',
+                route: 'TrackOrder',
+            });
         } catch (error) {
             console.error('Error notifying customer:', error);
         }

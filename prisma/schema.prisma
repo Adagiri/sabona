@@ -243,8 +243,8 @@ model User {
   mainVendorWithdrawals WithdrawalLaundry[] @relation("MainVendorWithdrawals")
   location              UserLocation?
 
-  phoneChangeLogs PhoneChangeLog[] @relation("UserPhoneChanges")
-  emailChangeLogs EmailChangeLog[] @relation("UserEmailChanges")
+  phoneChangeLogs   PhoneChangeLog[] @relation("UserPhoneChanges")
+  emailChangeLogs   EmailChangeLog[] @relation("UserEmailChanges")
   adminPhoneChanges PhoneChangeLog[] @relation("AdminPhoneChanges")
   adminEmailChanges EmailChangeLog[] @relation("AdminEmailChanges")
 }
@@ -797,8 +797,9 @@ model Payment {
   status         String // Payment Status 
   paymentMethod  String // Payment Method (e.g., Visa, MasterCard)
 
-  createdAt DateTime @default(now()) @db.Timestamptz() // Timestamp of creation
-  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz() // Timestamp of last update
+  createdAt DateTime  @default(now()) @db.Timestamptz() // Timestamp of creation
+  updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz() // Timestamp of last update
+  deletedAt DateTime? @db.Timestamptz()
 }
 
 enum CouponType {
@@ -940,19 +941,19 @@ model WithdrawalLaundry {
 
 // Phone change log model to track all phone number changes
 model PhoneChangeLog {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation("UserPhoneChanges", fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation("UserPhoneChanges", fields: [userId], references: [id], onDelete: Cascade)
 
-  oldPhone    String?  // Previous phone number (null if first time setting)
-  newPhone    String   // New phone number
+  oldPhone String? // Previous phone number (null if first time setting)
+  newPhone String // New phone number
 
-  changedBy   String   // Admin ID who made the change
-  admin       User     @relation("AdminPhoneChanges", fields: [changedBy], references: [id])
+  changedBy String // Admin ID who made the change
+  admin     User   @relation("AdminPhoneChanges", fields: [changedBy], references: [id])
 
-  reason      String   // Reason for the change
+  reason String // Reason for the change
 
-  createdAt   DateTime @default(now()) @db.Timestamptz()
+  createdAt DateTime @default(now()) @db.Timestamptz()
 
   @@index([userId])
   @@index([changedBy])
@@ -961,19 +962,19 @@ model PhoneChangeLog {
 
 // Email change log model to track all email changes
 model EmailChangeLog {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation("UserEmailChanges", fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation("UserEmailChanges", fields: [userId], references: [id], onDelete: Cascade)
 
-  oldEmail    String?  // Previous email (null if first time setting)
-  newEmail    String   // New email
+  oldEmail String? // Previous email (null if first time setting)
+  newEmail String // New email
 
-  changedBy   String   // Admin ID who made the change
-  admin       User     @relation("AdminEmailChanges", fields: [changedBy], references: [id])
+  changedBy String // Admin ID who made the change
+  admin     User   @relation("AdminEmailChanges", fields: [changedBy], references: [id])
 
-  reason      String?  // Optional reason for the change
+  reason String? // Optional reason for the change
 
-  createdAt   DateTime @default(now()) @db.Timestamptz()
+  createdAt DateTime @default(now()) @db.Timestamptz()
 
   @@index([userId])
   @@index([changedBy])

@@ -75,7 +75,6 @@ import { BooleanResponseDTO } from 'src/core/response/response.schema';
 import { GetAdminSettingsResponseDTO } from './dto/response/adminSettings.response';
 import { UpdateAdminSettingsRequestDTO } from './dto/request/updateAdminSettings.request';
 import { CancelCustomOrderRequestDTO } from './dto/customOrders.dto';
-import { CancelOrderRequestDTO } from './dto/request/cancelOrder.request';
 import { DeleteUserResponseDTO } from './dto/response/deleteUser.response';
 import { DeleteUserRequestDTO } from './dto/request/deleteUser.request';
 import { IgnoreTranslation } from 'src/core/decorators/ignore_translation.decorator';
@@ -948,25 +947,25 @@ export default class AdminController {
         return await this._customOrderService.cancelCustomOrder(orderId, data.reason);
     }
 
-    @Authorized(UserType.ADMIN)
-    @Patch({
-        path: '/order/:orderId/cancel',
-        description: 'Cancel regular order',
-        response: {},
-    })
-    async cancelOrder(@Param('orderId') orderId: string, @Body() data: CancelOrderRequestDTO): Promise<any> {
-        return await this._adminService.cancelOrder(orderId, data.reason, data.refundCustomer);
-    }
+    // @Authorized(UserType.ADMIN)
+    // @Patch({
+    //     path: '/order/:orderId/cancel',
+    //     description: 'Cancel regular order',
+    //     response: {},
+    // })
+    // async cancelOrder(@Param('orderId') orderId: string, @Body() data: CancelOrderRequestDTO): Promise<any> {
+    //     return await this._adminService.cancelOrder(orderId, data.reason, data.refundCustomer);
+    // }
 
-    @Authorized(UserType.ADMIN)
-    @Patch({
-        path: '/order/:orderId/accept',
-        description: 'Accept order on behalf of vendor',
-        response: {},
-    })
-    async acceptOrder(@Param('orderId') orderId: string, @CurrentUser() admin: User): Promise<any> {
-        return await this._adminService.acceptOrder(orderId, admin);
-    }
+    // @Authorized(UserType.ADMIN)
+    // @Patch({
+    //     path: '/order/:orderId/accept',
+    //     description: 'Accept order on behalf of vendor',
+    //     response: {},
+    // })
+    // async acceptOrder(@Param('orderId') orderId: string, @CurrentUser() admin: User): Promise<any> {
+    //     return await this._adminService.acceptOrder(orderId, admin);
+    // }
 
     @Authorized(UserType.ADMIN)
     @Patch({
