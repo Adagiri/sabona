@@ -290,6 +290,17 @@ export const NOTIFICATION_TEMPLATES = {
         },
     },
 
+    ORDER_COMPLETED: {
+        en: {
+            title: 'Order Completed',
+            body: 'Your order has been completed successfully',
+        },
+        ar: {
+            title: 'تم إكمال الطلب',
+            body: 'تم إكمال طلبك بنجاح',
+        },
+    },
+
     // Admin broadcast (custom message)
     ADMIN_BROADCAST: {
         en: {
