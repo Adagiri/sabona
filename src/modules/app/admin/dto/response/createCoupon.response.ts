@@ -1,6 +1,6 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { CouponType } from "@prisma/client";
-import { IsString, IsBoolean, IsOptional, IsNumber, IsDate, isNumber, IsEnum } from "class-validator";
+import { ApiProperty } from '@nestjs/swagger';
+import { CouponType, Prisma } from '@prisma/client';
+import { IsString, IsBoolean, IsOptional, IsNumber, IsDate, IsEnum, IsJSON } from 'class-validator';
 
 export class CreateCouponResponseDTO {
     @ApiProperty()
@@ -15,23 +15,33 @@ export class CreateCouponResponseDTO {
     @IsString()
     name: string;
 
+    @ApiProperty({ required: false, type: 'object' })
+    @IsOptional()
+    @IsJSON()
+    nameLocale: Prisma.JsonValue | null;
+
     @ApiProperty()
     @IsNumber()
     discount: number;
 
-    @ApiProperty()
+    @ApiProperty({ enum: CouponType })
     @IsEnum(CouponType)
     type: CouponType;
 
-    @ApiProperty()
+    @ApiProperty({ required: false })
     @IsOptional()
     @IsNumber()
     maxDiscount: number | null;
 
-    @ApiProperty()
+    @ApiProperty({ required: false })
     @IsOptional()
     @IsNumber()
-    minOrderAmount: number;
+    minOrderAmount: number | null;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsDate()
+    startDate: Date | null;
 
     @ApiProperty()
     @IsDate()
@@ -41,7 +51,7 @@ export class CreateCouponResponseDTO {
     @IsBoolean()
     isActive: boolean;
 
-    @ApiProperty()
+    @ApiProperty({ required: false })
     @IsOptional()
     @IsNumber()
     usageLimit: number | null;

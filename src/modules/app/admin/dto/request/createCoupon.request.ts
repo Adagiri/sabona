@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { CouponType } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsDate, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsDate, IsEnum,  IsNotEmpty, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
 
 export class CouponNameTranslationDTO {
     @ApiProperty({ example: 'Summer Sale' })
@@ -26,6 +26,7 @@ export class CreateCouponRequest {
     code: string;
 
     @ApiProperty({ type: CouponNameTranslationDTO })
+    @IsObject()
     nameLocale: CouponNameTranslationDTO;
 
     @ApiProperty({

@@ -561,38 +561,42 @@ export default class AdminService {
     }
 
     async createCoupon(data: CreateCouponRequest): Promise<CreateCouponResponseDTO> {
-        // Check if coupon code already exists
-        const existingCoupon = await this._dbService.coupon.findFirst({
-            where: {
-                code: data.code,
-                deletedAt: null,
-            },
-        });
+        try {
+            // Check if coupon code already exists
+            const existingCoupon = await this._dbService.coupon.findFirst({
+                where: {
+                    code: data.code,
+                    deletedAt: null,
+                },
+            });
 
-        if (existingCoupon) {
-            throw new BadRequestException('Coupon code already exists');
+            if (existingCoupon) {
+                throw new BadRequestException('Coupon code already exists');
+            }
+
+            const coupon = await this._dbService.coupon.create({
+                data: {
+                    code: data.code,
+                    nameLocale: data.nameLocale,
+                    name: data.nameLocale.en,
+                    discount: data.discount,
+                    type: data.type,
+                    maxDiscount: data.maxDiscount,
+                    minOrderAmount: data.minOrderAmount,
+                    expiryDate: data.expiryDate,
+                    startDate: data.startDate,
+                    usageLimit: data.usageLimit,
+                    singleUse: data.singleUse,
+                    isActive: data.isActive ?? true,
+                },
+            });
+
+            return {
+                ...coupon,
+            };
+        } catch (error) {
+            console.log(error, ' :error whilst creating coupon');
         }
-
-        const coupon = await this._dbService.coupon.create({
-            data: {
-                code: data.code,
-                nameLocale: data.nameLocale,
-                name: data.nameLocale.en,
-                discount: data.discount,
-                type: data.type,
-                maxDiscount: data.maxDiscount,
-                minOrderAmount: data.minOrderAmount,
-                expiryDate: data.expiryDate,
-                startDate: data.startDate,
-                usageLimit: data.usageLimit,
-                singleUse: data.singleUse,
-                isActive: data.isActive ?? true,
-            },
-        });
-
-        return {
-            ...coupon,
-        };
     }
 
     async getCoupons(data: PaginatedRequest): Promise<any> {
