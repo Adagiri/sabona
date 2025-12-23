@@ -106,7 +106,7 @@ export default class UserController {
         @Body() data: UpdateLocationRequestDTO,
         @CurrentUser() user: User,
     ): Promise<UpdateLocationResponseDTO> {
-        return this._userService.UpdateLocation(user.id, data.lat, data.long);
+        return await this._userService.UpdateLocation(user.id, data.lat, data.long);
     }
 
     @Authorized()
@@ -120,7 +120,7 @@ export default class UserController {
         @CurrentUser() user: User,
     ): Promise<UpdatePreferredLanguageResponseDTO> {
         
-        return this._userService.UpdatePreferredLanguage(user.id, data.preferredLanguage);
+        return await this._userService.UpdatePreferredLanguage(user.id, data.preferredLanguage);
     }
 
     @Get({

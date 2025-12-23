@@ -819,9 +819,11 @@ export default class UserService {
     async UpdatePreferredLanguage(userId: string, preferredLanguage: string): Promise<any> {
         try {
             const user = await this._dbService.user.update({
-                where: { id: userId },
+                where: { id: userId,  },
                 data: { preferredLanguage },
             });
+
+            console.log(user, preferredLanguage, userId);
 
             const response = {
                 id: user.id,
